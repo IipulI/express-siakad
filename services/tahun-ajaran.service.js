@@ -1,4 +1,4 @@
-import TahunAjaranModels from "../models/tahun-ajaran.models.js";
+import TahunAjaran from "../models/tahun.ajaran.js";
 import {getPagination} from "../utils/pagination.js";
 import {formatTimestamp} from "../utils/date-formatter.js";
 
@@ -7,7 +7,7 @@ export const findAll = async (page, size) => {
         if (page !== null && size !== null) {
             const { limit, offset } = getPagination(page, size);
 
-            const {count, rows} = await TahunAjaranModels.findAndCountAll({
+            const {count, rows} = await TahunAjaran.findAndCountAll({
                 attributes: ['id', 'tahun', 'nama'],
                 limit,
                 offset,
@@ -29,7 +29,7 @@ export const findAll = async (page, size) => {
             }
         }
         else {
-            const {count, rows}= await TahunAjaranModels.findAndCountAll({
+            const {count, rows}= await TahunAjaran.findAndCountAll({
                 attributes: ['id', 'tahun', 'nama'],
                 raw: true,
             })
@@ -51,13 +51,13 @@ export const findAll = async (page, size) => {
 export const createTahunAjaran = async (tahunAjaranData) => {
     const { tahun, nama } = tahunAjaranData;
 
-    const existingTahunAjaran = await TahunAjaranModels.findOne({ where: { nama } });
+    const existingTahunAjaran = await TahunAjaran.findOne({ where: { nama } });
     if (existingTahunAjaran) {
         throw new Error(`Tahun Ajaran with name "${nama}" already exists.`);
     }
 
     try {
-        await TahunAjaranModels.create({ tahun, nama });
+        await TahunAjaran.create({ tahun, nama });
     } catch (err) {
         if (err.name === 'SequelizeUniqueConstraintError') {
             throw new Error(`Duplicate entry: ${err.errors.map(e => e.message).join(', ')}`);
@@ -68,13 +68,13 @@ export const createTahunAjaran = async (tahunAjaranData) => {
 
 export const updateTahunAjaran = async (id, updateData) => {
     try {
-        const tahunAjaran = await TahunAjaranModels.findByPk(id);
+        const tahunAjaran = await TahunAjaran.findByPk(id);
 
         if (!tahunAjaran) {
             return null;
         }
 
-        const [updatedRowsCount] = await TahunAjaranModels.update(updateData, {
+        const [updatedRowsCount] = await TahunAjaran.update(updateData, {
             where: { id: id }
         });
 
@@ -86,7 +86,7 @@ export const updateTahunAjaran = async (id, updateData) => {
 
 export const deleteTahunAjaran = async (id) => {
     try {
-        const deletedRowsCount = await TahunAjaranModels.destroy({
+        const deletedRowsCount = await TahunAjaran.destroy({
             where: { id: id }
         });
 

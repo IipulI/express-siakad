@@ -3,11 +3,11 @@ import { Model, DataTypes } from 'sequelize';
 import { sequelize } from "../config/database.js";
 import { v7 as uuid7 } from "uuid";
 
-class TahunAjaranModels extends Model {
+class TahunAjaran extends Model {
 
 }
 
-TahunAjaranModels.init(
+TahunAjaran.init(
     {
         id: {
             type: DataTypes.UUID,
@@ -29,9 +29,9 @@ TahunAjaranModels.init(
         timestamps: true,
         paranoid: true,
 
-        modelName: 'TahunAjaranModels',
+        modelName: 'TahunAjaran',
         tableName: 'siak_tahun_ajaran'
     }
 )
 
-export default TahunAjaranModels;
+export default TahunAjaran;

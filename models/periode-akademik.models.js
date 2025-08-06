@@ -14,8 +14,9 @@ PeriodeAkademik.init(
         primaryKey: true,
         defaultValue: uuid7
       },
-      siak_tahun_ajaran_id: {
+      siakTahunAjaranId: {
         type: DataTypes.UUID,
+        field: 'siak_tahun_ajaran_id',
       },
       nama: {
         allowNull: false,
@@ -26,12 +27,14 @@ PeriodeAkademik.init(
         allowNull: false,
         type: DataTypes.STRING,
       },
-      tanggal_mulai: {
+      tanggalMulai: {
         allowNull: false,
+        field: 'tanggal_mulai',
         type: DataTypes.DATEONLY
       },
-      tanggal_selesai: {
+      tanggalSelesai: {
         allowNull: false,
+        field: 'tanggal_selesai',
         type: DataTypes.DATEONLY
       },
       status: {
@@ -45,7 +48,7 @@ PeriodeAkademik.init(
       timestamps: true,
       paranoid: true,
 
-      modelName: 'PeriodeAkademikModels',
+      modelName: 'PeriodeAkademik',
       tableName: 'siak_periode_akademik'
     }
 )

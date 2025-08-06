@@ -1,18 +1,19 @@
 import {getPagination} from "../utils/pagination.js";
-import PeriodeAkademikModels from "../models/periode-akademik.models.js";
-import TahunAjaranModels from "../models/tahun-ajaran.models.js";
-
+import PeriodeAkademik from "../models/periode-akademik.models.js";
+import TahunAjaran from "../models/tahun.ajaran.js";
 
 export const findAll = async (page, size) => {
     try {
         if (page !== null && size !== null) {
             const { limit, offset } = getPagination(page, size);
 
-            const {count, rows} = await PeriodeAkademikModels.findAndCountAll({
+            const {count, rows} = await PeriodeAkademik.findAndCountAll({
+                attributes: {
+                    exclude: ['createdAt', 'updatedAt', 'deletedAt']
+                },
                 limit,
                 offset,
                 order: [['kode', 'DESC']],
-                raw: true,
             });
 
             return {
@@ -22,8 +23,10 @@ export const findAll = async (page, size) => {
             }
         }
         else {
-            const {count, rows}= await PeriodeAkademikModels.findAndCountAll({
-                raw: true,
+            const {count, rows}= await PeriodeAkademik.findAndCountAll({
+                attributes: {
+                    exclude: ['createdAt', 'updatedAt', 'deletedAt']
+                },
             })
 
             return {
@@ -41,13 +44,13 @@ export const findAll = async (page, size) => {
 export const createPeriodeAkademik = async (periodeAkademikData) => {
     const { siakTahunAjaranId, nama, kode, tanggalMulai, tanggalSelesai } = periodeAkademikData;
 
-    const tahunAjaranExist = await TahunAjaranModels.findByPk(periodeAkademikData.siakTahunAjaranId);
-    if (tahunAjaranExist == null) {
+    const tahunAjaranExist = await TahunAjaran.findByPk(periodeAkademikData.siakTahunAjaranId);
+    if (!tahunAjaranExist) {
         throw new Error (`Tahun Ajaran tidak ditemukan`)
     }
 
     try {
-        await PeriodeAkademikModels.create({
+        await PeriodeAkademik.create({
             siak_tahun_ajaran_id: siakTahunAjaranId,
             nama,
             kode,
@@ -65,13 +68,13 @@ export const updatePeriodeAkademik = async (id, updateData) => {
     const { nama, kode, tanggalMulai, tanggalSelesai, status } = updateData;
 
     try {
-        const periodeAkademik = await PeriodeAkademikModels.findByPk(id);
+        const periodeAkademik = await PeriodeAkademik.findByPk(id);
 
         if (!periodeAkademik) {
             return null;
         }
 
-        const [updatedRowsCount] = await PeriodeAkademikModels.update({
+        const [updatedRowsCount] = await PeriodeAkademik.update({
             nama: nama,
             kode: kode,
             tanggal_mulai: tanggalMulai,
@@ -89,7 +92,7 @@ export const updatePeriodeAkademik = async (id, updateData) => {
 
 export const deletePeriodeAkademik = async (id) => {
     try {
-        const deletedRowsCount = await PeriodeAkademikModels.destroy({
+        const deletedRowsCount = await PeriodeAkademik.destroy({
             where: { id: id }
         });
 

@@ -1,7 +1,8 @@
-import * as periodeAkademikService from "../../services/periode-akademik.service.js";
+import * as tahunKurikulumService from "../../services/tahun-kurikulum.service.js"
 import ResponseBuilder from "../../utils/response.js";
 import {getPagingData} from "../../utils/pagination.js";
 import {validationResult} from "express-validator";
+
 
 export const findAll = async (req, res) => {
     const page = req.query.page ? parseInt(req.query.page) : null;
@@ -9,10 +10,10 @@ export const findAll = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        const data =  await periodeAkademikService.findAll(page, size);
+        const data = await tahunKurikulumService.findAll(page, size)
 
         let payload;
-        if (data.isPaginated === true) {
+        if(data.isPaginated === true) {
             payload = getPagingData(data, page, size);
         } else {
             payload = data.rows
@@ -20,14 +21,14 @@ export const findAll = async (req, res) => {
 
         responseBuilder
             .code(200)
-            .message("Berhasil Menggambil data")
+            .message("Berhasil menggambil data")
             .json(payload)
     }
-    catch (error) {
+    catch (err) {
         responseBuilder
             .status('failure')
             .code(500)
-            .message(error.message || "Unexpected error")
+            .message(err.message || 'Some error occurred.')
             .json();
     }
 }
@@ -46,7 +47,7 @@ export const create = async (req, res) => {
     }
 
     try {
-        await periodeAkademikService.createPeriodeAkademik(req.body)
+        await tahunKurikulumService.createTahunKurikulum(req.body)
 
         responseBuilder
             .code(201)
@@ -65,62 +66,65 @@ export const create = async (req, res) => {
         responseBuilder
             .status('failure')
             .code(500)
-            .message(err.message || 'Terjadi kesalahan saat menambahkan data Tahun Ajaran.')
+            .message(err.message || 'Terjadi kesalahan saat menambahkan data Tahun Kurikulum.')
             .json();
     }
 }
 
-export const updatePeriodeAkademik = async (req, res) => {
+export const update = async (req, res) => {
     const { id } = req.params;
-    const { nama, kode, tanggalMulai, tanggalSelesai, status } = req.body;
     const responseBuilder = new ResponseBuilder(res);
+    const { tahun, nama, keterangan, tanggalMulai, tanggalSelesai } = req.body;
 
-    if (!nama || !kode || !tanggalMulai || !tanggalSelesai || !status) {
+    // request validation
+    if (!tahun || !nama || !keterangan || !tanggalMulai || !tanggalSelesai) {
         return responseBuilder
             .status('failure')
             .code(404)
-            .message('At least one field (nama, kode, tanggalMulai, tanggalSelesai, status) is required for update.')
+            .message("At least one field (tahun, nama, keterangan, tanggalMulai, tanggalSelesai) is required for update")
             .json();
     }
 
     try {
-        const isUpdated = await periodeAkademikService.updatePeriodeAkademik(id, req.body);
+        const isUpdated = await tahunKurikulumService.updateTahunKurikulum(req.body)
 
         if (isUpdated) {
             return responseBuilder.status('success')
                 .code(200)
-                .message("Update data successfully.")
-                .json()
+                .message("Update data successfully")
+                .json();
         } else {
             return responseBuilder
                 .status('failure')
                 .code(404)
-                .message(`Periode Akademik with ID ${id} not found or no changes were made.`)
+                .message(`Tahun kurikulum with ID ${id} not found or no changes were made`)
                 .json();
         }
-    } catch (error) {
-        return responseBuilder
+    }
+    catch (error) {
+        responseBuilder
             .status('failure')
             .code(500)
-            .message('Unexpected error occurred.')
+            .message("Unexpected error occurred.")
             .json();
     }
-};
+}
 
-export const deletePeriodeAkademik = async (req, res) => {
+export const destroy = async (req, res) => {
     const { id } = req.params;
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        const isDeleted = await periodeAkademikService.deletePeriodeAkademik(id);
+        const isDeleted = await tahunKurikulumService.deleteTahunKurikulum(id);
 
         if (isDeleted) {
             return res.status(204).end();
-        } else {
+        }
+        else {
             return responseBuilder
                 .status('failure')
                 .code(404)
-                .message(`Periode Akademik with ID ${id} not found.`)
+                .message(`Tahun Kurikulum with ID ${id} not found.`)
                 .json();
         }
     } catch (error) {
@@ -131,4 +135,4 @@ export const deletePeriodeAkademik = async (req, res) => {
             .message('Unexpected error occurred.')
             .json();
     }
-};
+}
