@@ -1,8 +1,7 @@
-import * as periodeAkademikService from "../../services/periode-akademik.service.js";
+import * as fakultasService from "../../services/fakultas.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
-import * as tahunAjaranService from "../../services/tahun-ajaran.service.js";
 
 export const findAll = async (req, res) => {
   const page = req.query.page ? parseInt(req.query.page) : null;
@@ -10,7 +9,7 @@ export const findAll = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const data = await periodeAkademikService.findAll(page, size);
+    const data = await fakultasService.findAll(page, size);
 
     let payload;
     if (data.isPaginated === true) {
@@ -43,7 +42,7 @@ export const create = async (req, res) => {
   }
 
   try {
-    await periodeAkademikService.createPeriodeAkademik(req.body);
+    await fakultasService.createPeriodeAkademik(req.body);
 
     responseBuilder
       .code(201)
@@ -84,10 +83,7 @@ export const updatePeriodeAkademik = async (req, res) => {
   }
 
   try {
-    const isUpdated = await periodeAkademikService.updatePeriodeAkademik(
-      id,
-      req.body
-    );
+    const isUpdated = await fakultasService.updatePeriodeAkademik(id, req.body);
 
     if (isUpdated) {
       return responseBuilder
@@ -121,7 +117,7 @@ export const deletePeriodeAkademik = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const isDeleted = await periodeAkademikService.deletePeriodeAkademik(id);
+    const isDeleted = await fakultasService.deletePeriodeAkademik(id);
 
     if (isDeleted) {
       return res.status(204).end();
