@@ -16,5 +16,4 @@ export const validateCreatePeriodeAkademik = [
 
     body('tanggalSelesai')
         .notEmpty().withMessage('tanggalSelesai is required')
-
 ];

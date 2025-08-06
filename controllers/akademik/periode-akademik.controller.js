@@ -3,6 +3,8 @@ import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
 import * as tahunAjaranService from "../../services/tahun-ajaran.service.js";
+import { getPagingData } from "../../utils/pagination.js";
+import { validationResult } from "express-validator";
 
 export const findAll = async (req, res) => {
   const page = req.query.page ? parseInt(req.query.page) : null;
