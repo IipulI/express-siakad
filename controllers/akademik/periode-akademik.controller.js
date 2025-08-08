@@ -2,9 +2,6 @@ import * as periodeAkademikService from "../../services/periode-akademik.service
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
-import * as tahunAjaranService from "../../services/tahun-ajaran.service.js";
-import { getPagingData } from "../../utils/pagination.js";
-import { validationResult } from "express-validator";
 
 export const findAll = async (req, res) => {
   const page = req.query.page ? parseInt(req.query.page) : null;
@@ -127,14 +124,16 @@ export const deletePeriodeAkademik = async (req, res) => {
 
     if (isDeleted) {
       return res.status(204).end();
-    } else {
+    }
+    else {
       return responseBuilder
         .status("failure")
         .code(404)
         .message(`Periode Akademik with ID ${id} not found.`)
         .json();
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error(error);
     return responseBuilder
       .status("failure")

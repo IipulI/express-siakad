@@ -47,12 +47,12 @@ export const create = async (req, res) => {
     try {
         const { tahun, nama } = req.body;
 
-        const newTahunAjaran = await tahunAjaranService.createTahunAjaran({ tahun, nama });
+        await tahunAjaranService.createTahunAjaran({ tahun, nama });
 
         responseBuilder
             .code(201)
             .message('Data Tahun Ajaran berhasil ditambahkan.')
-            .json(newTahunAjaran);
+            .json();
 
     } catch (err) {
         if (err.message.includes('already exists')) {

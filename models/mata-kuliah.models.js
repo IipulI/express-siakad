@@ -14,9 +14,14 @@ MataKuliah.init(
             primaryKey: true,
             defaultValue: uuid7
         },
-        siak_program_studi_id: {},
-        siak_tahun_kurikulum_id: {},
-
+        siakProgramStudiId: {
+            type: DataTypes.UUID,
+            field: "siak_program_studi_id"
+        },
+        siakTahunKurikulumId: {
+            type: DataTypes.UUID,
+            field: "siak_tahun_kurikulum_id"
+        },
         nama: {
             allowNull: false,
             type: DataTypes.STRING
@@ -48,21 +53,40 @@ MataKuliah.init(
             field: "opsi_wajib",
             type: DataTypes.BOOLEAN
         },
-        sksTatap: {
+        sksTatapMuka: {
             allowNull: true,
-            type: DataTypes.INTEGER
+            type: DataTypes.INTEGER,
+            field: 'sks_tatap_muka',
         },
-        sks_praktikum: {
+        sksPraktikum: {
             allowNull: true,
-            type: DataTypes.INTEGER
+            type: DataTypes.INTEGER,
+            field: 'sks_praktikum',
         },
-        sks_praktik_lapangan: {
+        sksPraktikLapangan: {
             allowNull: true,
-            type: DataTypes.INTEGER
+            type: DataTypes.INTEGER,
+            field: 'sks_praktik_lapangan',
         },
-        total_sks:{
+        totalSks:{
             allowNull: true,
-            type: DataTypes.INTEGER
+            type: DataTypes.INTEGER,
+            field: 'total_sks',
+        },
+        prasyaratMataKuliah1: {
+            allowNull: true,
+            type: DataTypes.UUID,
+            field: "prasyarat_mata_kuliah_1"
+        },
+        prasyaratMataKuliah2: {
+            allowNull: true,
+            type: DataTypes.UUID,
+            field: "prasyarat_mata_kuliah_2"
+        },
+        prasyaratMataKuliah3: {
+            allowNull: true,
+            type: DataTypes.UUID,
+            field: "prasyarat_mata_kuliah_3"
         },
     },
     {

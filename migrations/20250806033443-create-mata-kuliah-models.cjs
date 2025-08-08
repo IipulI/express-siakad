@@ -60,6 +60,39 @@ module.exports = {
             allowNull: true,
             type: Sequelize.INTEGER
         },
+        prasyarat_mata_kuliah_1: {
+            allowNull: true,
+            type: Sequelize.UUID,
+            references: {
+                model: {
+                    tableName: 'siak_mata_kuliah',
+                    schema: 'public'
+                },
+                key: 'id'
+            }
+        },
+        prasyarat_mata_kuliah_2: {
+            allowNull: true,
+            type: Sequelize.UUID,
+            references: {
+                model: {
+                    tableName: 'siak_mata_kuliah',
+                    schema: 'public'
+                },
+                key: 'id'
+            }
+        },
+        prasyarat_mata_kuliah_3: {
+            allowNull: true,
+            type: Sequelize.UUID,
+            references: {
+                model: {
+                    tableName: 'siak_mata_kuliah',
+                    schema: 'public'
+                },
+                key: 'id'
+            }
+        },
         created_at: {
             allowNull: false,
             type: Sequelize.DATE
