@@ -1,6 +1,6 @@
 import {getPagination} from "../utils/pagination.js";
 import PeriodeAkademik from "../models/periode-akademik.models.js";
-import TahunAjaran from "../models/tahun.ajaran.js";
+import TahunAjaranModels from "../models/tahun-ajaran.models.js";
 
 export const findAll = async (page, size) => {
     try {
@@ -44,7 +44,7 @@ export const findAll = async (page, size) => {
 export const createPeriodeAkademik = async (periodeAkademikData) => {
     const { siakTahunAjaranId, nama, kode, tanggalMulai, tanggalSelesai } = periodeAkademikData;
 
-    const tahunAjaranExist = await TahunAjaran.findByPk(periodeAkademikData.siakTahunAjaranId);
+    const tahunAjaranExist = await TahunAjaranModels.findByPk(periodeAkademikData.siakTahunAjaranId);
     if (!tahunAjaranExist) {
         throw new Error (`Tahun Ajaran tidak ditemukan`)
     }
