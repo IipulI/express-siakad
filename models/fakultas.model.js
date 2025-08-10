@@ -1,31 +1,36 @@
-// /models/tahunajaran.models.js
+// /models/fakultas.models.js
 import { Model, DataTypes } from "sequelize";
-import { sequelize } from "../config/database.js";
 import { v7 as uuid7 } from "uuid";
 
-class FakultasModels extends Model {}
+export default (sequelize) => {
+    class Fakultas extends Model {
+        static associate(models) {
+            // define assoc
+        }
+    }
 
-FakultasModels.init(
-  {
-    id: {
-      type: DataTypes.UUID,
-      primaryKey: true,
-      defaultValue: uuid7,
-    },
-    nama: {
-      type: DataTypes.STRING(75),
-      allowNull: false,
-    },
-  },
-  {
-    sequelize,
-    underscored: true,
-    timestamps: true,
-    paranoid: true,
+    Fakultas.init(
+        {
+            id: {
+                type: DataTypes.UUID,
+                primaryKey: true,
+                defaultValue: uuid7,
+            },
+            nama: {
+                type: DataTypes.STRING(75),
+                allowNull: false,
+            },
+        },
+        {
+            sequelize,
+            underscored: true,
+            timestamps: true,
+            paranoid: true,
 
-    modelName: "Fakultas",
-    tableName: "siak_fakultas",
-  }
-);
+            modelName: "Fakultas",
+            tableName: "siak_fakultas",
+        }
+    );
 
-export default FakultasModels;
+    return Fakultas
+}

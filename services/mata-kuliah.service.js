@@ -1,6 +1,6 @@
-import {getPagination} from "../utils/pagination.js";
-import MataKuliah from "../models/mata-kuliah.models.js";
-import {sequelize} from "../config/database.js";
+import { getPagination } from "../utils/pagination.js";
+import * as models from "../models/index.js"
+const { sequelize, MataKuliah } = models;
 
 export const findAll = async (page, size) => {
     try {

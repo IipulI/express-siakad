@@ -1,7 +1,6 @@
-import TahunKurikulum from "../models/tahun-kurikulum.models.js";
-import {getPagination} from "../utils/pagination.js";
-import PeriodeAkademik from "../models/periode-akademik.models.js";
-
+import * as models from "../models/index.js";
+import { getPagination } from "../utils/pagination.js";
+const  { TahunKurikulum, PeriodeAkademik } = models;
 
 export const findAll = async (page, size) => {
     try {

@@ -1,13 +1,14 @@
-import FakultasModels from "../models/fakultas.model.js";
-import RuanganModels from "../models/ruangan.models.js";
+import * as models from "../models/index.js"
 import { getPagination } from "../utils/pagination.js";
+
+const { FakultasModels, Ruangan } = models;
 
 export const findAll = async (page, size) => {
   try {
     if (page !== null && size !== null) {
       const { limit, offset } = getPagination(page, size);
 
-      const { count, rows } = await RuanganModels.findAndCountAll({
+      const { count, rows } = await Ruangan.findAndCountAll({
         attributes: [
           "id",
           "siak_fakultas_id",
@@ -33,7 +34,7 @@ export const findAll = async (page, size) => {
         isPaginated: true,
       };
     } else {
-      const { count, rows } = await RuanganModels.findAndCountAll({
+      const { count, rows } = await Ruangan.findAndCountAll({
         attributes: [
           "id",
           "siak_fakultas_id",

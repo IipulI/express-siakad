@@ -1,29 +1,21 @@
-// /models/tahunajaran.models.js
+// /models/krs-mahasiswa.models.js
 import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
-    class TahunAjaran extends Model {
+    class KrsMahasiswa extends Model {
         static associate(models) {
             // define assoc
         }
     }
 
-    TahunAjaran.init(
+    KrsMahasiswa.init(
         {
             id: {
                 type: DataTypes.UUID,
                 primaryKey: true,
-                defaultValue: uuid7
+                defaultValue: uuid7,
             },
-            tahun: {
-                type: DataTypes.STRING(5),
-                allowNull: false
-            },
-            nama: {
-                type: DataTypes.STRING(50),
-                allowNull: false,
-            }
         },
         {
             sequelize,
@@ -31,10 +23,10 @@ export default (sequelize) => {
             timestamps: true,
             paranoid: true,
 
-            modelName: "TahunAjaran",
-            tableName: "siak_tahun_ajaran",
+            modelName: "KrsMahasiswa",
+            tableName: "siak_krs_mahasiswa",
         }
     );
 
-    return TahunAjaran;
+    return KrsMahasiswa;
 }
