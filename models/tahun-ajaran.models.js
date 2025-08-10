@@ -2,7 +2,7 @@
 import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
-export default (sequelize, DataTypes) => {
+export default (sequelize) => {
     class TahunAjaran extends Model {
         static associate(models) {
             // define assoc
