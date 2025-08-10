@@ -1,4 +1,5 @@
-import MataKuliah from "../models/mata-kuliah.models.js";
+import * as models from "../models/index.js";
+const { MataKuliah } = models
 
 export const fetchKurikulumProdi = async (programStudiId, tahunKurikulumId) => {
     try {

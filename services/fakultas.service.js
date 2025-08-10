@@ -1,14 +1,17 @@
+import { getPagination } from "../utils/pagination.js";
+import * as models from "../models/index.js";
+const { Fakultas, Ruangan } = models
+
 export const findAll = async (page, size) => {
   try {
     if (page !== null && size !== null) {
       const { limit, offset } = getPagination(page, size);
 
-      const { count, rows } = await FakultasModels.findAndCountAll({
+      const { count, rows } = await Fakultas.findAndCountAll({
         attributes: ["id", "nama"],
         limit,
         offset,
         order: [["ruangan", "DESC"]],
-        raw: true,
       });
 
       // const formattedRows = rows.map(record => ({
@@ -22,7 +25,7 @@ export const findAll = async (page, size) => {
         isPaginated: true,
       };
     } else {
-      const { count, rows } = await RuanganModels.findAndCountAll({
+      const { count, rows } = await Ruangan.findAndCountAll({
         attributes: [
           "id",
           "siak_fakultas_id",
@@ -31,7 +34,6 @@ export const findAll = async (page, size) => {
           "kapasitas",
           "lantai",
         ],
-        raw: true,
       });
 
       return {

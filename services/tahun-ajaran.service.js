@@ -1,6 +1,7 @@
-import TahunAjaran from "../models/tahun-ajaran.models.js";
-import {getPagination} from "../utils/pagination.js";
-import {formatTimestamp} from "../utils/date-formatter.js";
+import * as models from "../models/index.js"
+const { TahunAjaran } = models;
+import { getPagination } from "../utils/pagination.js";
+import { formatTimestamp } from "../utils/date-formatter.js";
 
 export const findAll = async (page, size) => {
     try {

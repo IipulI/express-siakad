@@ -17,13 +17,13 @@ export const findAll = async (req, res) => {
             payload = data.rows
         }
 
-        responseBuilder
+        return responseBuilder
             .code(200)
             .message("Successfully retrieve data")
             .json(payload)
     }
     catch (error) {
-        responseBuilder
+        return responseBuilder
             .status('failure')
             .code(500)
             .message(error.message || 'Unexpected error')

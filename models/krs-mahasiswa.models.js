@@ -1,24 +1,20 @@
-// /models/fakultas.models.js
+// /models/krs-mahasiswa.models.js
 import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
-    class Fakultas extends Model {
+    class KrsMahasiswa extends Model {
         static associate(models) {
             // define assoc
         }
     }
 
-    Fakultas.init(
+    KrsMahasiswa.init(
         {
             id: {
                 type: DataTypes.UUID,
                 primaryKey: true,
                 defaultValue: uuid7,
-            },
-            nama: {
-                type: DataTypes.STRING(75),
-                allowNull: false,
             },
         },
         {
@@ -27,10 +23,10 @@ export default (sequelize) => {
             timestamps: true,
             paranoid: true,
 
-            modelName: "Fakultas",
-            tableName: "siak_fakultas",
+            modelName: "KrsMahasiswa",
+            tableName: "siak_krs_mahasiswa",
         }
     );
 
-    return Fakultas
+    return KrsMahasiswa;
 }

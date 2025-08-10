@@ -1,103 +1,104 @@
-// /models/tahunajaran.models.js
+// /models/mata-kuliah.models.js
 import { Model, DataTypes } from 'sequelize';
-import { sequelize } from "../config/database.js";
 import { v7 as uuid7 } from "uuid";
 
-class MataKuliah extends Model {
+export default (sequelize) => {
+    class MataKuliah extends Model {
 
-}
-
-MataKuliah.init(
-    {
-        id: {
-            type: DataTypes.UUID,
-            primaryKey: true,
-            defaultValue: uuid7
-        },
-        siakProgramStudiId: {
-            type: DataTypes.UUID,
-            field: "siak_program_studi_id"
-        },
-        siakTahunKurikulumId: {
-            type: DataTypes.UUID,
-            field: "siak_tahun_kurikulum_id"
-        },
-        nama: {
-            allowNull: false,
-            type: DataTypes.STRING
-        },
-        kode: {
-            allowNull: false,
-            type: DataTypes.STRING
-        },
-        jenis: {
-            allowNull: false,
-            type: DataTypes.STRING
-        },
-        semester: {
-            allowNull: true,
-            type: DataTypes.INTEGER
-        },
-        nilaiMin: {
-            allowNull: true,
-            field : "nilai_min",
-            type: DataTypes.STRING(5)
-        },
-        adaPraktikum: {
-            allowNull: false,
-            field: "ada_praktikum",
-            type: DataTypes.BOOLEAN
-        },
-        opsiWajib: {
-            allowNull: true,
-            field: "opsi_wajib",
-            type: DataTypes.BOOLEAN
-        },
-        sksTatapMuka: {
-            allowNull: true,
-            type: DataTypes.INTEGER,
-            field: 'sks_tatap_muka',
-        },
-        sksPraktikum: {
-            allowNull: true,
-            type: DataTypes.INTEGER,
-            field: 'sks_praktikum',
-        },
-        sksPraktikLapangan: {
-            allowNull: true,
-            type: DataTypes.INTEGER,
-            field: 'sks_praktik_lapangan',
-        },
-        totalSks:{
-            allowNull: true,
-            type: DataTypes.INTEGER,
-            field: 'total_sks',
-        },
-        prasyaratMataKuliah1: {
-            allowNull: true,
-            type: DataTypes.UUID,
-            field: "prasyarat_mata_kuliah_1"
-        },
-        prasyaratMataKuliah2: {
-            allowNull: true,
-            type: DataTypes.UUID,
-            field: "prasyarat_mata_kuliah_2"
-        },
-        prasyaratMataKuliah3: {
-            allowNull: true,
-            type: DataTypes.UUID,
-            field: "prasyarat_mata_kuliah_3"
-        },
-    },
-    {
-        sequelize,
-        underscored: true,
-        timestamps: true,
-        paranoid: true,
-
-        modelName: 'MataKuliah',
-        tableName: 'siak_mata_kuliah'
     }
-)
 
-export default MataKuliah;
+    MataKuliah.init(
+        {
+            id: {
+                type: DataTypes.UUID,
+                primaryKey: true,
+                defaultValue: uuid7
+            },
+            siakProgramStudiId: {
+                type: DataTypes.UUID,
+                field: "siak_program_studi_id"
+            },
+            siakTahunKurikulumId: {
+                type: DataTypes.UUID,
+                field: "siak_tahun_kurikulum_id"
+            },
+            nama: {
+                allowNull: false,
+                type: DataTypes.STRING
+            },
+            kode: {
+                allowNull: false,
+                type: DataTypes.STRING
+            },
+            jenis: {
+                allowNull: false,
+                type: DataTypes.STRING
+            },
+            semester: {
+                allowNull: true,
+                type: DataTypes.INTEGER
+            },
+            nilaiMin: {
+                allowNull: true,
+                field : "nilai_min",
+                type: DataTypes.STRING(5)
+            },
+            adaPraktikum: {
+                allowNull: false,
+                field: "ada_praktikum",
+                type: DataTypes.BOOLEAN
+            },
+            opsiWajib: {
+                allowNull: true,
+                field: "opsi_wajib",
+                type: DataTypes.BOOLEAN
+            },
+            sksTatapMuka: {
+                allowNull: true,
+                type: DataTypes.INTEGER,
+                field: 'sks_tatap_muka',
+            },
+            sksPraktikum: {
+                allowNull: true,
+                type: DataTypes.INTEGER,
+                field: 'sks_praktikum',
+            },
+            sksPraktikLapangan: {
+                allowNull: true,
+                type: DataTypes.INTEGER,
+                field: 'sks_praktik_lapangan',
+            },
+            totalSks:{
+                allowNull: true,
+                type: DataTypes.INTEGER,
+                field: 'total_sks',
+            },
+            prasyaratMataKuliah1: {
+                allowNull: true,
+                type: DataTypes.UUID,
+                field: "prasyarat_mata_kuliah_1"
+            },
+            prasyaratMataKuliah2: {
+                allowNull: true,
+                type: DataTypes.UUID,
+                field: "prasyarat_mata_kuliah_2"
+            },
+            prasyaratMataKuliah3: {
+                allowNull: true,
+                type: DataTypes.UUID,
+                field: "prasyarat_mata_kuliah_3"
+            },
+        },
+        {
+            sequelize,
+            underscored: true,
+            timestamps: true,
+            paranoid: true,
+
+            modelName: 'MataKuliah',
+            tableName: 'siak_mata_kuliah'
+        }
+    );
+
+    return MataKuliah;
+}
