@@ -1,5 +1,5 @@
 import { getPagination } from "../utils/pagination.js";
-import * as models from "../models/index.js"
+import models from "../models/index.js"
 const { sequelize, MataKuliah } = models;
 
 export const findAll = async (page, size) => {
@@ -11,7 +11,6 @@ export const findAll = async (page, size) => {
                 limit,
                 offset,
                 order: [['createdAt', 'DESC']],
-                raw: true
             })
 
             return {
@@ -22,7 +21,6 @@ export const findAll = async (page, size) => {
         }
         else {
             const { count, rows } = await MataKuliah.findAndCountAll({
-                raw:true
             })
 
             return {

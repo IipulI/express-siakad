@@ -1,38 +1,38 @@
-// /models/mahasiswa.models.js
+// /models/program-studi.models.js
 import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
-    class Mahasiswa extends Model {
+    class ProgramStudi extends Model {
         static associate(models) {
-            this.hasMany(models.KrsMahasiswa, {
-                foreignKey: 'siak_mahasiswa_id',
-                as: 'krsMahasiswa',
+            this.belongsTo(models.Fakultas, {
+                foreignKey: "siak_fakultas_id",
             })
         }
     }
 
-    Mahasiswa.init(
+    ProgramStudi.init(
         {
             id: {
                 type: DataTypes.UUID,
                 primaryKey: true,
                 defaultValue: uuid7,
             },
-            siakProgramStudiId: {
+            siakFakultasId: {
                 type: DataTypes.UUID,
-                fields: "siak_program_studi_id"
+                fields: "siak_fakultas_id"
+            },
+            siakJenjangId: {
+                type: DataTypes.UUID,
+                fields: "siak_jenjang_id"
             },
             nama: {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
-            npm: {
+            kode: {
                 type: DataTypes.STRING,
                 allowNull: false,
-            },
-            semester: {
-                type: DataTypes.INTEGER
             }
         },
         {
@@ -41,10 +41,10 @@ export default (sequelize) => {
             timestamps: true,
             paranoid: true,
 
-            modelName: "Mahasiswa",
-            tableName: "siak_mahasiswa",
+            modelName: "ProgramStudi",
+            tableName: "siak_program_studi",
         }
     );
 
-    return Mahasiswa;
+    return ProgramStudi
 }

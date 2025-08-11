@@ -5,7 +5,20 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class KrsMahasiswa extends Model {
         static associate(models) {
-            // define assoc
+            this.belongsTo(models.PeriodeAkademik, {
+                foreignKey: 'siak_periode_akademik_id',
+                as: 'periodeAkademik'
+            })
+
+            this.belongsTo(models.Mahasiswa, {
+                foreignKey: "siak_mahasiswa_id",
+                as: 'mahasiswa',
+            })
+
+            this.hasMany(models.RincianKrsMahasiswa, {
+                foreignKey: "siak_krs_mahasiswa_id",
+                as: 'rincianKrsMahasiswa',
+            })
         }
     }
 
@@ -15,6 +28,26 @@ export default (sequelize) => {
                 type: DataTypes.UUID,
                 primaryKey: true,
                 defaultValue: uuid7,
+            },
+            siakMahasiswaId: {
+                type: DataTypes.UUID ,
+                fields: "siak_mahasiswa_id"
+            },
+            siakPeriodeAkademikId: {
+                type: DataTypes.UUID ,
+                fields: "siak_periode_akademik_id"
+            },
+            status: {
+                type: DataTypes.STRING ,
+                fields: "status"
+            },
+            sksDiambil: {
+                type: DataTypes.INTEGER ,
+                fields: "sks_diambil"
+            },
+            semester: {
+                type: DataTypes.INTEGER ,
+                fields: "semester"
             },
         },
         {

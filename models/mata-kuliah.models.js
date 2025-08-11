@@ -4,7 +4,22 @@ import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
     class MataKuliah extends Model {
+        static associate(models) {
+            this.belongsTo(models.TahunKurikulum, {
+                foreignKey: 'siak_tahun_kurikulum_id',
+                as: 'tahunKurikulum',
+            })
 
+            this.belongsTo(models.ProgramStudi, {
+                foreignKey: 'siak_program_studi_id',
+                as: 'programStudi',
+            })
+
+            this.hasMany(models.KelasKuliah, {
+                foreignKey: 'siak_mata_kuliah_id',
+                as: "kelasKuliah"
+            })
+        }
     }
 
     MataKuliah.init(

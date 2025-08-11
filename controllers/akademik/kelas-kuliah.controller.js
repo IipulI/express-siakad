@@ -25,3 +25,67 @@ export const findAll = async (req, res) => {
             .json();
     }
 }
+
+export const findOne = async (req, res) => {
+    const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        const dataClass = await KelasKuliahService.detailClass(id)
+
+        return responseBuilder
+            .code(200)
+            .message("Successfully retrieve data")
+            .json(dataClass)
+    }
+    catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(500)
+            .message(error.message || "Unexpected error")
+            .json();
+    }
+}
+
+export const schedules = async (req, res) => {
+    const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        const dataClass = await KelasKuliahService.classSchedule(id)
+
+        return responseBuilder
+            .code(200)
+            .message("Successfully retrieve data")
+            .json(dataClass)
+    }
+    catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(500)
+            .message(error.message || "Unexpected error")
+            .json();
+    }
+}
+
+export const classParticipant = async (req, res) => {
+    const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        const dataClass = await KelasKuliahService.classParticipant(id)
+
+        return responseBuilder
+            .code(200)
+            .message("Successfully retrieve data")
+            .json(dataClass)
+    }
+    catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(500)
+            .message(error.message || "Unexpected error")
+            .json();
+    }
+}
+
