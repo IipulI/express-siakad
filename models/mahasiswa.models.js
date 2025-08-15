@@ -9,6 +9,27 @@ export default (sequelize) => {
                 foreignKey: 'siak_mahasiswa_id',
                 as: 'krsMahasiswa',
             })
+
+            this.hasOne(models.KrsMahasiswa, {
+                foreignKey: 'siak_mahasiswa_id',
+                as: 'krsTerbaru',
+                order: [
+                    ['semester', 'DESC']
+                ]
+            })
+
+            this.hasOne(models.PembimbingAkademik, {
+                as: "pembimbingDosen",
+                foreignKey: 'siak_mahasiswa_id',
+            })
+
+            this.hasOne(models.HasilStudi, {
+                foreignKey: 'siak_mahasiswa_id',
+                as: "hasilStudiTerbaru",
+                order: [
+                    ['semester', 'DESC']
+                ]
+            })
         }
     }
 
@@ -33,6 +54,10 @@ export default (sequelize) => {
             },
             semester: {
                 type: DataTypes.INTEGER
+            },
+            periodeMasuk: {
+                type: DataTypes.STRING,
+                field: "periode_masuk"
             }
         },
         {

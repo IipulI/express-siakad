@@ -42,6 +42,21 @@ export const findAll = async (page, size) => {
     }
 }
 
+export const findActive = async () => {
+    const activePeriod = await PeriodeAkademik.findOne({
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        where: { status: "Aktif" }
+    })
+
+    if(!activePeriod) {
+        throw new Error('No active period found.');
+    }
+
+    return activePeriod;
+}
+
 export const createPeriodeAkademik = async (periodeAkademikData) => {
     const { siakTahunAjaranId, nama, kode, tanggalMulai, tanggalSelesai } = periodeAkademikData;
 

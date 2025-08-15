@@ -52,9 +52,9 @@ export const findAll = async (page, size) => {
 export const createTahunAjaran = async (tahunAjaranData) => {
     const { tahun, nama } = tahunAjaranData;
 
-    const existingTahunAjaran = await TahunAjaran.findOne({ where: { nama } });
+    const existingTahunAjaran = await TahunAjaran.findOne({ attributes: [], where: { tahun } });
     if (existingTahunAjaran) {
-        throw new Error(`Tahun Ajaran with name "${nama}" already exists.`);
+        throw new Error(`Tahun Ajaran with year "${tahun}" already exists.`);
     }
 
     try {
