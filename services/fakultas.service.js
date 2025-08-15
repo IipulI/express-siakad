@@ -1,6 +1,6 @@
 import { getPagination } from "../utils/pagination.js";
 import * as models from "../models/index.js";
-const { Fakultas, Ruangan } = models
+const { Fakultas, Ruangan } = models;
 
 export const findAll = async (page, size) => {
   try {
@@ -45,4 +45,8 @@ export const findAll = async (page, size) => {
   } catch (error) {
     throw new Error(`Error retrieving data : ${error.message}`);
   }
+};
+
+export const createFakultas = async (fakultasData) => {
+    const {}
 };
