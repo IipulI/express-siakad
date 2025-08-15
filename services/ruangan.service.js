@@ -1,4 +1,4 @@
-import * as models from "../models/index.js";
+import * as models from "../models/index.js"
 import { getPagination } from "../utils/pagination.js";
 
 const { Ruangan, Fakultas } = models;

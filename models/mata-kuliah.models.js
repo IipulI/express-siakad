@@ -19,6 +19,22 @@ export default (sequelize) => {
                 foreignKey: 'siak_mata_kuliah_id',
                 as: "kelasKuliah"
             })
+
+            this.belongsTo(models.MataKuliah, {
+                foreignKey: "prasyarat_mata_kuliah_1",
+                as: "prasyarat1"
+            })
+
+            this.belongsTo(models.MataKuliah, {
+                foreignKey: "prasyarat_mata_kuliah_2",
+                as: "prasyarat2"
+            })
+
+            this.belongsTo(models.MataKuliah, {
+                foreignKey: "prasyarat_mata_kuliah_3",
+                as: "prasyarat3"
+            })
+
         }
     }
 

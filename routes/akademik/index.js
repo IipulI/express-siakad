@@ -6,6 +6,7 @@ import MataKuliahRouter from "./mata-kuliah.router.js";
 import KurikulumProdiRouter from "./kurikulum-prodi.router.js";
 import KelasKuliahRouter from "./kelas-kuliah.router.js";
 import RuanganRouter from "./ruangan.router.js";
+import PembimbingAkademikRouter from "./pembimbing-akademik.router.js";
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use("/tahun-kurikulum", TahunKurikulumRouter);
 router.use("/mata-kuliah", MataKuliahRouter);
 router.use("/kurikulum-prodi", KurikulumProdiRouter);
 router.use("/kelas-kuliah", KelasKuliahRouter);
+router.use("/pembimbing-akademik", PembimbingAkademikRouter)
 
 export default router;
