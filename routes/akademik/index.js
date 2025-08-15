@@ -5,13 +5,15 @@ import TahunKurikulumRouter from "./tahun-kurikulum.router.js";
 import MataKuliahRouter from "./mata-kuliah.router.js";
 import KurikulumProdiRouter from "./kurikulum-prodi.router.js";
 import KelasKuliahRouter from "./kelas-kuliah.router.js";
+import RuanganRouter from "./ruangan.router.js";
 
 const router = Router();
 
 router.use("/tahun-ajaran", TahunAjaranRouter);
+router.use("/ruangan", RuanganRouter);
 router.use("/periode-akademik", PeriodeAkademikRouter);
 router.use("/tahun-kurikulum", TahunKurikulumRouter);
-router.use("/mata-kuliah", MataKuliahRouter)
+router.use("/mata-kuliah", MataKuliahRouter);
 router.use("/kurikulum-prodi", KurikulumProdiRouter);
 router.use("/kelas-kuliah", KelasKuliahRouter);
 

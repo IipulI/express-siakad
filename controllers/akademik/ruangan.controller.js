@@ -27,3 +27,49 @@ export const findAll = async (req, res) => {
       .json();
   }
 };
+
+export const create = async (req, res) => {
+  const responseBuilder = new ResponseBuilder(res);
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return responseBuilder
+      .status("failure")
+      .code(422)
+      .message("Validation failed.")
+      .json(errors.array());
+  }
+
+  try {
+    const { siakFakultasId, nama, ruangan, kapasitas, lantai } = req.body;
+
+    await ruanganService.createRuangan({
+      siakFakultasId,
+      nama,
+      ruangan,
+      kapasitas,
+      lantai,
+    });
+
+    responseBuilder
+      .code(201)
+      .message("Data Ruangan berhasil ditambahkan.")
+      .json();
+  } catch (err) {
+    if (err.message.includes("already exists")) {
+      return responseBuilder
+        .status("failure")
+        .code(409)
+        .message(err.message)
+        .json();
+    }
+
+    responseBuilder
+      .status("failure")
+      .code(500)
+      .message(
+        err.message || "Terjadi kesalahan saat menambahkan data Tahun Ajaran."
+      )
+      .json();
+  }
+};
