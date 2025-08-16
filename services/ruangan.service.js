@@ -1,4 +1,4 @@
-import * as models from "../models/index.js"
+import models from "../models/index.js"
 import { getPagination } from "../utils/pagination.js";
 
 const { Ruangan, Fakultas } = models;
@@ -43,7 +43,7 @@ export const findAll = async (page, size) => {
           "kapasitas",
           "lantai",
         ],
-        include: [{ model: Fakultas, attributes: ["id", "nama"] }],
+        include: [{ model: Fakultas, as: 'fakultas', attributes: ["id", "nama"] }],
         // raw: true,
       });
 
@@ -54,6 +54,7 @@ export const findAll = async (page, size) => {
       };
     }
   } catch (error) {
+    console.log(error)
     throw new Error(`Error retrieving data : ${error.message}`);
   }
 };
