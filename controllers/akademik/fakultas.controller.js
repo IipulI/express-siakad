@@ -42,7 +42,7 @@ export const create = async (req, res) => {
   }
 
   try {
-    await fakultasService.createPeriodeAkademik(req.body);
+    await fakultasService.createFakultas(req.body);
 
     responseBuilder
       .code(201)
@@ -61,29 +61,27 @@ export const create = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        err.message || "Terjadi kesalahan saat menambahkan data Tahun Ajaran."
+        err.message || "Terjadi kesalahan saat menambahkan data Fakultas"
       )
       .json();
   }
 };
 
-export const updatePeriodeAkademik = async (req, res) => {
+export const updateFakultas = async (req, res) => {
   const { id } = req.params;
-  const { nama, kode, tanggalMulai, tanggalSelesai, status } = req.body;
+  const { nama } = req.body;
   const responseBuilder = new ResponseBuilder(res);
 
-  if (!nama || !kode || !tanggalMulai || !tanggalSelesai || !status) {
+  if (!nama) {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message(
-        "At least one field (nama, kode, tanggalMulai, tanggalSelesai, status) is required for update."
-      )
+      .message("At least one field (nama) is required for update.")
       .json();
   }
 
   try {
-    const isUpdated = await fakultasService.updatePeriodeAkademik(id, req.body);
+    const isUpdated = await fakultasService.updateFakultas(id, req.body);
 
     if (isUpdated) {
       return responseBuilder
@@ -95,9 +93,7 @@ export const updatePeriodeAkademik = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(
-          `Periode Akademik with ID ${id} not found or no changes were made.`
-        )
+        .message(`Fakultas with ID ${id} not found or no changes were made.`)
         .json();
     }
   } catch (error) {
@@ -112,12 +108,12 @@ export const updatePeriodeAkademik = async (req, res) => {
   }
 };
 
-export const deletePeriodeAkademik = async (req, res) => {
+export const deleteFakultas = async (req, res) => {
   const { id } = req.params;
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const isDeleted = await fakultasService.deletePeriodeAkademik(id);
+    const isDeleted = await fakultasService.deleteFakultas(id);
 
     if (isDeleted) {
       return res.status(204).end();
@@ -125,7 +121,7 @@ export const deletePeriodeAkademik = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Periode Akademik with ID ${id} not found.`)
+        .message(`Fakultas with ID ${id} not found.`)
         .json();
     }
   } catch (error) {
@@ -133,9 +129,7 @@ export const deletePeriodeAkademik = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(500)
-      .message(
-        "Terjadi kesalahan internal server saat menghapus Periode Akademik."
-      )
+      .message("Terjadi kesalahan internal server saat menghapus Fakultas.")
       .json();
   }
 };
