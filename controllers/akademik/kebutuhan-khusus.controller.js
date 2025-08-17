@@ -1,4 +1,4 @@
-import * as ruanganService from "../../services/ruangan.service.js";
+import * as kebutuhanKhusus from "../../services/kebutuhan-khusus.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
@@ -9,7 +9,7 @@ export const findAll = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const data = await ruanganService.findAll(page, size);
+    const data = await kebutuhanKhusus.findAll(page, size);
 
     let payload;
     if (data.isPaginated === true) {
@@ -41,19 +41,15 @@ export const create = async (req, res) => {
   }
 
   try {
-    const { siakFakultasId, nama, ruangan, kapasitas, lantai } = req.body;
+    const { nama } = req.body;
 
-    await ruanganService.createRuangan({
-      siakFakultasId,
+    await kebutuhanKhusus.createKebutuhanKhusus({
       nama,
-      ruangan,
-      kapasitas,
-      lantai,
     });
 
     responseBuilder
       .code(201)
-      .message("Data Ruangan berhasil ditambahkan.")
+      .message("Data Kebutuhan Khusus berhasil ditambahkan.")
       .json();
   } catch (err) {
     if (err.message.includes("already exists")) {
@@ -68,32 +64,29 @@ export const create = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        err.message || "Terjadi kesalahan saat menambahkan data Ruangan."
+        err.message ||
+          "Terjadi kesalahan saat menambahkan data Kebutuhan Khusus."
       )
       .json();
   }
 };
 
-export const updateRuangan = async (req, res) => {
+export const updateKebutuhanKhusus = async (req, res) => {
   const { id } = req.params;
-  const { siakFakultasId, nama, ruangan, kapasitas, lantai } = req.body;
+  const { nama } = req.body;
   const responseBuilder = new ResponseBuilder(res);
 
-  if (!nama && !ruangan) {
+  if (!nama) {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message("At least one field (Nama or Ruangan) is required for update.")
+      .message("At least one field (Nama) is required for update.")
       .json();
   }
 
   try {
-    const isUpdated = await ruanganService.updateRuangan(id, {
-      siakFakultasId,
+    const isUpdated = await kebutuhanKhusus.updateKebutuhanKhusus(id, {
       nama,
-      ruangan,
-      kapasitas,
-      lantai,
     });
 
     if (isUpdated) {
@@ -106,7 +99,9 @@ export const updateRuangan = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Ruangan with ID ${id} not found or no changes were made.`)
+        .message(
+          `Kebutuhan Khusus with ID ${id} not found or no changes were made.`
+        )
         .json();
     }
   } catch (error) {
@@ -115,29 +110,29 @@ export const updateRuangan = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        "Terjadi kesalahan internal server saat memperbarui Ruangan Models."
+        "Terjadi kesalahan internal server saat memperbarui Kebutuhan Khusus Models."
       )
       .json();
   }
 };
 
-export const deleteRuangan = async (req, res) => {
+export const deleteKebutuhanKhusus = async (req, res) => {
   const { id } = req.params;
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const isDeleted = await ruanganService.deleteRuangan(id);
+    const isDeleted = await kebutuhanKhusus.deleteKebutuhanKhusus(id);
 
     if (isDeleted) {
       return responseBuilder
         .code(200)
-        .message(`Data Ruangan Berhasil Dihapus`)
+        .message(`Data Kebutuhan Khusus Berhasil Dihapus`)
         .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Ruangan with ID ${id} not found.`)
+        .message(`Kebutuhan Khusus with ID ${id} not found.`)
         .json();
     }
   } catch (error) {
@@ -145,7 +140,9 @@ export const deleteRuangan = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(500)
-      .message("Terjadi kesalahan internal server saat menghapus Ruangan.")
+      .message(
+        "Terjadi kesalahan internal server saat menghapus Kebutuhan Khusus."
+      )
       .json();
   }
 };

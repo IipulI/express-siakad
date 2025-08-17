@@ -1,4 +1,4 @@
-import * as ruanganService from "../../services/ruangan.service.js";
+import * as pekerjaanService from "../../services/pekerjaan.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
@@ -9,7 +9,7 @@ export const findAll = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const data = await ruanganService.findAll(page, size);
+    const data = await pekerjaanService.findAll(page, size);
 
     let payload;
     if (data.isPaginated === true) {
@@ -41,19 +41,15 @@ export const create = async (req, res) => {
   }
 
   try {
-    const { siakFakultasId, nama, ruangan, kapasitas, lantai } = req.body;
+    const { nama } = req.body;
 
-    await ruanganService.createRuangan({
-      siakFakultasId,
+    await pekerjaanService.createPekerjaan({
       nama,
-      ruangan,
-      kapasitas,
-      lantai,
     });
 
     responseBuilder
       .code(201)
-      .message("Data Ruangan berhasil ditambahkan.")
+      .message("Data Pekerjaan berhasil ditambahkan.")
       .json();
   } catch (err) {
     if (err.message.includes("already exists")) {
@@ -68,32 +64,28 @@ export const create = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        err.message || "Terjadi kesalahan saat menambahkan data Ruangan."
+        err.message || "Terjadi kesalahan saat menambahkan data Pekerjaan."
       )
       .json();
   }
 };
 
-export const updateRuangan = async (req, res) => {
+export const updatePekerjaan = async (req, res) => {
   const { id } = req.params;
-  const { siakFakultasId, nama, ruangan, kapasitas, lantai } = req.body;
+  const { nama } = req.body;
   const responseBuilder = new ResponseBuilder(res);
 
-  if (!nama && !ruangan) {
+  if (!nama) {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message("At least one field (Nama or Ruangan) is required for update.")
+      .message("At least one field (Nama) is required for update.")
       .json();
   }
 
   try {
-    const isUpdated = await ruanganService.updateRuangan(id, {
-      siakFakultasId,
+    const isUpdated = await pekerjaanService.updatePekerjaan(id, {
       nama,
-      ruangan,
-      kapasitas,
-      lantai,
     });
 
     if (isUpdated) {
@@ -106,7 +98,7 @@ export const updateRuangan = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Ruangan with ID ${id} not found or no changes were made.`)
+        .message(`Pekerjaan with ID ${id} not found or no changes were made.`)
         .json();
     }
   } catch (error) {
@@ -115,29 +107,29 @@ export const updateRuangan = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        "Terjadi kesalahan internal server saat memperbarui Ruangan Models."
+        "Terjadi kesalahan internal server saat memperbarui Pekerjaan Models."
       )
       .json();
   }
 };
 
-export const deleteRuangan = async (req, res) => {
+export const deletePekerjaan = async (req, res) => {
   const { id } = req.params;
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const isDeleted = await ruanganService.deleteRuangan(id);
+    const isDeleted = await pekerjaanService.deletePekerjaan(id);
 
     if (isDeleted) {
       return responseBuilder
         .code(200)
-        .message(`Data Ruangan Berhasil Dihapus`)
+        .message(`Data Pekerjaan Berhasil Dihapus`)
         .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Ruangan with ID ${id} not found.`)
+        .message(`Pekerjaan with ID ${id} not found.`)
         .json();
     }
   } catch (error) {
