@@ -1,4 +1,4 @@
-import * as fakultasService from "../../services/fakultas.service.js";
+import * as penghasilanPekerjaan from "../../services/penghasilan-pekerjaan.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
@@ -9,7 +9,7 @@ export const findAll = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const data = await fakultasService.findAll(page, size);
+    const data = await penghasilanPekerjaan.findAll(page, size);
 
     let payload;
     if (data.isPaginated === true) {
@@ -23,7 +23,7 @@ export const findAll = async (req, res) => {
     responseBuilder
       .status("failure")
       .code(500)
-      .message(error.message || "Terjadi kesalah tidak terduga")
+      .message(error.message || "Unexpected error")
       .json();
   }
 };
@@ -31,22 +31,25 @@ export const findAll = async (req, res) => {
 export const create = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
-  // request validation
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return responseBuilder
       .status("failure")
       .code(422)
-      .message("validation failed.")
+      .message("Validation failed.")
       .json(errors.array());
   }
 
   try {
-    await fakultasService.createFakultas(req.body);
+    const { range } = req.body;
+
+    await penghasilanPekerjaan.createPenghasilanPekerjaan({
+      range,
+    });
 
     responseBuilder
       .code(201)
-      .message("Data periode akademik berhasil ditambahkan")
+      .message("Data Penghasilan Pekerjaan berhasil ditambahkan.")
       .json();
   } catch (err) {
     if (err.message.includes("already exists")) {
@@ -61,42 +64,46 @@ export const create = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        err.message || "Terjadi kesalahan saat menambahkan data Fakultas"
+        err.message ||
+          "Terjadi kesalahan saat menambahkan data Penghasilan Pekerjaan."
       )
       .json();
   }
 };
 
-export const updateFakultas = async (req, res) => {
+export const updatePenghasilanPekerjaan = async (req, res) => {
   const { id } = req.params;
-  const { nama } = req.body;
+  const { range } = req.body;
   const responseBuilder = new ResponseBuilder(res);
 
-  if (!nama) {
+  if (!range) {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message(
-        "Harap isi minimal satu data (nama, kode, tanggal mulai, tanggal selesai, status) untuk update"
-      )
+      .message("At least one field (Range) is required for update.")
       .json();
   }
 
   try {
-    const isUpdated = await fakultasService.updateFakultas(id, req.body);
+    const isUpdated = await penghasilanPekerjaan.updatePenghasilanPekerjaan(
+      id,
+      {
+        range,
+      }
+    );
 
     if (isUpdated) {
       return responseBuilder
         .status("success")
         .code(200)
-        .message("Berhasil memperbarui data fakultas")
+        .message("Update data successfully.")
         .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
         .message(
-          `Periode Akademik dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`
+          `Penghasilan Pekerjaan with ID ${id} not found or no changes were made.`
         )
         .json();
     }
@@ -106,26 +113,29 @@ export const updateFakultas = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        "Terjadi kesalahan internal server saat memperbarui Periode Akademik."
+        "Terjadi kesalahan internal server saat memperbarui Penghasilan Pekerjaan Models."
       )
       .json();
   }
 };
 
-export const deleteFakultas = async (req, res) => {
+export const deletePenghasilanPekerjaan = async (req, res) => {
   const { id } = req.params;
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const isDeleted = await fakultasService.deleteFakultas(id);
+    const isDeleted = await penghasilanPekerjaan.deletePenghasilanPekerjaan(id);
 
     if (isDeleted) {
-      return res.status(204).end();
+      return responseBuilder
+        .code(200)
+        .message(`Data Penghasilan Pekerjaan Berhasil Dihapus`)
+        .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Periode Akademik dengan ID ${id} tidak ditemukan.`)
+        .message(`Penghasilan Pekerjaan with ID ${id} not found.`)
         .json();
     }
   } catch (error) {
@@ -133,7 +143,9 @@ export const deleteFakultas = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(500)
-      .message("Terjadi kesalahan internal server saat menghapus Fakultas.")
+      .message(
+        "Terjadi kesalahan internal server saat menghapus Penghasilan Pekerjaan."
+      )
       .json();
   }
 };

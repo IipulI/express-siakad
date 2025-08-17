@@ -68,8 +68,84 @@ export const create = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        err.message || "Terjadi kesalahan saat menambahkan data Tahun Ajaran."
+        err.message || "Terjadi kesalahan saat menambahkan data Ruangan."
       )
+      .json();
+  }
+};
+
+export const updateRuangan = async (req, res) => {
+  const { id } = req.params;
+  const { siakFakultasId, nama, ruangan, kapasitas, lantai } = req.body;
+  const responseBuilder = new ResponseBuilder(res);
+
+  if (!nama && !ruangan) {
+    return responseBuilder
+      .status("failure")
+      .code(404)
+      .message("At least one field (Nama or Ruangan) is required for update.")
+      .json();
+  }
+
+  try {
+    const isUpdated = await ruanganService.updateRuangan(id, {
+      siakFakultasId,
+      nama,
+      ruangan,
+      kapasitas,
+      lantai,
+    });
+
+    if (isUpdated) {
+      return responseBuilder
+        .status("success")
+        .code(200)
+        .message("Update data successfully.")
+        .json();
+    } else {
+      return responseBuilder
+        .status("failure")
+        .code(404)
+        .message(`Ruangan with ID ${id} not found or no changes were made.`)
+        .json();
+    }
+  } catch (error) {
+    console.error(error);
+    return responseBuilder
+      .status("failure")
+      .code(500)
+      .message(
+        "Terjadi kesalahan internal server saat memperbarui Ruangan Models."
+      )
+      .json();
+  }
+};
+
+export const deleteRuangan = async (req, res) => {
+  const { id } = req.params;
+  const responseBuilder = new ResponseBuilder(res);
+
+  try {
+    const isDeleted = await ruanganService.deleteRuangan(id);
+
+    if (isDeleted) {
+      return responseBuilder
+        .code(200)
+        .message(`Data Ruangan Berhasil Dihapus`)
+        .json();
+    } else {
+      return responseBuilder
+        .status("failure")
+        .code(404)
+        .message(`Ruangan with ID ${id} not found.`)
+        .json();
+    }
+  } catch (error) {
+    console.error(error);
+    return responseBuilder
+      .status("failure")
+      .code(500)
+      .message("Terjadi kesalahan internal server saat menghapus Ruangan.")
       .json();
   }
 };

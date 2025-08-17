@@ -1,5 +1,5 @@
 import { getPagination } from "../utils/pagination.js";
-import * as models from "../models/index.js";
+import models from "../models/index.js";
 const { Fakultas, Ruangan } = models;
 
 export const findAll = async (page, size) => {
@@ -48,5 +48,22 @@ export const findAll = async (page, size) => {
 };
 
 export const createFakultas = async (fakultasData) => {
-    const {}
+  const { nama } = fakultasData;
+
+  const existingFakultas = await Fakultas.findOne({ where: { nama } });
+
+  if (existingRuangan) {
+    throw new Error(`Fakultas with name "${ruangan}" already exists.`);
+  }
+
+  try {
+    await Ruangan.create({ siakFakultasId, nama, ruangan, kapasitas, lantai });
+  } catch (err) {
+    if (err.name === "SequelizeUniqueConstraintError") {
+      throw new Error(
+        `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
+      );
+    }
+    throw new Error(`Error creating Ruangan: ${err.message}`);
+  }
 };

@@ -1,7 +1,6 @@
 // /models/tahunajaran.models.js
 import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
-import Fakultas from "./fakultas.model.js";
 
 export default (sequelize) => {
   class Ruangan extends Model {

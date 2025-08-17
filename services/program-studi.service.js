@@ -1,25 +1,24 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
 
-const { Ruangan, Fakultas } = models;
+const { ProgramStudi } = models;
 
 export const findAll = async (page, size) => {
   try {
     if (page !== null && size !== null) {
       const { limit, offset } = getPagination(page, size);
 
-      const { count, rows } = await Ruangan.findAndCountAll({
+      const { count, rows } = await ProgramStudi.findAndCountAll({
         attributes: [
           "id",
           "siak_fakultas_id",
+          "siak_jenjang_id",
           "nama",
-          "ruangan",
-          "kapasitas",
-          "lantai",
+          "kode",
         ],
         limit,
         offset,
-        order: [["ruangan", "DESC"]],
+        order: [["id", "DESC"]],
         raw: true,
       });
 
@@ -34,14 +33,13 @@ export const findAll = async (page, size) => {
         isPaginated: true,
       };
     } else {
-      const { count, rows } = await Ruangan.findAndCountAll({
+      const { count, rows } = await ProgramStudi.findAndCountAll({
         attributes: [
           "id",
           "siak_fakultas_id",
+          "siak_jenjang_id",
           "nama",
-          "ruangan",
-          "kapasitas",
-          "lantai",
+          "kode",
         ],
         include: [
           { model: Fakultas, as: "fakultas", attributes: ["id", "nama"] },
@@ -56,7 +54,6 @@ export const findAll = async (page, size) => {
       };
     }
   } catch (error) {
-    console.log(error);
     throw new Error(`Error retrieving data : ${error.message}`);
   }
 };
