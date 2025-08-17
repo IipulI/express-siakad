@@ -56,6 +56,7 @@ export const findAll = async (page, size) => {
       };
     }
   } catch (error) {
+    console.log(error);
     throw new Error(`Error retrieving data : ${error.message}`);
   }
 };

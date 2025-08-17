@@ -3,7 +3,7 @@ import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
-  class Ruangan extends Model {
+  class KebutuhanKhusus extends Model {
     static associate(models) {
       this.belongsTo(models.Fakultas, {
         foreignKey: "siak_fakultas_id",
@@ -12,32 +12,15 @@ export default (sequelize) => {
     }
   }
 
-  Ruangan.init(
+  KebutuhanKhusus.init(
     {
       id: {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: uuid7,
       },
-      siakFakultasId: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        field: "siak_fakultas_id",
-      },
       nama: {
-        type: DataTypes.STRING(50),
-        allowNull: false,
-      },
-      ruangan: {
-        type: DataTypes.STRING(50),
-        allowNull: false,
-      },
-      kapasitas: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-      },
-      lantai: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING(75),
         allowNull: false,
       },
     },
@@ -47,10 +30,10 @@ export default (sequelize) => {
       timestamps: true,
       paranoid: true,
 
-      modelName: "Ruangan",
-      tableName: "siak_ruangan",
+      modelName: "KebutuhanKhusus",
+      tableName: "siak_kebutuhan_khusus",
     }
   );
 
-  return Ruangan;
+  return KebutuhanKhusus;
 };
