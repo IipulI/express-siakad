@@ -23,7 +23,7 @@ export const findAll = async (req, res) => {
     responseBuilder
       .status("failure")
       .code(500)
-      .message(error.message || "Unexpected error")
+      .message(error.message || "Terjadi kesalahan yang tidak terduga")
       .json();
   }
 };
@@ -36,7 +36,7 @@ export const create = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(422)
-      .message("Validation failed.")
+      .message("Validasi gagal")
       .json(errors.array());
   }
 

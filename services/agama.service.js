@@ -46,7 +46,7 @@ export const findAll = async (page, size) => {
     }
   } catch (error) {
     console.log(error)
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Gagal mengambil data : ${error.message}`);
   }
 };
 
@@ -67,9 +67,9 @@ export const createAgama = async (agamaData) => {
         await Agama.create({ nama });
     } catch (err) {
         if (err.name === 'SequelizeUniqueConstraintError') {
-            throw new Error(`Duplicate entry: ${err.errors.map(e => e.message).join(', ')}`);
+            throw new Error(`Data yang Anda masukkan sudah ada : ${err.errors.map(e => e.message).join(', ')}`);
         }
-        throw new Error(`Error creating Agama : ${err.message}`);
+        throw new Error(`Gagal membuat data Agama : ${err.message}`);
     }
 };
 
@@ -91,7 +91,7 @@ export const updateAgama = async (id, agamaData) => {
         return updatedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error updating agama : ${error.message}`);
+        throw new Error(`Gagal memperbarui data agama : ${error.message}`);
     }
 }
 
@@ -104,6 +104,6 @@ export const deleteAgama = async (id) => {
         return deletedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error deleting agama : ${error.message}`);
+        throw new Error(`Gagal menghapus data agama : ${error.message}`);
     }
 }

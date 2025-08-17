@@ -27,7 +27,7 @@ export const findAll = async (req, res) => {
         responseBuilder
             .status('failure')
             .code(500)
-            .message(err.message || 'Some error occurred.')
+            .message(err.message || 'Terjadi kesalahan')
             .json();
     }
 };
@@ -40,7 +40,7 @@ export const create = async (req, res) => {
         return responseBuilder
             .status('failure')
             .code(422)
-            .message('Validation failed.')
+            .message('Validasi gagal')
             .json(errors.array());
     }
 
@@ -80,7 +80,7 @@ export const updateTahunAjaran = async (req, res) => {
         return responseBuilder
             .status('failure')
             .code(404)
-            .message('At least one field (tahun or nama) is required for update.')
+            .message('Harus mengisi setidaknya satu field (tahun atau nama) untuk melakukan pembaruan')
             .json();
     }
 
@@ -90,13 +90,13 @@ export const updateTahunAjaran = async (req, res) => {
         if (isUpdated) {
             return responseBuilder.status('success')
                 .code(200)
-                .message("Update data successfully.")
+                .message("Data berhasil diperbarui")
                 .json()
         } else {
             return responseBuilder
                 .status('failure')
                 .code(404)
-                .message(`TahunAjaran with ID ${id} not found or no changes were made.`)
+                .message(`Tahun Ajaran dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan”`)
                 .json();
         }
     } catch (error) {
@@ -122,7 +122,7 @@ export const deleteTahunAjaran = async (req, res) => {
             return responseBuilder
                 .status('failure')
                 .code(404)
-                .message(`TahunAjaran with ID ${id} not found.`)
+                .message(`Tahun Ajaran dengan ID ${id} tidak ditemukan`)
                 .json();
         }
     } catch (error) {

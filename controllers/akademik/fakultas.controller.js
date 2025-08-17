@@ -23,7 +23,7 @@ export const findAll = async (req, res) => {
     responseBuilder
       .status("failure")
       .code(500)
-      .message(error.message || "Unexpected error")
+      .message(error.message || "Terjadi kesalah tidak terduga")
       .json();
   }
 };
@@ -76,7 +76,9 @@ export const updateFakultas = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message("At least one field (nama) is required for update.")
+      .message(
+        "Harap isi minimal satu data (nama, kode, tanggal mulai, tanggal selesai, status) untuk update"
+      )
       .json();
   }
 
@@ -87,13 +89,15 @@ export const updateFakultas = async (req, res) => {
       return responseBuilder
         .status("success")
         .code(200)
-        .message("Update data successfully.")
+        .message("Berhasil memperbarui data fakultas")
         .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Fakultas with ID ${id} not found or no changes were made.`)
+        .message(
+          `Periode Akademik dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`
+        )
         .json();
     }
   } catch (error) {
@@ -121,7 +125,7 @@ export const deleteFakultas = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Fakultas with ID ${id} not found.`)
+        .message(`Periode Akademik dengan ID ${id} tidak ditemukan.`)
         .json();
     }
   } catch (error) {

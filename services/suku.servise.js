@@ -46,7 +46,7 @@ export const findAll = async (page, size) => {
     }
   } catch (error) {
     console.log(error)
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Kesalahan saat mengambil data : ${error.message}`);
   }
 };
 
@@ -67,9 +67,9 @@ export const createSuku = async (sukuData) => {
         await Suku.create({ nama });
     } catch (err) {
         if (err.name === 'SequelizeUniqueConstraintError') {
-            throw new Error(`Duplicate entry: ${err.errors.map(e => e.message).join(', ')}`);
+            throw new Error(`Data yang Anda masukkan sudah ada.: ${err.errors.map(e => e.message).join(', ')}`);
         }
-        throw new Error(`Error creating Agama : ${err.message}`);
+        throw new Error(`Gagal membuat data Suku : ${err.message}`);
     }
 };
 
@@ -91,7 +91,7 @@ export const updateSuku = async (id, sukuData) => {
         return updatedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error updating suku : ${error.message}`);
+        throw new Error(`Gagal memperbarui data Suku : ${error.message}`);
     }
 }
 
@@ -104,6 +104,6 @@ export const deleteSuku = async (id) => {
         return deletedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error deleting suku : ${error.message}`);
+        throw new Error(`Gagal menghapus data Suku : ${error.message}`);
     }
 }
