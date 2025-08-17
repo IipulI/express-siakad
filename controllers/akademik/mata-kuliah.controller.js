@@ -19,14 +19,14 @@ export const findAll = async (req, res) => {
 
         return responseBuilder
             .code(200)
-            .message("Successfully retrieve data")
+            .message("Data berhasil diambil")
             .json(payload)
     }
     catch (error) {
         return responseBuilder
             .status('failure')
             .code(500)
-            .message(error.message || 'Unexpected error')
+            .message(error.message || 'Terjadi kesalahan tak terduga')
             .json();
     }
 }
@@ -40,14 +40,14 @@ export const findOne = async (req, res) => {
 
         responseBuilder
             .code(200)
-            .message("Successfully retrieve data")
+            .message("Data berhasil diambil")
             .json(data);
     }
     catch (error) {
         responseBuilder
             .status('failure')
             .code(500)
-            .message(error.message || 'Unexpected error')
+            .message(error.message || 'Terjadi kesalahan tak terduga')
             .json();
     }
 }
@@ -60,7 +60,7 @@ export const create = async (req, res) => {
 
         responseBuilder
             .code(201)
-            .message("Successfully creating MataKuliah data")
+            .message("Data Mata Kuliah berhasil dibuat")
             .json();
     }
     catch (error) {
@@ -75,7 +75,7 @@ export const create = async (req, res) => {
         responseBuilder
             .status('failure')
             .code(500)
-            .message(error.message || 'Unexpected error')
+            .message(error.message || 'Terjadi kesalahan yang tidak terduga')
             .json();
     }
 }
@@ -91,7 +91,7 @@ export const update = async (req, res) => {
             return responseBuilder
                 .status("success")
                 .code(200)
-                .message("Update data successfully.")
+                .message("Data berhasil diperbarui")
                 .json();
         }
         else {
@@ -99,7 +99,7 @@ export const update = async (req, res) => {
                 .status("failure")
                 .code(404)
                 .message(
-                    `Periode Akademik with ID ${id} not found or no changes were made.`
+                    `Periode Akademik dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`
                 )
                 .json();
         }
@@ -108,7 +108,7 @@ export const update = async (req, res) => {
         return responseBuilder
             .status("failure")
             .code(500)
-            .message("Unexpected error")
+            .message("Terjadi kesalahan yang tidak terduga.")
             .json();
     }
 }
@@ -126,7 +126,7 @@ export const destroy = async (req, res) => {
             return responseBuilder
                 .status("failure")
                 .code(404)
-                .message(`Mata Kuliah with ID ${id} not found.`)
+                .message(`Mata kuliah dengan ID ${id} tidak ditemukan`)
                 .json();
         }
     }
@@ -134,7 +134,7 @@ export const destroy = async (req, res) => {
         return responseBuilder
             .status("failure")
             .code(500)
-            .message("Unexpected error")
+            .message("Terjadi kesalahan yang tidak terduga")
             .json();
     }
 }

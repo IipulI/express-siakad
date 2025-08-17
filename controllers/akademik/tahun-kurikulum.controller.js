@@ -28,7 +28,7 @@ export const findAll = async (req, res) => {
         responseBuilder
             .status('failure')
             .code(500)
-            .message(err.message || 'Some error occurred.')
+            .message(err.message || 'Terjadi kesalahan')
             .json();
     }
 }
@@ -42,7 +42,7 @@ export const create = async (req, res) => {
         return responseBuilder
             .status('failure')
             .code(422)
-            .message("validation failed.")
+            .message("Validasi gagal")
             .json(errors.array());
     }
 
@@ -81,7 +81,7 @@ export const update = async (req, res) => {
         return responseBuilder
             .status('failure')
             .code(404)
-            .message("At least one field (tahun, nama, keterangan, tanggalMulai, tanggalSelesai) is required for update")
+            .message("Minimal satu kolom (tahun, nama, keterangan, tanggal mulai, tanggal selesai) harus diisi untuk memperbarui data")
             .json();
     }
 
@@ -91,13 +91,13 @@ export const update = async (req, res) => {
         if (isUpdated) {
             return responseBuilder.status('success')
                 .code(200)
-                .message("Update data successfully")
+                .message("Data berhasil diperbarui")
                 .json();
         } else {
             return responseBuilder
                 .status('failure')
                 .code(404)
-                .message(`Tahun kurikulum with ID ${id} not found or no changes were made`)
+                .message(`Tahun kurikulum dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`)
                 .json();
         }
     }
@@ -105,7 +105,7 @@ export const update = async (req, res) => {
         responseBuilder
             .status('failure')
             .code(500)
-            .message("Unexpected error occurred.")
+            .message("Terjadi kesalahan yang tidak terduga")
             .json();
     }
 }
@@ -124,7 +124,7 @@ export const destroy = async (req, res) => {
             return responseBuilder
                 .status('failure')
                 .code(404)
-                .message(`Tahun Kurikulum with ID ${id} not found.`)
+                .message(`Tahun Kurikulum dengan ID ${id} tidak ditemukan`)
                 .json();
         }
     } catch (error) {
@@ -132,7 +132,7 @@ export const destroy = async (req, res) => {
         return responseBuilder
             .status('failure')
             .code(500)
-            .message('Unexpected error occurred.')
+            .message('Terjadi kesalahan yang tidak terduga')
             .json();
     }
 }

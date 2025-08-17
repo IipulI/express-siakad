@@ -33,14 +33,14 @@ export const fetchKurikulumProdi = async (req, res) => {
 
         return  responseBuilder
             .code(200)
-            .message("Successfully retrieve data")
+            .message("Data berhasil diambil")
             .json(finalResponse)
     }
     catch (error) {
         return responseBuilder
             .status("failure")
             .code(500)
-            .message(error.message || 'Unexpected error')
+            .message(error.message || 'Terjadi kesalahan tak terduga.')
             .json();
     }
 }
@@ -54,14 +54,14 @@ export const addCourseToKurikulumProdi = async (req, res) => {
 
         return responseBuilder
             .code(200)
-            .message("Update data successfully")
+            .message("Data berhasil diperbarui")
             .json();
     }
     catch (error) {
         return responseBuilder
             .status("failure")
             .code(500)
-            .message(error.message || 'Unexpected error')
+            .message(error.message || 'Terjadi kesalahan tak terduga')
             .json();
     }
 }
@@ -76,7 +76,7 @@ export const deleteCourseFromKurikulumProdi = async (req, res) => {
         return responseBuilder
             .status('success')
             .code(200)
-            .message("Update data successfully")
+            .message("Data berhasil diperbarui")
             .json();
     }
     catch (error) {
