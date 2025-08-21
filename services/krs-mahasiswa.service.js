@@ -2,16 +2,19 @@ import db from '../models/index.js'
 import {findActive} from "./periode-akademik.service.js";
 import {Op} from 'sequelize'
 
-// Import your models
 const {
     sequelize,
+    BatasSks,
     Dosen,
+    HasilStudi,
     JadwalKuliah,
+    Jenjang,
     KelasKuliah,
     KrsMahasiswa,
     Mahasiswa,
     MataKuliah,
     PeriodeAkademik,
+    ProgramStudi,
     RincianKrsMahasiswa,
     Ruangan,
     TahunKurikulum
@@ -113,13 +116,34 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
                         ],
                         model: TahunKurikulum,
                         as: 'tahunKurikulum'
-                    }
+                    },
+                    {
+                        attributes: [
+                            'id', 'nama', 'kode'
+                        ],
+                        model:MataKuliah,
+                        as: 'prasyarat1'
+                    },
+                    {
+                        attributes: [
+                            'id', 'nama', 'kode'
+                        ],
+                        model:MataKuliah,
+                        as: 'prasyarat2'
+                    },
+                    {
+                        attributes: [
+                            'id', 'nama', 'kode'
+                        ],
+                        model:MataKuliah,
+                        as: 'prasyarat3'
+                    },
                 ]
             },
             {
                 attributes: ['id', 'hari', 'jamMulai', 'jamSelesai'],
                 model: JadwalKuliah,
-                as: 'jadwalUtama',
+                as: 'jadwalKuliah',
                 include: [
                     {
                         attributes: [
@@ -141,6 +165,7 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
     // --- Step 5: Categorize, Sort, and Combine Results ---
     const notTaken = [];
     const failed = [];
+    const available = [];
 
     // Iterate directly over the available KELAS
     for (const kelas of availableKelas) {
@@ -159,6 +184,10 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
             kelasJson.previousGrade = history.hurufMutu;
             failed.push(kelasJson);
         }
+        else {
+            kelasJson.previousGrade = history.hurufMutu;
+            available.push(kelasJson)
+        }
     }
 
     // The sort function now accesses the nested course property for the semester
@@ -166,7 +195,7 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
     notTaken.sort(sortBySemester);
     failed.sort(sortBySemester);
 
-    return [...notTaken, ...failed];
+    return [...notTaken, ...failed, ...available];
 };
 
 export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
@@ -248,6 +277,37 @@ export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
     }
 };
 
+export const submitKrs = async (siakKrsId, siakMahasiswaId) => {
+    try {
+        const existingKrs = await KrsMahasiswa.findByPk(siakKrsId, {
+            attributes : ['id', 'siakMahasiswaId', 'status']
+        })
+        if(!existingKrs) {
+            throw new Error('Krs tidak ditemukan.')
+        }
+        if (existingKrs.siakMahasiswaId !== siakMahasiswaId) {
+            throw new Error("Krs bukan milik anda")
+        }
+        if(existingKrs.status === "Diajukan" || existingKrs.status === 'Disetujui'){
+            throw new Error(`Status Krs sudah tidak bisa dirubah karena sudah : ${existingKrs.status}`)
+        }
+
+        return await KrsMahasiswa.update(
+            {
+                status: "Diajukan",
+            },
+            {
+                where: {
+                    id: siakKrsId
+                }
+            }
+        )
+    }
+    catch (error) {
+        throw new Error(`Terjadi Kesalahan : ${error.message}`);
+    }
+}
+
 export const updateKrs = async (krsId, kelasKuliahId) => {
     try {
         const krs = await KrsMahasiswa.findByPk(krsId, {
@@ -260,7 +320,7 @@ export const updateKrs = async (krsId, kelasKuliahId) => {
         if (!krs) {
             throw new Error('KRS not found.')
         }
-        if (krs.status === 'Disetujui') {
+        if (krs.status === 'Disetujui' || krs.status === 'Diajukan') {
             throw new Error('Krs Sudah disetujui, tidak bisa dirubah lagi');
         }
 
@@ -346,8 +406,8 @@ export const deleteKrs = async (krsId, kelasKuliahId) => {
         if(!krs) {
             throw new Error('KRS not found.');
         }
-        if (krs.status === 'Disetujui') {
-            throw new Error('Krs Sudah disetujui, tidak bisa dirubah lagi');
+        if (krs.status === 'Disetujui' || krs.status === 'Diajukan') {
+            throw new Error(`Krs sudah ${krs.status}, tidak bisa dirubah lagi`);
         }
 
         await sequelize.transaction(async (trx) => {
@@ -359,7 +419,7 @@ export const deleteKrs = async (krsId, kelasKuliahId) => {
     }
     catch (error) {
         console.log(error);
-        throw new Error(`Error updating KRS: ${error.message}`);
+        throw new Error(error.message);
     }
 }
 
@@ -433,6 +493,148 @@ export const savedKrs = async (mahasiswaId) => {
     })
 
     return dataKelasKuliah;
+}
+
+export const historyKrs = async (mahasiswaId, periodeId) => {
+    try {
+        const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
+            attributes: [
+                'id', 'siakProgramStudiId'
+            ],
+            include: {
+                attributes: [],
+                model: ProgramStudi,
+                as: "programStudi",
+                include: {
+                    attributes: ['id'],
+                    model: Jenjang,
+                    as: 'jenjang',
+                }
+            },
+            raw:true
+        })
+        if (!mahasiswa) {
+            throw new Error(`Mahasiswa tidak ditemukan`)
+        }
+
+        const periodeAkademik = await PeriodeAkademik.findByPk(periodeId, {
+            attributes: [
+                'id', 'kode'
+            ]
+        })
+        if (!periodeAkademik) {
+            throw new Error(`Periode akademik tidak ditemukan`)
+        }
+
+        let batasSks = 0;
+        const hasilStudi = await HasilStudi.findOne({
+            attributes: [
+                'ips'
+            ],
+            where: {
+                siakMahasiswaId: mahasiswaId,
+                siakPeriodeAkademikId: periodeId
+            }
+        })
+
+        if (!hasilStudi) {
+            batasSks = 21;
+        } else {
+            const { batasSks: foundSks } = await BatasSks.findOne({
+                attributes: ['batasSks'],
+                where: {
+                    siakJenjangId: mahasiswa['programStudi.jenjang.id'],
+                    ips_min: {
+                        [Op.lte]: hasilStudi.ips
+                    },
+                    ips_max: {
+                        [Op.gte]: hasilStudi.ips
+                    }
+                },
+                raw: true
+            }) || {};
+            batasSks = foundSks;
+        }
+
+        if (batasSks === undefined) {
+            console.error(`Error: Aturan Batas SKS tidak ditemukan untuk IPS ${hasilStudi.ips}`);
+            batasSks = 21;
+        }
+
+        const  rincianKrsMahasiswa = await RincianKrsMahasiswa.findAll({
+            attributes: [],
+            include: [
+                {
+                    attributes: [],
+                    where: {
+                        siakMahasiswaId: mahasiswaId,
+                        siakPeriodeAkademikId: periodeId
+                    },
+                    model: KrsMahasiswa,
+                    as: 'krsMahasiswa',
+                    required: true,
+                },
+                {
+                    attributes: [
+                        'nama'
+                    ],
+                    model: KelasKuliah,
+                    as: 'kelasKuliah',
+                    include: [
+                        {
+                            attributes: [
+                                'nama', 'kode', 'totalSks'
+                            ],
+                            model: MataKuliah,
+                            as: 'mataKuliah',
+                        },
+                        {
+                            attributes: [
+                                'hari', 'jamMulai', 'jamSelesai',
+                            ],
+                            model: JadwalKuliah,
+                            as: "jadwalKuliah",
+                            include: [
+                                {
+                                    attributes: ['nama'],
+                                    model: Ruangan,
+                                    as: 'ruangan',
+                                },
+                                {
+                                    attributes: ['nama', 'nidn'],
+                                    model: Dosen,
+                                    as: 'dosen',
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            raw: true,
+        }).then(rincianKrsMahasiswa => rincianKrsMahasiswa.map(item => {
+            return {
+                kodeMataKuliah: item['kelasKuliah.mataKuliah.kode'],
+                namaMataKuliah: item['kelasKuliah.mataKuliah.nama'],
+                kelas: item['kelasKuliah.nama'],
+                sks: item['kelasKuliah.mataKuliah.totalSks'],
+                hari: item['kelasKuliah.jadwalKuliah.hari'],
+                jam: `${item['kelasKuliah.jadwalKuliah.jamMulai'].slice(0, 5)} - ${item['kelasKuliah.jadwalKuliah.jamSelesai'].slice(0, 5)}`,
+                ruangan: item['kelasKuliah.jadwalKuliah.ruangan.nama'],
+                dosenPengajar: item['kelasKuliah.jadwalKuliah.dosen.nama'],
+            }
+        }))
+        const totalSks = rincianKrsMahasiswa.reduce((sum, course) => sum + course.sks, 0);
+
+        return {
+            krs: rincianKrsMahasiswa,
+            totalSks: totalSks,
+            batasSks: batasSks,
+        }
+    }
+    catch (error) {
+        console.log(error);
+        throw new Error(error.message);
+    }
 }
 
 // Helper function to get taken subjects, to avoid code duplication
