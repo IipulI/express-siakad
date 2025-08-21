@@ -227,7 +227,12 @@ export const updateKrsMahasiswa = async (krsIds, status) => {
     try {
         await sequelize.transaction(async (trx) => {
             const foundKrs = await KrsMahasiswa.findAll({
-                where: { id: krsIds },
+                where: {
+                    id: krsIds,
+                    status: {
+                        [Op.ne] : "Diajukan"
+                    }
+                },
                 attributes: ['id'],
                 transaction: trx,
             });
@@ -235,7 +240,7 @@ export const updateKrsMahasiswa = async (krsIds, status) => {
             const foundIds = foundKrs.map(krs => krs.id);
             const notFoundIds = krsIds.filter(id => !foundIds.includes(id));
             if (notFoundIds.length > 0) {
-                throw new Error(`KRS with IDs not found: ${notFoundIds.join(', ')}`);
+                throw new Error(`KRS dengan Id: ${notFoundIds.join(', ')}. Tidak ditemukan`);
             }
 
             await KrsMahasiswa.update({

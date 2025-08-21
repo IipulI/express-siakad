@@ -1,7 +1,7 @@
-import * as models from "../models/index.js"
-const { TahunAjaran } = models;
+import models from "../models/index.js"
 import { getPagination } from "../utils/pagination.js";
 import { formatTimestamp } from "../utils/date-formatter.js";
+const { TahunAjaran } = models;
 
 export const findAll = async (page, size) => {
     try {
@@ -52,7 +52,7 @@ export const findAll = async (page, size) => {
 export const createTahunAjaran = async (tahunAjaranData) => {
     const { tahun, nama } = tahunAjaranData;
 
-    const existingTahunAjaran = await TahunAjaran.findOne({ attributes: [], where: { tahun } });
+    const existingTahunAjaran = await TahunAjaran.findOne({ attributes: ['tahun'], where: { tahun } });
     if (existingTahunAjaran) {
         throw new Error(`Tahun Ajaran with year "${tahun}" already exists.`);
     }
