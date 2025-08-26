@@ -15,6 +15,7 @@ import PekerjaanRouter from "./pekerjaan.router.js";
 import PendidikanRouter from "./pendidikan.router.js";
 import PenghasilanPekerjaan from "./penghasilan-pekerjaan.router.js";
 import HasilStudiRouter from "./hasil-studi.router.js";
+import ObeRouter from "./obe.router.js";
 
 const router = Router();
 
@@ -33,6 +34,7 @@ router.use("/suku", SukuRouter);
 router.use("/pekerjaan", PekerjaanRouter);
 router.use("/pendidikan", PendidikanRouter);
 router.use("/penghasilan-pekerjaan", PenghasilanPekerjaan);
+router.use("/obe", ObeRouter)
 
 
 router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
