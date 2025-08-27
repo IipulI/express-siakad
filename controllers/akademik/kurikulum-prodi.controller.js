@@ -6,7 +6,7 @@ export const fetchKurikulumProdi = async (req, res) => {
     const tahunKurikulumId = req.query.siakTahunKurikulumId
 
     if (!programStudiId || !tahunKurikulumId) {
-        throw new Error(`Program studi and tahun kurikulum is required`)
+        throw new Error(`Program Studi dan Tahun Kurikulum wajib diisi`)
     }
 
     const responseBuilder = new ResponseBuilder(res);

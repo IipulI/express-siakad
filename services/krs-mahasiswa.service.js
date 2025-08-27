@@ -30,7 +30,7 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
     });
 
     if (!activePeriod) {
-        throw new Error('No active academic period found.');
+        throw new Error('Tidak ada periode akademik aktif yang ditemukan');
     }
 
     // --- Step 2: Get Student's Program Studi and Course History ---
@@ -54,7 +54,7 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
     });
 
     if (!mahasiswa) {
-        throw new Error(`Mahasiswa with ID ${mahasiswaId} not found.`);
+        throw new Error(`Mahasiswa dengan ID ${mahasiswaId} tidak ditemukan`);
     }
 
     const programStudiId = mahasiswa.siakProgramStudiId;
@@ -202,11 +202,11 @@ export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
     try {
         // Get Mahasiswa
         const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, { attributes: ['id', 'semester'] });
-        if (!mahasiswa) throw new Error('Missing Mahasiswa');
+        if (!mahasiswa) throw new Error('Data mahasiswa tidak ada');
 
         // Get periode aktif
         const activePeriod = await findActive();
-        if (!activePeriod) throw new Error('No active academic period found.');
+        if (!activePeriod) throw new Error('Tidak ada periode akademik aktif yang ditemukan');
 
         // Check eksistensi krs
         const existingKrs = await KrsMahasiswa.findOne({
@@ -230,7 +230,7 @@ export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
             },
         });
         if (selectedClassCourse.length !== kelasKuliahIds.length) {
-            throw new Error('Some classes not found.');
+            throw new Error('Beberapa kelas tidak ditemukan');
         }
 
         // Get taken subjects in a consistent manner (similar to your previous logic)
@@ -273,7 +273,7 @@ export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
         return data;
     } catch (error) {
         console.error('Error saving KRS:', error);
-        throw new Error(`Failed to save KRS: ${error.message}`);
+        throw new Error(`Gagal menyimpan KRS: ${error.message}`);
     }
 };
 
@@ -318,7 +318,7 @@ export const updateKrs = async (krsId, kelasKuliahId) => {
             }]
         });
         if (!krs) {
-            throw new Error('KRS not found.')
+            throw new Error('KRS tidak ditemukan')
         }
         if (krs.status === 'Disetujui' || krs.status === 'Diajukan') {
             throw new Error('Krs Sudah disetujui, tidak bisa dirubah lagi');
@@ -341,7 +341,7 @@ export const updateKrs = async (krsId, kelasKuliahId) => {
             }
         });
         if(newSelectedClasses.length !== kelasKuliahId.length) {
-            throw new Error('Some classes not found.');
+            throw new Error('Beberapa kelas tidak ditemukan');
         }
 
         // Get all courses the student has taken previously
@@ -386,10 +386,10 @@ export const updateKrs = async (krsId, kelasKuliahId) => {
             await krs.save({ transaction: trx });
         });
 
-        return { message: 'KRS updated successfully.' };
+        return { message: 'KRS berhasil diperbarui' };
     } catch (error) {
         console.error('Error updating KRS:', error);
-        throw new Error(`Failed to update KRS: ${error.message}`);
+        throw new Error(`Gagal memperbarui KRS: ${error.message}`);
     }
 };
 
@@ -404,7 +404,7 @@ export const deleteKrs = async (krsId, kelasKuliahId) => {
             }
         })
         if(!krs) {
-            throw new Error('KRS not found.');
+            throw new Error('KRS tidak ditemukan');
         }
         if (krs.status === 'Disetujui' || krs.status === 'Diajukan') {
             throw new Error(`Krs sudah ${krs.status}, tidak bisa dirubah lagi`);
@@ -419,7 +419,7 @@ export const deleteKrs = async (krsId, kelasKuliahId) => {
     }
     catch (error) {
         console.log(error);
-        throw new Error(error.message);
+        throw new Error(`Gagal memperbarui KRS: ${error.message}`);
     }
 }
 
@@ -430,7 +430,7 @@ export const savedKrs = async (mahasiswaId) => {
     });
 
     if (!activePeriod) {
-        throw new Error('No active academic period found.');
+        throw new Error('Tidak ada periode akademik aktif yang ditemukan');
     }
 
     const rincianKrsMahasiswa = await RincianKrsMahasiswa.findAll({
@@ -450,7 +450,7 @@ export const savedKrs = async (mahasiswaId) => {
         .then(rincianKrsMahasiswa => rincianKrsMahasiswa.map(rincian => rincian.siakKelasKuliahId));
 
     if(!rincianKrsMahasiswa){
-        throw new Error(`Mahasiswa with ID ${mahasiswaId} not found.`);
+        throw new Error(`Mahasiswa dengan ID ${mahasiswaId} tidak ditemukan`);
     }
 
     const dataKelasKuliah = await KelasKuliah.findAll({

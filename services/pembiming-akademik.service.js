@@ -149,7 +149,7 @@ export const assignDosen = async (dosenId, mahasiswaIds, periodeAkademikId) => {
             });
 
             if (!periode) {
-                throw new Error(`Academic Period with ID ${periodeAkademikId} not found.`);
+                throw new Error(`Periode Akademik dengan ID ${periodeAkademikId} tidak ditemukan`);
             }
 
             // Validate if all provided mahasiswaIds actually exist
@@ -163,7 +163,7 @@ export const assignDosen = async (dosenId, mahasiswaIds, periodeAkademikId) => {
             const notFoundMahasiswaIds = mahasiswaIds.filter(id => !foundMahasiswaIds.includes(id));
 
             if (notFoundMahasiswaIds.length > 0) {
-                throw new Error(`Some student IDs not found: ${notFoundMahasiswaIds.join(', ')}. Please ensure all students exist.`);
+                throw new Error(`Beberapa ID Mahasiswa tidak ditemukan: ${notFoundMahasiswaIds.join(', ')}. Pastikan semua data mahasiswa tersedia`);
             }
 
             // 2. Get existing assignments for this period
@@ -240,7 +240,7 @@ export const updateKrsMahasiswa = async (krsIds, status) => {
             const foundIds = foundKrs.map(krs => krs.id);
             const notFoundIds = krsIds.filter(id => !foundIds.includes(id));
             if (notFoundIds.length > 0) {
-                throw new Error(`KRS dengan Id: ${notFoundIds.join(', ')}. Tidak ditemukan`);
+                throw new Error(`KRS dengan ID berikut tidak ditemukan: ${notFoundIds.join(', ')}`);
             }
 
             await KrsMahasiswa.update({
@@ -251,6 +251,6 @@ export const updateKrsMahasiswa = async (krsIds, status) => {
             });
         });
     } catch (error) {
-        throw new Error(`Failed to update KRS status: ${error.message}`);
+        throw new Error(`Gagal memperbarui status KRS: ${error.message}`);
     }
 };
