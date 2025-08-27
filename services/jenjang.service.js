@@ -39,7 +39,7 @@ export const findAll = async (page, size) => {
       };
     }
   } catch (error) {
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
   }
 };
 
@@ -49,7 +49,7 @@ export const createJenjang = async (jenjangData) => {
   const existingJenjang = await Jenjang.findOne({ where: { jenjang } });
 
   if (existingJenjang) {
-    throw new Error(`Jenjang with name "${jenjang}" already exists.`);
+    throw new Error(`Jenjang dengan nama "${jenjang}" sudah ada`);
   }
 
   try {
@@ -60,7 +60,7 @@ export const createJenjang = async (jenjangData) => {
         `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
       );
     }
-    throw new Error(`Error creating Jenjang: ${err.message}`);
+    throw new Error(`Terjadi kesalahan saat membuat Jenjang: ${err.message}`);
   }
 };
 
@@ -78,7 +78,7 @@ export const updateJenjang = async (id, updateData) => {
 
     return updatedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error updating Jenjang: ${error.message}`);
+    throw new Error(`Terjadi kesalahan saat memperbarui Jenjang: ${error.message}`);
   }
 };
 
@@ -90,6 +90,6 @@ export const deleteJenjang = async (id) => {
 
     return deletedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error deleting Jenjang: ${error.message}`);
+    throw new Error(`Terjadi kesalahan saat menghapus Jenjang: ${error.message}`);
   }
 };

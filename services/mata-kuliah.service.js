@@ -31,7 +31,7 @@ export const findAll = async (page, size) => {
         }
     }
     catch (error) {
-        throw new Error(`Error retrieving data : ${error.message}`);
+        throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
     }
 }
 
@@ -45,7 +45,7 @@ export const findOne = async (id) => {
         return existMataKuliah;
     }
     catch (error) {
-        throw new Error(`Error retrieving data : ${error.message}`);
+        throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
     }
 }
 
@@ -125,7 +125,7 @@ export const updateMataKuliah = async (id, mataKuliahData) => {
     try {
         const existMataKuliah = await MataKuliah.findByPk(id);
         if (!existMataKuliah) {
-            throw new Error(`Mata Kuliah does not exist`);
+            throw new Error(`Mata Kuliah tidak ditemukan`);
         }
 
         if (mataKuliahData.prasyaratMataKuliah1Id != null) {
@@ -178,7 +178,7 @@ export const updateMataKuliah = async (id, mataKuliahData) => {
         return updatedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error updating data : ${error.message}`);
+        throw new Error(`Kesalahan saat memperbarui data: ${error.message}`);
     }
 }
 
@@ -191,6 +191,6 @@ export const deleteMataKuliah = async (id) => {
         return deletedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error deleting Mata Kuliah : ${error.message}`);
+        throw new Error(`Kesalahan saat menghapus Mata Kuliah: ${error.message}`);
     }
 }

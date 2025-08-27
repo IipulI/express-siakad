@@ -65,7 +65,7 @@ export const findAll = async (page,size) => {
     catch (error) {
         console.log(error)
 
-        throw new Error(`Error retrieving data : ${error}`);
+        throw new Error(`Gagal mengambil data: ${error}`);
     }
 }
 
@@ -101,7 +101,7 @@ export const detailClass = async (id) => {
             ]
         })
         if (!dataClass) {
-            throw new Error(`KelasKuliah doesn't exist`)
+            throw new Error(`Kelas Kuliah tidak ditemukan`)
         }
 
         return dataClass
@@ -116,7 +116,7 @@ export const classSchedule = async(id) => {
     try {
         const existClass = await KelasKuliah.findByPk(id)
         if (!existClass) {
-            throw new Error(`KelasKuliah doesn't exist`)
+            throw new Error(`Kelas Kuliah tidak ditemukan`)
         }
 
         return await JadwalKuliah.findAll({
@@ -154,7 +154,7 @@ export const classParticipant = async(id) => {
     try {
         const existClass = await KelasKuliah.findByPk(id, {attributes: ['id']})
         if (!existClass) {
-            throw new Error(`KelasKuliah doesn't exist`)
+            throw new Error(`Kelas Kuliah tidak ditemukan`)
         }
 
         return await Mahasiswa.findAll({

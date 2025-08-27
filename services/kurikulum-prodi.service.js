@@ -4,7 +4,7 @@ const { MataKuliah } = models
 export const fetchKurikulumProdi = async (programStudiId, tahunKurikulumId) => {
     try {
         if (programStudiId === null && tahunKurikulumId === null) {
-            throw new Error(`Program studi and tahun kurikulum is required`)
+            throw new Error(`Program studi dan tahun kurikulum wajib diisi`)
         }
 
         const rows = await MataKuliah.findAll({
@@ -22,7 +22,7 @@ export const fetchKurikulumProdi = async (programStudiId, tahunKurikulumId) => {
         return rows
     }
     catch (error) {
-        throw new Error(`Error retrieving data : ${error.message}`)
+        throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`)
     }
 }
 
@@ -30,7 +30,7 @@ export const addCourseToKurikulumProdi = async (id, courseData) => {
     try {
         const existingMataKuliah = MataKuliah.findByPk(id)
         if (!existingMataKuliah) {
-            throw new Error(`Data MataKuliah doesn't exist`)
+            throw new Error(`Data MataKuliah tidak ditemukan`)
         }
 
         const [updatedRowsCount] = await MataKuliah.update({
@@ -46,7 +46,7 @@ export const addCourseToKurikulumProdi = async (id, courseData) => {
         return updatedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error updating data : ${error.message}`)
+        throw new Error(`Terjadi kesalahan saat memperbarui data: ${error.message}`)
     }
 }
 
@@ -54,7 +54,7 @@ export const deleteCourseFromKurikulumProdi = async (id) => {
     try {
         const existingMataKuliah = MataKuliah.findByPk(id)
         if (!existingMataKuliah) {
-            throw new Error(`Data MataKuliah doesn't exist`)
+            throw new Error(`Data Mata Kuliah tidak ditemukan`)
         }
 
         const [updatedRowsCount] = await MataKuliah.update({
@@ -68,6 +68,6 @@ export const deleteCourseFromKurikulumProdi = async (id) => {
         })
     }
     catch (error) {
-        throw new Error(`Error updating data : ${error.message}`)
+        throw new Error(`Terjadi kesalahan saat memperbarui data: ${error.message}`)
     }
 }

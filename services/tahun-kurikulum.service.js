@@ -37,7 +37,7 @@ export const findAll = async (page, size) => {
         }
     }
     catch (error) {
-        throw new Error(`Error retrieving data : ${error.message}`);
+        throw new Error(`Gagal mengambil data: ${error.message}`);
     }
 }
 
@@ -57,7 +57,7 @@ export const createTahunKurikulum = async (tahunKurikulumData) => {
         })
     }
     catch (error) {
-        throw new Error(`Error retrieving data : ${error.message}`);
+        throw new Error(`Gagal mengambil data: ${error.message}`);
     }
 }
 
@@ -89,7 +89,7 @@ export const updateTahunKurikulum = async (id, tahunKurikulumData) => {
         return updatedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error updating tahun kurikulum : ${error.message}`);
+        throw new Error(`Gagal memperbarui tahun kurikulum: ${error.message}`);
     }
 }
 
@@ -102,6 +102,6 @@ export const deleteTahunKurikulum = async (id) => {
         return deletedRowsCount > 0;
     }
     catch (error) {
-        throw new Error(`Error deleting tahun kurikulum : ${error.message}`);
+        throw new Error(`Gagal menghapus tahun kurikulum: ${error.message}`);
     }
 }
