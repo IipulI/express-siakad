@@ -2,34 +2,6 @@ import * as KrsMahasiswaService from "../../services/krs-mahasiswa.service.js"
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 
-// export const testEndpoints = async (req, res) =>{
-//     const user = req.user
-//     const mahasiswa = user.mahasiswa
-//     const keyword = req.query.keyword
-//
-//     const responseBuilder = new ResponseBuilder(res);
-//     try {
-//         // 1. Get the parameters from the URL
-//         const mahasiswaId = mahasiswa.id;
-//
-//         // 2. Call the service function with the parameters
-//         const courses = await getAvailableKrs(mahasiswaId, periodeId);
-//
-//         // 3. Send a successful response with the data
-//         res.status(200).json({
-//             message: "Successfully retrieved available courses for KRS.",
-//             data: courses,
-//         });
-//     } catch (error) {
-//         // 4. Handle any errors that occur
-//         console.error("Error getting available KRS:", error);
-//         res.status(500).json({
-//             message: "An error occurred while fetching available courses.",
-//             error: error.message,
-//         });
-//     }
-// }
-
 export const getAvailableKrs = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res)
 
@@ -87,6 +59,40 @@ export const saveKrs = async (req, res) => {
             .code(500)
             .message("Failed to retrieve data")
             .json(error)
+    }
+}
+
+export const submitKrs = async(req, res) => {
+    const responseBuilder = new ResponseBuilder(res)
+    const siakKrsId = req.body.siakKrsId
+
+    try {
+        const user = req.user;
+        const mahasiswa = user?.mahasiswa;
+
+        const updateData = await KrsMahasiswaService.submitKrs(siakKrsId, mahasiswa.id)
+
+        console.log(updateData)
+
+        if (updateData) {
+            responseBuilder
+                .code(200)
+                .message("Berhasil mengajukan krs")
+                .json()
+        } else {
+            responseBuilder
+                .status('failure')
+                .code(500)
+                .message("Gagal mengajukan krs")
+        }
+
+    }
+    catch (error) {
+        console.log("Terdapat error di ketika submit krs : ", error);
+        responseBuilder
+            .status('failure')
+            .code(500)
+            .json(error.message)
     }
 }
 

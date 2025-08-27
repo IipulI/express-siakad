@@ -1,4 +1,4 @@
-import * as models from "../models/index.js";
+import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
 const  { TahunKurikulum, PeriodeAkademik } = models;
 

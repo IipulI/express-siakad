@@ -52,7 +52,7 @@ export const findOne = async (id) => {
 export const createMataKuliah = async (mataKuliahData) => {
 
     // Untuk pengecekan program studi nanti
-    // const programStudiExist = await ProgramStudiModels.findByPk(mataKuliahData.siakProgramStudiId)
+    // const programStudiExist = await ProgramStudi.findByPk(mataKuliahData.siakProgramStudiId)
     // if (!programStudiExist) {
     //     throw new Error(`Program Studi doesn\'t exist`);
     // }
@@ -88,6 +88,7 @@ export const createMataKuliah = async (mataKuliahData) => {
                 }
             }
 
+
             const createdMataKuliah = await MataKuliah.create(
                 {
                     siakProgramStudiId: mataKuliahData.siakProgramStudiId,
@@ -117,7 +118,7 @@ export const createMataKuliah = async (mataKuliahData) => {
         return true;
     }
     catch (error) {
-        throw new Error(`Error creating data : ${error.message}`);
+        throw new Error(error.message);
     }
 }
 

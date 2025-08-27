@@ -227,7 +227,12 @@ export const updateKrsMahasiswa = async (krsIds, status) => {
     try {
         await sequelize.transaction(async (trx) => {
             const foundKrs = await KrsMahasiswa.findAll({
-                where: { id: krsIds },
+                where: {
+                    id: krsIds,
+                    status: {
+                        [Op.ne] : "Diajukan"
+                    }
+                },
                 attributes: ['id'],
                 transaction: trx,
             });

@@ -8,6 +8,11 @@ export default (sequelize) => {
       this.belongsTo(models.Fakultas, {
         foreignKey: "siak_fakultas_id",
       });
+
+      this.belongsTo(models.Jenjang, {
+        foreignKey: "siak_jenjang_id",
+        as: "jenjang"
+      });
     }
   }
 

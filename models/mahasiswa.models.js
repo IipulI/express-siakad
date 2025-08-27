@@ -5,6 +5,11 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class Mahasiswa extends Model {
         static associate(models) {
+            this.belongsTo(models.ProgramStudi, {
+                foreignKey: 'siak_program_studi_id',
+                as: 'programStudi'
+            })
+
             this.hasMany(models.KrsMahasiswa, {
                 foreignKey: 'siak_mahasiswa_id',
                 as: 'krsMahasiswa',
