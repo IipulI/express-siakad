@@ -49,6 +49,8 @@ export default (sequelize) => {
                 type: DataTypes.UUID,
                 fields: "siak_program_studi_id"
             },
+
+            // Info Mahasiswa
             nama: {
                 type: DataTypes.STRING,
                 allowNull: false,
@@ -57,13 +59,96 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
+            angkatan: {
+                type: DataTypes.STRING,
+            },
             semester: {
                 type: DataTypes.INTEGER
             },
             periodeMasuk: {
                 type: DataTypes.STRING,
                 field: "periode_masuk"
-            }
+            },
+            periodeKeluar: {
+                type: DataTypes.STRING,
+                field: "periode_keluar"
+            },
+            kebutuhanKhusus: {
+                type: DataTypes.BOOLEAN,
+                field: "kebutuhan_khusus"
+            },
+            status: {
+                type: DataTypes.STRING,
+            },
+
+            // Umum
+            biodataValid: {
+                type: DataTypes.BOOLEAN,
+                field: "biodata_valid"
+            },
+            jenisKelamin: {
+                type: DataTypes.STRING,
+                field: "jenis_kelamin"
+            },
+            tempatLahir: {
+                type: DataTypes.STRING,
+                field: "tempat_lahir"
+            },
+            tanggalLahir: {
+                type: DataTypes.DATEONLY,
+                field: "tanggal_lahir"
+            },
+            beratBadan: {
+                type: DataTypes.INTEGER,
+                field: "berat_badan"
+            },
+            tinggiBadan: {
+                type: DataTypes.INTEGER,
+                field: "tinggi_badan"
+            },
+            golonganDarah: {
+                type: DataTypes.STRING,
+                field: "golongan_darah"
+            },
+
+            // Kontak
+            noTelepon : {
+                type: DataTypes.STRING,
+                field: "no_telepon"
+            },
+            noWhatsapp : {
+                type: DataTypes.STRING,
+                field: "no_whatsapp"
+            },
+            emailPribadi : {
+                type: DataTypes.STRING,
+                field: "email_pribadi"
+            },
+            emailKampus : {
+                type: DataTypes.STRING,
+                field: "email_kampus"
+            },
+
+            // Kewarganegaraan
+            kewarganegaraan: {
+            },
+            paspor: {
+                type: DataTypes.STRING,
+            },
+            no_kk: {
+                type: DataTypes.STRING,
+                field: "no_kk"
+            },
+            nik: {
+                type: DataTypes.STRING,
+            },
+            status_nikah: {
+                field: "status_nikah"
+            },
+
+
+
+
         },
         {
             sequelize,
