@@ -16,8 +16,10 @@ import PendidikanRouter from "./pendidikan.router.js";
 import PenghasilanPekerjaan from "./penghasilan-pekerjaan.router.js";
 import HasilStudiRouter from "./hasil-studi.router.js";
 import ObeRouter from "./obe.router.js";
+import RpsRouter from "./rps.router.js";
 import BatasSks from "./batas-sks.router.js";
 import JalurPendaftaran from "./jalur-pendaftaran.router.js";
+
 const router = Router();
 
 router.use("/tahun-ajaran", TahunAjaranRouter);
@@ -35,9 +37,11 @@ router.use("/suku", SukuRouter);
 router.use("/pekerjaan", PekerjaanRouter);
 router.use("/pendidikan", PendidikanRouter);
 router.use("/penghasilan-pekerjaan", PenghasilanPekerjaan);
+router.use("/rps", RpsRouter);
 router.use("/batas-sks", BatasSks);
 router.use("/jalur-pendaftaran", JalurPendaftaran);
 router.use("/obe", ObeRouter)
 
 router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
+
 export default router;

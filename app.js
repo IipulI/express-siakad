@@ -1,8 +1,9 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import apiRoutes from './routes/index.js';
-import { errorMiddleware } from './middleware/error.middleware.js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import apiRoutes from "./routes/index.js";
+import { errorMiddleware } from "./middleware/error.middleware.js";
+import path from "path";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -17,13 +18,15 @@ app.use(express.json());
 // Parse URL-encoded bodies
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/public", express.static(path.join(process.cwd(), "public")));
 
 // --- API Routes ---
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Welcome to the Express ES6 Boilerplate API!' });
+app.get("/", (req, res) => {
+  res
+    .status(200)
+    .json({ message: "Welcome to the Express ES6 Boilerplate API!" });
 });
-app.use('/api', apiRoutes);
-
+app.use("/api", apiRoutes);
 
 // --- Error Handling Middleware ---
 // This should be the last middleware to be used
