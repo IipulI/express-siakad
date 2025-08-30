@@ -1,4 +1,4 @@
-import * as kebutuhanKhusus from "../../services/kebutuhan-khusus.service.js";
+import * as BatasSks from "../../services/batas-sks.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
@@ -9,7 +9,7 @@ export const findAll = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const data = await kebutuhanKhusus.findAll(page, size);
+    const data = await BatasSks.findAll(page, size);
 
     let payload;
     if (data.isPaginated === true) {
@@ -27,7 +27,6 @@ export const findAll = async (req, res) => {
       .json();
   }
 };
-
 export const create = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
@@ -41,15 +40,15 @@ export const create = async (req, res) => {
   }
 
   try {
-    const { nama } = req.body;
+    const { siakJenjangId, ipsMin, ipsMax, batasSks } = req.body;
 
-    await kebutuhanKhusus.createKebutuhanKhusus({
-      nama,
+    await BatasSks.createBatasSks({
+      siakJenjangId, ipsMin, ipsMax, batasSks
     });
 
     responseBuilder
       .code(201)
-      .message("Data Kebutuhan Khusus berhasil ditambahkan.")
+      .message("Data Batas Sks berhasil ditambahkan.")
       .json();
   } catch (err) {
     if (err.message.includes("already exists")) {
@@ -65,28 +64,20 @@ export const create = async (req, res) => {
       .code(500)
       .message(
         err.message ||
-          "Terjadi kesalahan saat menambahkan data Kebutuhan Khusus."
+          "Terjadi kesalahan saat menambahkan data Batas Sks"
       )
       .json();
   }
 };
 
-export const updateKebutuhanKhusus = async (req, res) => {
+export const updateBatasSks = async (req, res) => {
   const { id } = req.params;
-  const { nama } = req.body;
+  const { ipsMin, ipsMax, batasSks } = req.body;
   const responseBuilder = new ResponseBuilder(res);
 
-  if (!nama) {
-    return responseBuilder
-      .status("failure")
-      .code(404)
-      .message("Minimal satu kolom (Nama) harus diisi untuk memperbarui data")
-      .json();
-  }
-
   try {
-    const isUpdated = await kebutuhanKhusus.updateKebutuhanKhusus(id, {
-      nama,
+    const isUpdated = await BatasSks.updateBatasSks(id, {
+      ipsMin, ipsMax, batasSks,
     });
 
     if (isUpdated) {
@@ -100,7 +91,7 @@ export const updateKebutuhanKhusus = async (req, res) => {
         .status("failure")
         .code(404)
         .message(
-          `Data Kebutuhan Khusus dengan ID ${id} tidak ditemukan atau tidak ada perubahan`
+          `Data Batas Sks dengan ID ${id} tidak ditemukan atau tidak ada perubahan`
         )
         .json();
     }
@@ -110,39 +101,38 @@ export const updateKebutuhanKhusus = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        "Terjadi kesalahan internal server saat memperbarui Kebutuhan Khusus Models."
+        "Terjadi kesalahan internal server saat memperbarui Batas Sks Models."
       )
       .json();
   }
 };
 
-export const deleteKebutuhanKhusus = async (req, res) => {
-  const { id } = req.params;
-  const responseBuilder = new ResponseBuilder(res);
+export const deleteBatasSks = async (req, res) => {
+    const responseBuilder = new ResponseBuilder(res)
+    const id= req.params.id
+    try {
+        const isDeleted = await BatasSks.deleteBatasSks(id);
 
-  try {
-    const isDeleted = await kebutuhanKhusus.deleteKebutuhanKhusus(id);
-
-    if (isDeleted) {
-      return responseBuilder
-        .code(200)
-        .message(`Data Kebutuhan Khusus Berhasil Dihapus`)
-        .json();
-    } else {
-      return responseBuilder
+        if (isDeleted) {
+        return responseBuilder
+            .code(200)
+            .message(`Data Batas Sks Berhasil Dihapus`)
+            .json();
+        } else {
+        return responseBuilder
+            .status("failure")
+            .code(404)
+            .message(`Batas Sks dengan ID ${id} tidak ditemukan`)
+            .json();
+        }
+    } catch (error) {
+        console.error(error);
+        return responseBuilder
         .status("failure")
-        .code(404)
-        .message(`Kebutuhan Khusus dengan ID ${id} tidak ditemukan`)
-        .json();
-    }
-  } catch (error) {
-    console.error(error);
-    return responseBuilder
-      .status("failure")
-      .code(500)
-      .message(
-        "Terjadi kesalahan internal server saat menghapus Kebutuhan Khusus."
-      )
-      .json();
-  }
-};
+        .code(500)
+        .message(
+            "Terjadi kesalahan internal server saat menghapus Batas Sks."
+        )
+        .json(error.message);
+    };
+}

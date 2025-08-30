@@ -57,7 +57,7 @@ export const findAll = async (page, size) => {
     }
   } catch (error) {
     console.log(error);
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Terjadi kesalahan saat menghapus Ruangan: ${error.message}`);
   }
 };
 
@@ -67,7 +67,7 @@ export const createRuangan = async (ruanganData) => {
   const existingRuangan = await Ruangan.findOne({ where: { ruangan } });
 
   if (existingRuangan) {
-    throw new Error(`Ruangan with name "${ruangan}" already exists.`);
+    throw new Error(`Ruangan dengan nama "${ruangan}" sudah ada`);
   }
 
   try {
@@ -78,7 +78,7 @@ export const createRuangan = async (ruanganData) => {
         `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
       );
     }
-    throw new Error(`Error creating Ruangan: ${err.message}`);
+    throw new Error(`Terjadi kesalahan saat membuat Ruangan: ${err.message}`);
   }
 };
 
@@ -96,7 +96,7 @@ export const updateRuangan = async (id, updateData) => {
 
     return updatedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error updating Ruangan: ${error.message}`);
+    throw new Error(`Terjadi kesalahan saat memperbarui Ruangan: ${error.message}`);
   }
 };
 
@@ -108,6 +108,6 @@ export const deleteRuangan = async (id) => {
 
     return deletedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error deleting Ruangan: ${error.message}`);
+    throw new Error(`Terjadi kesalahan saat menghapus Ruangan: ${error.message}`);
   }
 };
