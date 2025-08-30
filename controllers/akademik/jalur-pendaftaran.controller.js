@@ -1,4 +1,4 @@
-import * as kebutuhanKhusus from "../../services/kebutuhan-khusus.service.js";
+import * as JalurPendaftaran from "../../services/jalur-pendaftaran.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
@@ -9,7 +9,7 @@ export const findAll = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
-    const data = await kebutuhanKhusus.findAll(page, size);
+    const data = await JalurPendaftaran.findAll(page, size);
 
     let payload;
     if (data.isPaginated === true) {
@@ -27,7 +27,6 @@ export const findAll = async (req, res) => {
       .json();
   }
 };
-
 export const create = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
 
@@ -43,13 +42,13 @@ export const create = async (req, res) => {
   try {
     const { nama } = req.body;
 
-    await kebutuhanKhusus.createKebutuhanKhusus({
-      nama,
+    await JalurPendaftaran.createJalurPendaftaran({
+      nama
     });
 
     responseBuilder
       .code(201)
-      .message("Data Kebutuhan Khusus berhasil ditambahkan.")
+      .message("Data Jalur Pendaftaran berhasil ditambahkan.")
       .json();
   } catch (err) {
     if (err.message.includes("already exists")) {
@@ -65,28 +64,20 @@ export const create = async (req, res) => {
       .code(500)
       .message(
         err.message ||
-          "Terjadi kesalahan saat menambahkan data Kebutuhan Khusus."
+          "Terjadi kesalahan saat menambahkan data Jalur Pendaftaran"
       )
       .json();
   }
 };
 
-export const updateKebutuhanKhusus = async (req, res) => {
+export const updateJalurPendaftaran = async (req, res) => {
   const { id } = req.params;
   const { nama } = req.body;
   const responseBuilder = new ResponseBuilder(res);
 
-  if (!nama) {
-    return responseBuilder
-      .status("failure")
-      .code(404)
-      .message("Minimal satu kolom (Nama) harus diisi untuk memperbarui data")
-      .json();
-  }
-
   try {
-    const isUpdated = await kebutuhanKhusus.updateKebutuhanKhusus(id, {
-      nama,
+    const isUpdated = await JalurPendaftaran.updateJalurPendaftaran(id, {
+      nama
     });
 
     if (isUpdated) {
@@ -100,7 +91,7 @@ export const updateKebutuhanKhusus = async (req, res) => {
         .status("failure")
         .code(404)
         .message(
-          `Data Kebutuhan Khusus dengan ID ${id} tidak ditemukan atau tidak ada perubahan`
+          `Data Jalur Pendaftaran dengan ID ${id} tidak ditemukan atau tidak ada perubahan`
         )
         .json();
     }
@@ -110,38 +101,7 @@ export const updateKebutuhanKhusus = async (req, res) => {
       .status("failure")
       .code(500)
       .message(
-        "Terjadi kesalahan internal server saat memperbarui Kebutuhan Khusus Models."
-      )
-      .json();
-  }
-};
-
-export const deleteKebutuhanKhusus = async (req, res) => {
-  const { id } = req.params;
-  const responseBuilder = new ResponseBuilder(res);
-
-  try {
-    const isDeleted = await kebutuhanKhusus.deleteKebutuhanKhusus(id);
-
-    if (isDeleted) {
-      return responseBuilder
-        .code(200)
-        .message(`Data Kebutuhan Khusus Berhasil Dihapus`)
-        .json();
-    } else {
-      return responseBuilder
-        .status("failure")
-        .code(404)
-        .message(`Kebutuhan Khusus dengan ID ${id} tidak ditemukan`)
-        .json();
-    }
-  } catch (error) {
-    console.error(error);
-    return responseBuilder
-      .status("failure")
-      .code(500)
-      .message(
-        "Terjadi kesalahan internal server saat menghapus Kebutuhan Khusus."
+        "Terjadi kesalahan internal server saat memperbarui Jalur Pendaftaran Models."
       )
       .json();
   }

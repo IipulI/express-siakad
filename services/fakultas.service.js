@@ -43,7 +43,7 @@ export const findAll = async (page, size) => {
       };
     }
   } catch (error) {
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Kesalahan saat mengambil data : ${error.message}`);
   }
 };
 
@@ -53,7 +53,7 @@ export const createFakultas = async (fakultasData) => {
   const existingFakultas = await Fakultas.findOne({ where: { nama } });
 
   if (existingRuangan) {
-    throw new Error(`Fakultas with name "${ruangan}" already exists.`);
+    throw new Error(`Fakultas dengan nama "${ruangan}" sudah ada`);
   }
 
   try {
@@ -64,6 +64,6 @@ export const createFakultas = async (fakultasData) => {
         `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
       );
     }
-    throw new Error(`Error creating Ruangan: ${err.message}`);
+    throw new Error(`Terjadi kesalahan saat membuat Ruangan: ${err.message}`);
   }
 };

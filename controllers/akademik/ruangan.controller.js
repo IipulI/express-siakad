@@ -83,7 +83,7 @@ export const updateRuangan = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message("At least one field (Nama or Ruangan) is required for update.")
+      .message("Minimal satu field (Nama atau Ruangan) harus diisi untuk pembaruan")
       .json();
   }
 
@@ -100,13 +100,13 @@ export const updateRuangan = async (req, res) => {
       return responseBuilder
         .status("success")
         .code(200)
-        .message("Update data successfully.")
+        .message("Data berhasil diperbarui")
         .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Ruangan with ID ${id} not found or no changes were made.`)
+        .message(`Ruangan dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`)
         .json();
     }
   } catch (error) {
@@ -137,7 +137,7 @@ export const deleteRuangan = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Ruangan with ID ${id} not found.`)
+        .message(`Ruangan dengan ID ${id} tidak ditemukan`)
         .json();
     }
   } catch (error) {

@@ -40,7 +40,7 @@ export const findAll = async (page, size) => {
     }
   } catch (error) {
     console.log(error);
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
   }
 };
 
@@ -52,7 +52,7 @@ export const createKebutuhanKhusus = async (ruanganData) => {
   });
 
   if (existingKebutuhanKhusus) {
-    throw new Error(`Kebutuhan Khusus with name "${nama}" already exists.`);
+    throw new Error(`Kebutuhan Khusus dengan nama "${nama}" sudah ada`);
   }
 
   try {
@@ -63,7 +63,7 @@ export const createKebutuhanKhusus = async (ruanganData) => {
         `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
       );
     }
-    throw new Error(`Error creating Kebutuhan Khusus: ${err.message}`);
+    throw new Error(`Terjadi kesalahan saat membuat Kebutuhan Khusus: ${err.message}`);
   }
 };
 
@@ -81,7 +81,7 @@ export const updateKebutuhanKhusus = async (id, updateData) => {
 
     return updatedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error updating Kebutuhan Khusus: ${error.message}`);
+    throw new Error(`Gagal memperbarui Kebutuhan Khusus: ${error.message}`);
   }
 };
 
@@ -93,6 +93,6 @@ export const deleteKebutuhanKhusus = async (id) => {
 
     return deletedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error deleting Kebutuhan Khusus: ${error.message}`);
+    throw new Error(`Gagal menghapus Kebutuhan Khusus: ${error.message}`);
   }
 };

@@ -41,7 +41,7 @@ export const findAll = async (page, size) => {
     }
   } catch (error) {
     console.log(error);
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Gagal mengambil data: ${error.message}`);
   }
 };
 
@@ -51,7 +51,7 @@ export const createPekerjaan = async (pekerjaanData) => {
   const existingPekerjaan = await Pekerjaan.findOne({ where: { nama } });
 
   if (existingPekerjaan) {
-    throw new Error(`Ruangan with name "${nama}" already exists.`);
+    throw new Error(`Ruangan dengan nama "${nama}" sudah ada`);
   }
 
   try {
@@ -64,7 +64,7 @@ export const createPekerjaan = async (pekerjaanData) => {
         `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
       );
     }
-    throw new Error(`Error creating Pekerjaan: ${err.message}`);
+    throw new Error(`Gagal membuat data Pekerjaan: ${err.message}`);
   }
 };
 
@@ -82,7 +82,7 @@ export const updatePekerjaan = async (id, updateData) => {
 
     return updatedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error updating Pekerjaan: ${error.message}`);
+    throw new Error(`Gagal memperbarui data Pekerjaan: ${error.message}`);
   }
 };
 
@@ -94,6 +94,6 @@ export const deletePekerjaan = async (id) => {
 
     return deletedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error deleting Pekerjaan: ${error.message}`);
+    throw new Error(`Gagal menghapus data Pekerjaan: ${error.message}`);
   }
 };

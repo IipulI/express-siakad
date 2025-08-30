@@ -23,7 +23,7 @@ export const findAll = async (req, res) => {
     responseBuilder
       .status("failure")
       .code(500)
-      .message(error.message || "Unexpected error")
+      .message(error.message || "Kesalahan tak terduga")
       .json();
   }
 };
@@ -36,7 +36,7 @@ export const create = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(422)
-      .message("Validation failed.")
+      .message("Validasi gagal")
       .json(errors.array());
   }
 
@@ -80,7 +80,7 @@ export const updateJenjang = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message("At least one field (Nama or Jenjang) is required for update.")
+      .message("Setidaknya satu field (Nama atau Jenjang) wajib diisi untuk memperbarui data")
       .json();
   }
 
@@ -94,13 +94,13 @@ export const updateJenjang = async (req, res) => {
       return responseBuilder
         .status("success")
         .code(200)
-        .message("Update data successfully.")
+        .message("Data berhasil diperbarui")
         .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Jenjang with ID ${id} not found or no changes were made.`)
+        .message(`Jenjang dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`)
         .json();
     }
   } catch (error) {
@@ -131,7 +131,7 @@ export const deleteJenjang = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Jenjang with ID ${id} not found.`)
+        .message(`Jenjang dengan ID ${id} tidak ditemukan`)
         .json();
     }
   } catch (error) {

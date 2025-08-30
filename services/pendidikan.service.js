@@ -41,7 +41,7 @@ export const findAll = async (page, size) => {
     }
   } catch (error) {
     console.log(error);
-    throw new Error(`Error retrieving data : ${error.message}`);
+    throw new Error(`Kesalahan saat mengambil data: ${error.message}`);
   }
 };
 
@@ -51,7 +51,7 @@ export const createPendidikan = async (pendidikanData) => {
   const existingPendidikan = await Pendidikan.findOne({ where: { nama } });
 
   if (existingPendidikan) {
-    throw new Error(`Ruangan with name "${nama}" already exists.`);
+    throw new Error(`Ruangan dengan nama "${nama}" sudah ada`);
   }
 
   try {
@@ -62,7 +62,7 @@ export const createPendidikan = async (pendidikanData) => {
         `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
       );
     }
-    throw new Error(`Error creating Pendidikan: ${err.message}`);
+    throw new Error(`Gagal menambahkan Pendidikan: ${err.message}`);
   }
 };
 
@@ -80,7 +80,7 @@ export const updatePendidikan = async (id, updateData) => {
 
     return updatedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error updating Pendidikan: ${error.message}`);
+    throw new Error(`Gagal memperbarui Pendidikan: ${error.message}`);
   }
 };
 
@@ -92,6 +92,6 @@ export const deletePendidikan = async (id) => {
 
     return deletedRowsCount > 0;
   } catch (error) {
-    throw new Error(`Error deleting Pendidikan: ${error.message}`);
+    throw new Error(`Gagal menghapus Pendidikan: ${error.message}`);
   }
 };

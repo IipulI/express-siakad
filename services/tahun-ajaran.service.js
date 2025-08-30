@@ -45,7 +45,7 @@ export const findAll = async (page, size) => {
 
     }
     catch (error) {
-        throw new Error(`Error retrieving data : ${error.message}`);
+        throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
     }
 }
 
@@ -54,7 +54,7 @@ export const createTahunAjaran = async (tahunAjaranData) => {
 
     const existingTahunAjaran = await TahunAjaran.findOne({ attributes: ['tahun'], where: { tahun } });
     if (existingTahunAjaran) {
-        throw new Error(`Tahun Ajaran with year "${tahun}" already exists.`);
+        throw new Error(`Tahun Ajaran dengan tahun "${tahun}" sudah ada`);
     }
 
     try {
@@ -63,7 +63,7 @@ export const createTahunAjaran = async (tahunAjaranData) => {
         if (err.name === 'SequelizeUniqueConstraintError') {
             throw new Error(`Duplicate entry: ${err.errors.map(e => e.message).join(', ')}`);
         }
-        throw new Error(`Error creating Tahun Ajaran: ${err.message}`);
+        throw new Error(`Gagal membuat Tahun Ajaran: ${err.message}`);
     }
 };
 
@@ -81,7 +81,7 @@ export const updateTahunAjaran = async (id, updateData) => {
 
         return updatedRowsCount > 0;
     } catch (error) {
-        throw new Error(`Error updating TahunAjaran: ${error.message}`);
+        throw new Error(`Gagal memperbarui Tahun Ajaran: ${error.message}`);
     }
 };
 
@@ -93,6 +93,6 @@ export const deleteTahunAjaran = async (id) => {
 
         return deletedRowsCount > 0;
     } catch (error) {
-        throw new Error(`Error deleting TahunAjaran: ${error.message}`);
+        throw new Error(`Gagal menghapus Tahun Ajaran: ${error.message}`);
     }
 };

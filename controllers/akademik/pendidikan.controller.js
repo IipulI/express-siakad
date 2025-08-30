@@ -23,7 +23,7 @@ export const findAll = async (req, res) => {
     responseBuilder
       .status("failure")
       .code(500)
-      .message(error.message || "Unexpected error")
+      .message(error.message || "Terjadi kesalahan yang tidak diharapkan")
       .json();
   }
 };
@@ -36,7 +36,7 @@ export const create = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(422)
-      .message("Validation failed.")
+      .message("Data tidak valid")
       .json(errors.array());
   }
 
@@ -80,7 +80,7 @@ export const updatePendidikan = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(404)
-      .message("At least one field (Nama or Jenjang) is required for update.")
+      .message("Minimal satu field (Nama atau Jenjang) harus diisi untuk melakukan pembaruan")
       .json();
   }
 
@@ -94,13 +94,13 @@ export const updatePendidikan = async (req, res) => {
       return responseBuilder
         .status("success")
         .code(200)
-        .message("Update data successfully.")
+        .message("Data berhasil diperbarui")
         .json();
     } else {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Pendidikan with ID ${id} not found or no changes were made.`)
+        .message(`Pendidikan dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`)
         .json();
     }
   } catch (error) {
@@ -131,7 +131,7 @@ export const deletePendidikan = async (req, res) => {
       return responseBuilder
         .status("failure")
         .code(404)
-        .message(`Pendidikan with ID ${id} not found.`)
+        .message(`Pendidikan dengan ID ${id} tidak ditemukan`)
         .json();
     }
   } catch (error) {
