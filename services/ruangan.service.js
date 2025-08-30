@@ -11,7 +11,7 @@ export const findAll = async (page, size) => {
       const { count, rows } = await Ruangan.findAndCountAll({
         attributes: [
           "id",
-          "siak_fakultas_id",
+          "siakFakultasId",
           "nama",
           "ruangan",
           "kapasitas",
@@ -37,7 +37,7 @@ export const findAll = async (page, size) => {
       const { count, rows } = await Ruangan.findAndCountAll({
         attributes: [
           "id",
-          "siak_fakultas_id",
+          "siakFakultasId",
           "nama",
           "ruangan",
           "kapasitas",

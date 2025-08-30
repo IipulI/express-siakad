@@ -15,6 +15,7 @@ import PekerjaanRouter from "./pekerjaan.router.js";
 import PendidikanRouter from "./pendidikan.router.js";
 import PenghasilanPekerjaan from "./penghasilan-pekerjaan.router.js";
 import HasilStudiRouter from "./hasil-studi.router.js";
+import RpsRouter from "./rps.router.js";
 
 const router = Router();
 
@@ -33,8 +34,8 @@ router.use("/suku", SukuRouter);
 router.use("/pekerjaan", PekerjaanRouter);
 router.use("/pendidikan", PendidikanRouter);
 router.use("/penghasilan-pekerjaan", PenghasilanPekerjaan);
+router.use("/rps", RpsRouter);
 
-
-router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
+router.use("/mahasiswa/hasil-studi", HasilStudiRouter);
 
 export default router;
