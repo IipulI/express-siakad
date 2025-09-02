@@ -1,4 +1,5 @@
 import db from "../models/index.js";
+import { Op } from "sequelize";
 
 const {
   HasilStudi,
@@ -10,31 +11,13 @@ const {
   RincianKrsMahasiswa,
 } = db;
 
-export const getHasilStudi = async (mahasiswaId, periodeId) => {
+export const getTranskrip = async (mahasiswaId) => {
   try {
     const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
       attributes: ["id", "nama", "periodeMasuk"],
     });
     if (!mahasiswa) {
       throw new Error(`Mahasiswa dengan Id ${mahasiswaId} tidak ditemukan`);
-    }
-
-    const periodeAkademik = await PeriodeAkademik.findByPk(periodeId, {
-      attributes: ["id", "kode"],
-    });
-    if (!periodeAkademik) {
-      throw new Error(`Periode akademik tidak ditemukan`);
-    }
-
-    const hasilStudi = await HasilStudi.findOne({
-      attributes: ["semester", "ips", "ipk", "sksDiambil", "sksLulus"],
-      where: {
-        siak_mahasiswa_id: mahasiswaId,
-        siak_periode_akademik_id: periodeId,
-      },
-    });
-    if (!hasilStudi) {
-      throw new Error(`Hasil studi tidak ditemukan`);
     }
 
     const rincianKrsMahasiswa = await RincianKrsMahasiswa.findAll({
@@ -52,10 +35,9 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
       ],
       include: [
         {
-          attributes: [],
+          attributes: ["semester"],
           where: {
             siakMahasiswaId: mahasiswaId,
-            siakPeriodeAkademikId: periodeId,
           },
           model: KrsMahasiswa,
           as: "krsMahasiswa",
@@ -66,9 +48,12 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
           model: KelasKuliah,
           as: "kelasKuliah",
           include: {
-            attributes: ["nama", "kode", "totalSks"],
+            attributes: ["nama", "kode", "totalSks", "nilai_min"],
             model: MataKuliah,
             as: "mataKuliah",
+            where: {
+              nilai_min: { [Op.ne]: "D" }, // ✅ ini sama dengan SQL: nilai_min != 'D'
+            },
           },
         },
       ],
@@ -76,7 +61,6 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
     });
 
     return {
-      hasilStudi: hasilStudi,
       rincianKrs: rincianKrsMahasiswa,
     };
   } catch (error) {

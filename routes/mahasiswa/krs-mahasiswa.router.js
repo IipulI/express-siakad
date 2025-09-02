@@ -9,5 +9,8 @@ router.post("/ajukan", KrsMahasiswaController.submitKrs);
 router.post("/", KrsMahasiswaController.saveKrs);
 router.put("/:id", KrsMahasiswaController.updateKrs);
 router.delete("/:id", KrsMahasiswaController.deleteKrs);
+router.use("/riwayat-krs", KrsMahasiswaController.getKrsHistory);
+
+// Riwayat KRS
 
 export default router;
