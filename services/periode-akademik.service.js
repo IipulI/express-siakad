@@ -38,7 +38,7 @@ export const findAll = async (page, size) => {
         }
     }
     catch (error) {
-        throw new Error(`Error retrieving data : ${error.message}`);
+        throw new Error(`Gagal mengambil data: ${error.message}`);
     }
 }
 
@@ -51,7 +51,7 @@ export const findActive = async () => {
     })
 
     if(!activePeriod) {
-        throw new Error('No active period found.');
+        throw new Error('Tidak ada periode aktif yang ditemukan');
     }
 
     return activePeriod;
@@ -76,7 +76,7 @@ export const createPeriodeAkademik = async (periodeAkademikData) => {
         })
     }
     catch (error) {
-        throw new Error(`Error creating periode akademik : ${error.message}`);
+        throw new Error(`Gagal membuat data Periode Akademik: ${error.message}`);
     }
 }
 
@@ -102,7 +102,7 @@ export const updatePeriodeAkademik = async (id, updateData) => {
 
         return updatedRowsCount > 0;
     } catch (error) {
-        throw new Error(`Error updating periode akademik: ${error.message}`);
+        throw new Error(`Gagal memperbarui data Periode Akademik: ${error.message}`);
     }
 };
 
@@ -114,6 +114,6 @@ export const deletePeriodeAkademik = async (id) => {
 
         return deletedRowsCount > 0;
     } catch (error) {
-        throw new Error(`Error deleting periode akademik: ${error.message}`);
+        throw new Error(`Gagal menghapus data Periode Akademik: ${error.message}`);
     }
 };

@@ -37,7 +37,7 @@ export const create = async (req, res) => {
     return responseBuilder
       .status("failure")
       .code(422)
-      .message("validation failed.")
+      .message("Validasi gagal.")
       .json(errors.array());
   }
 
