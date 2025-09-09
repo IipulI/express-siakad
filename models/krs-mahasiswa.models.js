@@ -31,23 +31,23 @@ export default (sequelize) => {
             },
             siakMahasiswaId: {
                 type: DataTypes.UUID ,
-                fields: "siak_mahasiswa_id"
+                field: "siak_mahasiswa_id"
             },
             siakPeriodeAkademikId: {
                 type: DataTypes.UUID ,
-                fields: "siak_periode_akademik_id"
+                field: "siak_periode_akademik_id"
             },
             status: {
                 type: DataTypes.STRING ,
-                fields: "status"
+                field: "status"
             },
             sksDiambil: {
                 type: DataTypes.INTEGER ,
-                fields: "sks_diambil"
+                field: "sks_diambil"
             },
             semester: {
                 type: DataTypes.INTEGER ,
-                fields: "semester"
+                field: "semester"
             },
         },
         {

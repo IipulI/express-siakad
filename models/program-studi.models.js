@@ -7,6 +7,7 @@ export default (sequelize) => {
     static associate(models) {
       this.belongsTo(models.Fakultas, {
         foreignKey: "siak_fakultas_id",
+          as: "fakultas",
       });
 
       this.belongsTo(models.Jenjang, {
