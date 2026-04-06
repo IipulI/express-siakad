@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import apiRoutes from "./routes/index.js";
-import { errorMiddleware } from "./middleware/error.middleware.js";
+import { errorMiddleware, handleErrorsAndCleanup } from "./middleware/error.middleware.js";
 import path from "path";
 
 // Load environment variables from .env file
@@ -30,6 +30,7 @@ app.use("/api", apiRoutes);
 
 // --- Error Handling Middleware ---
 // This should be the last middleware to be used
-app.use(errorMiddleware);
+// app.use(errorMiddleware);
+app.use(handleErrorsAndCleanup)
 
 export default app;
