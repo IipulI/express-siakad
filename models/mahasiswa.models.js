@@ -187,9 +187,11 @@ export default (sequelize) => {
                 field: "email_kampus"
             },
 
+            // Administrasi
             // Kewarganegaraan
             kewarganegaraan: {
                 type: DataTypes.STRING, // SUDAH DITAMBAHKAN
+                type: DataTypes.STRING
             },
             paspor: {
                 type: DataTypes.STRING,

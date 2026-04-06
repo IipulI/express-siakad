@@ -48,6 +48,22 @@ Object.keys(db).forEach(modelName => {
     }
 });
 
+// ... kode sebelumnya ...
+
+// 1. TAMBAHKAN BARIS INI UNTUK DEBUGGING
+console.log("=== DAFTAR MODEL YANG BERHASIL DI-LOAD ===");
+console.log(Object.keys(db));
+console.log("==========================================");
+
+// Set up associations
+Object.keys(db).forEach(modelName => {
+    if (db[modelName].associate) {
+        db[modelName].associate(db);
+    }
+});
+
+
+
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 

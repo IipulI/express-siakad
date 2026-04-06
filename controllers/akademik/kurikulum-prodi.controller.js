@@ -144,7 +144,7 @@ export const updateAturanObe = async (req, res) => {
 //     try {
 //         const data = await kurikulumProdiService.fetchPredikatKelulusan();
 //         return responseBuilder.code(200).message("Data Predikat berhasil diambil").json(data);
-//     } catch (error) {
+//     } catch (error) {å
 //         return responseBuilder.status("failure").code(500).message(error.message).json();
 //     }
 // };
