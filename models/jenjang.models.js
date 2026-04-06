@@ -1,4 +1,4 @@
-// /models/tahunajaran.models.js
+// /models/jenjang.models.js
 import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 

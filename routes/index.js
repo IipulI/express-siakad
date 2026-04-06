@@ -8,6 +8,6 @@ const router = Router();
 
 // Mount the user routes at /users
 router.use('/akademik', akademikRoutes);
-router.use('/mahasiswa', verifySsoToken, attachUser, mahasiswaRoutes)
+router.use('/mahasiswa', verifySsoToken, mahasiswaRoutes)
 
 export default router;

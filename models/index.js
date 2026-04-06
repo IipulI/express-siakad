@@ -1,4 +1,3 @@
-// models/index.js
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -25,12 +24,11 @@ if (config.use_env_variable) {
 // Read all files in the current directory
 const files = await fs.readdir(__dirname);
 
-// Filter out non-JS files, the index file itself, and test files
 const modelFiles = files.filter(file => {
     return (
         file.indexOf('.') !== 0 &&
         file !== basename &&
-        file.slice(-3) === '.js' &&
+        file.slice(-10) === '.models.js' &&
         file.indexOf('.test.js') === -1
     );
 });
@@ -38,7 +36,6 @@ const modelFiles = files.filter(file => {
 // Asynchronously import and initialize each model
 for (const file of modelFiles) {
     const filePath = path.join(__dirname, file);
-    // Convert the Windows path to a valid file URL before importing
     const module = await import(pathToFileURL(filePath));
     const model = module.default(sequelize, Sequelize.DataTypes);
     db[model.name] = model;
