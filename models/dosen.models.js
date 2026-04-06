@@ -16,18 +16,19 @@ export default (sequelize) => {
                 as: 'koordinatorMataKuliah'
             });
 
-this.belongsToMany(models.MataKuliah, {
-        through: models.PengembanganRps,
-        foreignKey: 'siakDosenId',      // <-- UBAH JADI camelCase
-        otherKey: 'siakMataKuliahId',   // <-- UBAH JADI camelCase
-        as: 'rpsDikembangkan'
-    });
+             this.belongsToMany(models.MataKuliah, {
+                through: models.PengembanganRps,
+                foreignKey: 'siakDosenId',      // <-- UBAH JADI camelCase
+                otherKey: 'siakMataKuliahId',   // <-- UBAH JADI camelCase
+                as: 'rpsDikembangkan'
+            });
+
             this.belongsToMany(models.MataKuliah, {
-    through: 'siak_pengajar_mata_kuliah', // Harus sama dengan yang di atas
-    foreignKey: 'siak_dosen_id',
-    otherKey: 'siak_mata_kuliah_id',
-    as: 'mataKuliahDiajar'
-});
+                through: 'siak_pengajar_mata_kuliah', // Harus sama dengan yang di atas
+                foreignKey: 'siak_dosen_id',
+                otherKey: 'siak_mata_kuliah_id',
+                as: 'mataKuliahDiajar'
+            });
 
 this.hasOne(models.ProgramStudi, {
         foreignKey: 'kaprodi_id', // Harus sama dengan yang di atas

@@ -1,6 +1,5 @@
 // /models/mahasiswa.models.js
 import {Model, DataTypes, UUID} from "sequelize";
-import {Model, DataTypes, UUID} from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
@@ -14,11 +13,6 @@ export default (sequelize) => {
             this.hasMany(models.KrsMahasiswa, {
                 foreignKey: 'siak_mahasiswa_id',
                 as: 'krsMahasiswa',
-            })
-
-            this.hasMany(models.HasilStudi, {
-                foreignKey: 'siak_mahasiswa_id',
-                as: 'hasilStudi'
             })
 
             this.hasMany(models.HasilStudi, {
@@ -66,10 +60,6 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
-            siakProgramStudiId: {
-                type: DataTypes.UUID,
-                fields: "siak_program_studi_id"
-            },
             // TODO : konsenterasi
             // siakKonsentrasiId: {
             //     type: DataTypes.UUID,
@@ -102,20 +92,6 @@ export default (sequelize) => {
                 field: "siak_jenis_pendaftaran_id"
             },
             gelombang: {
-            // TODO : tahun kurikulum
-            // siakTahunKurikulumId: {
-            //     type: DataTypes.UUID,
-            //     field: "siak_tahun_kurikulum_id"
-            // },
-            siakSistemKuliahId: {
-                type: DataTypes.UUID,
-                field: "siak_sistem_kuliah_id"
-            },
-            siakJenisPendaftaranId: {
-                type: DataTypes.UUID,
-                field: "siak_jenis_pendaftaran_id"
-            },
-            gelombang: {
                 type: DataTypes.STRING,
             },
             // TODO : Tanggal daftar ulang dan masuk
@@ -127,7 +103,6 @@ export default (sequelize) => {
             //     type: DataTypes.DATEONLY,
             //     field: "tanggal_awal_masuk"
             // },
-            },
             // TODO : Tanggal daftar ulang dan masuk
             // tanggalDaftarUlang: {
             //     type: DataTypes.DATEONLY,
