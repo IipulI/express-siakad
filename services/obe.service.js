@@ -18,7 +18,8 @@ export const getProfilLulusan = async (obeId) => {
                 attributes: {
                     exclude: ['createdAt', 'updatedAt', 'deletedAt']
                 },
-                where: { siakObeId : obeId }
+                where: { siakObeId : obeId },
+                transaction: trx
             })
         })
     }

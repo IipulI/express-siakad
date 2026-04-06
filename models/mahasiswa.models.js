@@ -1,5 +1,5 @@
 // /models/mahasiswa.models.js
-import { Model, DataTypes } from "sequelize";
+import {Model, DataTypes, UUID} from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
@@ -13,6 +13,11 @@ export default (sequelize) => {
             this.hasMany(models.KrsMahasiswa, {
                 foreignKey: 'siak_mahasiswa_id',
                 as: 'krsMahasiswa',
+            })
+
+            this.hasMany(models.HasilStudi, {
+                foreignKey: 'siak_mahasiswa_id',
+                as: 'hasilStudi'
             })
 
             this.hasOne(models.KrsMahasiswa, {
@@ -45,10 +50,6 @@ export default (sequelize) => {
                 primaryKey: true,
                 defaultValue: uuid7,
             },
-            siakProgramStudiId: {
-                type: DataTypes.UUID,
-                fields: "siak_program_studi_id"
-            },
 
             // Info Mahasiswa
             nama: {
@@ -59,32 +60,81 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
+            siakProgramStudiId: {
+                type: DataTypes.UUID,
+                fields: "siak_program_studi_id"
+            },
+            // TODO : konsenterasi
+            // siakKonsentrasiId: {
+            //     type: DataTypes.UUID,
+            //     fields: "siak_konsentrasi_id"
+            // },
+            periodeMasuk: {
+                type: DataTypes.STRING,
+                field: "periode_masuk"
+            },
+            // TODO : tahun kurikulum
+            // siakTahunKurikulumId: {
+            //     type: DataTypes.UUID,
+            //     field: "siak_tahun_kurikulum_id"
+            // },
+            siakSistemKuliahId: {
+                type: DataTypes.UUID,
+                field: "siak_sistem_kuliah_id"
+            },
+            siakJenisPendaftaranId: {
+                type: DataTypes.UUID,
+                field: "siak_jenis_pendaftaran_id"
+            },
+            gelombang: {
+                type: DataTypes.STRING,
+            },
+            // TODO : Tanggal daftar ulang dan masuk
+            // tanggalDaftarUlang: {
+            //     type: DataTypes.DATEONLY,
+            //     field: "tanggal_daftar_ulang"
+            // },
+            // tanggalAwalMasuk: {
+            //     type: DataTypes.DATEONLY,
+            //     field: "tanggal_awal_masuk"
+            // },
+            kebutuhanKhusus: {
+                type: DataTypes.BOOLEAN,
+                field: "kebutuhan_khusus"
+            },
+            siakStatusMahasiswaId: {
+                type: UUID,
+                field: "siak_status_mahasiswa_id"
+            },
+            // TODO : Kolom status hapus nantinya
+            status: {
+                type: DataTypes.STRING,
+            },
+            biodataValid: {
+                type: DataTypes.BOOLEAN,
+                field: "biodata_valid"
+            },
+
             angkatan: {
                 type: DataTypes.STRING,
             },
             semester: {
                 type: DataTypes.INTEGER
             },
-            periodeMasuk: {
-                type: DataTypes.STRING,
-                field: "periode_masuk"
-            },
             periodeKeluar: {
                 type: DataTypes.STRING,
                 field: "periode_keluar"
             },
-            kebutuhanKhusus: {
-                type: DataTypes.BOOLEAN,
-                field: "kebutuhan_khusus"
-            },
-            status: {
-                type: DataTypes.STRING,
-            },
 
+            // --- Informasi Umum ---
             // Umum
-            biodataValid: {
-                type: DataTypes.BOOLEAN,
-                field: "biodata_valid"
+            siakAgamaId: {
+                type: UUID,
+                field: "siak_agama_id"
+            },
+            siakSukuId: {
+                type: UUID,
+                field: "siak_suku_id"
             },
             jenisKelamin: {
                 type: DataTypes.STRING,
@@ -110,6 +160,10 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 field: "golongan_darah"
             },
+            siakTransportasiId: {
+                type: DataTypes.UUID,
+                field: "siak_transportasi_id"
+            },
 
             // Kontak
             noTelepon : {
@@ -129,23 +183,197 @@ export default (sequelize) => {
                 field: "email_kampus"
             },
 
-            // Kewarganegaraan
+            // Administrasi
             kewarganegaraan: {
+                type: DataTypes.STRING
             },
             paspor: {
                 type: DataTypes.STRING,
             },
-            no_kk: {
+            noKk: {
                 type: DataTypes.STRING,
                 field: "no_kk"
             },
+            // TODO : no_kps
+            // noKps: {
+            //     type: DataTypes.STRING,
+            //     field: "no_kps"
+            // },
             nik: {
                 type: DataTypes.STRING,
             },
-            status_nikah: {
+            statusNikah: {
+                type: DataTypes.STRING,
                 field: "status_nikah"
             },
+            ukuranJasAlmamater: {
+                type: DataTypes.STRING,
+                field: "ukuran_jas_almamater"
+            },
+            // TODO : dokumen/file akta kelahiran
+            // dokumenAktaKelahiran: {
+            //     type: DataTypes.STRING,
+            //     field: "dokumen_akta_kelahiran"
+            // },
 
+            // Pekerjaan
+            siakPekerjaanId: {
+                type: DataTypes.UUID,
+                field: "siak_pekerjaan_id"
+            },
+            // TODO : hapus kolom pekerjaan
+            pekerjaan: {
+                type: DataTypes.STRING
+            },
+            instansiPekerjaan: {
+                type: DataTypes.STRING,
+                field: "instansi_pekerjaan"
+            },
+            penghasilan: {
+                type: DataTypes.STRING
+            },
+            // TODO : siakPenghasilanId
+            // siakPenghasilanId: {
+            //     type: DataTypes.UUID,
+            //     field: "siak_penghasilan_id"
+            // },
+
+            // Bank
+            noRekening : {
+                type: DataTypes.STRING,
+                field: "no_rekening"
+            },
+            namaRekening : {
+                type: DataTypes.STRING,
+                field: "nama_rekening"
+            },
+            namaBank : {
+                type: DataTypes.STRING,
+                field: "nama_bank"
+            },
+
+            // --- Domisili ---
+            // Ktp
+            alamatKtp: {
+                type: DataTypes.TEXT,
+                field: "alamat_ktp"
+            },
+            rtKtp: {
+                type: DataTypes.STRING,
+                field: "rt_ktp"
+            },
+            rwKtp: {
+                type: DataTypes.STRING,
+                field: "rw_ktp"
+            },
+            provinsiKtp: {
+                type: DataTypes.STRING,
+                field: "provinsi_ktp"
+            },
+            kabupatenKtp: {
+                type: DataTypes.STRING,
+                field: "kabupaten_ktp"
+            },
+            kecamatanKtp: {
+                type: DataTypes.STRING,
+                field: "kecamatan_ktp"
+            },
+            kelurahanKtp: {
+                type: DataTypes.STRING,
+                field: "kelurahan_ktp"
+            },
+            dusunKtp: {
+                type: DataTypes.STRING,
+                field: "dusun_ktp"
+            },
+            kodePosKtp: {
+                type: DataTypes.STRING,
+                field: "kode_pos_ktp"
+            },
+
+            // Domisili
+            alamat: {
+                type: DataTypes.STRING,
+            },
+            rt: {
+                type: DataTypes.STRING,
+            },
+            rw: {
+                type: DataTypes.STRING,
+            },
+            provinsi: {
+                type: DataTypes.STRING,
+            },
+            kabupaten: {
+                type: DataTypes.STRING,
+            },
+            kecamatan: {
+                type: DataTypes.STRING,
+            },
+            kelurahan: {
+                type: DataTypes.STRING,
+            },
+            dusun: {
+                type: DataTypes.STRING,
+            },
+            kodePos: {
+                type: DataTypes.STRING,
+                field: "kode_pos"
+            },
+            // TODO : rubah status tinggal jadi id (narik dari master data)
+            statusTinggal: {
+                type: DataTypes.STRING,
+                field: "status_tinggal"
+            },
+            // siakJenisTinggalId: {
+            //     type: DataTypes.UUID,
+            //     field: "siak_jenis_tinggal_id"
+            // },
+
+            // sekolah
+            siakPendidikanTerakhirId: {
+                type: DataTypes.UUID,
+                field: "siak_pendidikan_terakhir_id"
+            },
+            provinsiPendidikanAsal: {
+                type: DataTypes.STRING,
+                field: "provinsi_pendidikan_asal"
+            },
+            kotaKabPendidikanAsal: {
+                type: DataTypes.STRING,
+                field: "kota_kab_pendidikan_asal"
+            },
+            npsnAsal: {
+                type: DataTypes.STRING,
+                field: "npsn_asal"
+            },
+            namaPendidikanAsal: {
+                type: DataTypes.STRING,
+                field: "nama_pendidikan_asal"
+            },
+            alamatPendidikanAsal: {
+                type: DataTypes.STRING,
+                field: "alamat_pendidikan_asal"
+            },
+            teleponPendidikanAsal: {
+                type: DataTypes.STRING,
+                field: "telepon_pendidikan_asal"
+            },
+            noIjazah: {
+                type: DataTypes.STRING,
+                field: "no_ijazah"
+            },
+            nisn: {
+                type: DataTypes.STRING,
+            },
+            fotoProfil: {
+                type: DataTypes.TEXT,
+                field: "foto_profil"
+            },
+            dokumenIjazah: {
+                type: DataTypes.TEXT,
+                field: "dokumen_ijazah"
+            },
 
 
 

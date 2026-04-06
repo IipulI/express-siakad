@@ -37,8 +37,8 @@ export default (sequelize) => {
       timestamps: true,
       paranoid: true,
 
-      modelName: "ProgramStudi",
-      tableName: "siak_program_studi",
+      modelName: "TeamPenyusunRps",
+      tableName: "siak_team_penysun_rps",
     }
   );
 

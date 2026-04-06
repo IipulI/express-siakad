@@ -20,6 +20,12 @@ export default (sequelize) => {
                 as: "kelasKuliah"
             })
 
+            this.hasMany(models.KomposisiNilaiMataKuliah, {
+                foreignKey: "siak_mata_kuliah_id",
+                as: 'komposisiNilaiMataKuliah',
+            })
+
+            // Prasyarat
             this.belongsTo(models.MataKuliah, {
                 foreignKey: "prasyarat_mata_kuliah_1",
                 as: "prasyarat1"
@@ -41,18 +47,37 @@ export default (sequelize) => {
     MataKuliah.init(
         {
             id: {
+                allowNull: false,
                 type: DataTypes.UUID,
                 primaryKey: true,
                 defaultValue: uuid7
             },
             siakProgramStudiId: {
+                allowNull: false,
                 type: DataTypes.UUID,
                 field: "siak_program_studi_id"
             },
             siakTahunKurikulumId: {
+                allowNull: false,
                 type: DataTypes.UUID,
                 field: "siak_tahun_kurikulum_id"
             },
+            // TODO :
+            // siakBidangIlmuId: {
+            //     allowNull: true,
+            //     type: DataTypes.UUID,
+            //     field: "siak_bidang_ilmu_id"
+            // },
+            // siakJenisMataKuliahId: {
+            //     allowNull: true,
+            //     type: DataTypes.UUID,
+            //     field: "siak_jenis_mata_kuliah_id"
+            // },
+            // siakKelompokMataKuliahId: {
+            //     allowNull: true,
+            //     type: DataTypes.UUID,
+            //     field: "siak_kelompok_mata_kuliah_id"
+            // },
             nama: {
                 allowNull: false,
                 type: DataTypes.STRING
