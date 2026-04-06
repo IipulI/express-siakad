@@ -10,6 +10,11 @@ export default (sequelize) => {
                 as: "mataKuliah",
             })
 
+            this.belongsTo(models.ProgramStudi, {
+                foreignKey: "siak_program_studi_id",
+                as: "programStudi",
+            })
+
             this.belongsTo(models.PeriodeAkademik, {
                 foreignKey: "siak_periode_akademik_id",
                 as: "periodeAkademik",
@@ -41,6 +46,10 @@ export default (sequelize) => {
             siakPeriodeAkademikId: {
                 type: DataTypes.UUID,
                 field: "siak_periode_akademik_id"
+            },
+            siakProgramStudiId: {
+                type: DataTypes.UUID,
+                field: "siak_program_studi_id"
             },
             siakRpsId: {
                 type: DataTypes.UUID,

@@ -1,24 +1,58 @@
 import {getPagination} from "../utils/pagination.js";
 import models from "../models/index.js"
+import {sequelize} from "../config/database.js";
+import { Op } from "sequelize";
 
-const { KelasKuliah, MataKuliah, PeriodeAkademik, JadwalKuliah, Dosen, Ruangan, Mahasiswa, KrsMahasiswa, RincianKrsMahasiswa } = models;
+const {
+    Dosen,
+    JadwalKuliah,
+    KelasKuliah,
+    KomposisiNilaiMataKuliah,
+    KrsMahasiswa,
+    Mahasiswa,
+    MataKuliah,
+    PeriodeAkademik,
+    ProgramStudi,
+    RincianKrsMahasiswa,
+    Ruangan,
+    SkalaPenilaian,
+    UnsurNilai,
+} = models;
 
-export const findAll = async (page,size) => {
+export const findAll = async (page, size, filter) => {
     try {
-        const { limit, offset } = getPagination(page, size);
+        let kelasKuliahWhere = {}
+        let mataKuliahWhere = {}
+        let dosenWhere = {}
 
-        const { count, rows } = await KelasKuliah.findAndCountAll({
+        if (filter.siakPeriodeAkademikId !== undefined) {
+            kelasKuliahWhere.siakPeriodeAkademikId = filter.siakPeriodeAkademikId
+        }
+        if (filter.siakProgramStudiId !== undefined) {
+            kelasKuliahWhere.siakProgramStudiId = filter.siakProgramStudiId
+        }
+        // if (filter.siakSistemKuliahId !== undefined) {
+        //     kelasKuliahWhere.siakSistemKuliahId = filter.siakSistemKuliahId
+        // }
+        if (filter.siakTahunKurikulumId !== undefined) {
+            mataKuliahWhere.siakTahunKurikulumId = filter.siakTahunKurikulumId
+        }
+        if (filter.siakDosenId !== undefined) {
+            dosenWhere.id = filter.siakDosenId
+        }
+
+        let kelasKuliahQueryBuilder = {
             attributes: [
-                'id', 'siakMataKuliahId', 'siakPeriodeAkademikId',
+                'id', 'siakMataKuliahId', 'siakPeriodeAkademikId', 'siakProgramStudiId',
                 'nama', 'kapasitas', 'jumlah_peminat', 'sistem_kuliah', 'status_kelas'
             ],
-            limit,
-            offset,
+            where: kelasKuliahWhere,
             include: [
                 {
                     attributes: [
                         'id', 'nama', 'kode', 'totalSks'
                     ],
+                    where: mataKuliahWhere,
                     model: MataKuliah,
                     as: 'mataKuliah',
                 },
@@ -54,12 +88,22 @@ export const findAll = async (page,size) => {
                     ]
                 }
             ]
-        })
+        }
+
+        let isPaginated = false;
+        if (page !== null && size !== null) {
+            const { limit, offset } = getPagination(page, size);
+            kelasKuliahQueryBuilder.limit = limit;
+            kelasKuliahQueryBuilder.offset = offset;
+            isPaginated = true;
+        }
+
+        const { count, rows } = await KelasKuliah.findAndCountAll(kelasKuliahQueryBuilder)
 
         return {
             count,
             rows,
-            isPaginated: true
+            isPaginated
         }
     }
     catch (error) {
@@ -76,6 +120,13 @@ export const detailClass = async (id) => {
                 exclude: ['createdAt', 'updatedAt', 'deletedAt']
             },
             include: [
+                {
+                    attributes: [
+                        'id', 'nama'
+                    ],
+                    model: ProgramStudi,
+                    as: 'programStudi',
+                },
                 {
                     attributes: [
                         'id', 'nama', 'kode', 'totalSks'
@@ -180,4 +231,203 @@ export const classParticipant = async(id) => {
         console.log(error)
         throw new Error(error);
     }
+}
+
+export const getGradingClass = async(id) => {
+    try {
+        return await sequelize.transaction(async (trx) => {
+            const classExist = await KelasKuliah.findByPk(id, {
+                attributes: ['id', 'siakMataKuliahId'],
+                transaction: trx,
+            })
+            if(!classExist) {
+                throw new Error(`Kelas Kuliah tidak ditemukan`)
+            }
+
+            const mataKuliahExist = await MataKuliah.findByPk(mataKuliahId, {
+                attributes: ['id'],
+                include: {
+                    attributes: [
+                        'id', 'key', 'persentase'
+                    ],
+                    model: KomposisiNilaiMataKuliah,
+                    as: 'komposisiNilaiMataKuliah'
+                },
+                transaction: trx
+            })
+
+            const komposisiMataKuliah = _getKomposisiMataKuliah(mataKuliahExist)
+
+            const participantClass = await RincianKrsMahasiswa.findAll({
+                attributes: [
+                    'id', 'kehadiran', 'tugas', 'uts', 'uas', 'nilai', 'hurufMutu'
+                ],
+                where : {
+                    siakKelasKuliahId: classExist.id
+                },
+                include: {
+                    attributes: ['id'],
+                    model: KrsMahasiswa,
+                    as: 'krsMahasiswa',
+                    include: {
+                        attributes: ['nama', 'npm'],
+                        model: Mahasiswa,
+                        as: "mahasiswa"
+                    }
+                },
+                transaction: trx,
+            })
+
+            const formattedResult = participantClass.map(items => {
+                const participant = items.get( {plain : true} )
+                const hurufMutu  = participant.hurufMutu;
+                const kehadiran = parseFloat(participant.kehadiran)
+                const tugas = parseFloat(participant.tugas)
+                const uts = parseFloat(participant.uts)
+                const uas = parseFloat(participant.uas)
+                const nilai = parseFloat(participant.nilai)
+                const { nama, npm } = participant.krsMahasiswa.mahasiswa;
+
+                return {
+                    nama,
+                    npm,
+                    kehadiran,
+                    tugas,
+                    uts,
+                    uas,
+                    nilai,
+                    hurufMutu
+                };
+            });
+
+            return {
+                komposisiNilai : komposisiMataKuliah,
+                pesertaKelas: formattedResult
+            }
+        })
+    }
+    catch (error) {
+        console.log(error)
+        throw new Error(error.message);
+    }
+}
+
+export const submitGradingClass = async(id, body) => {
+    try {
+        return await sequelize.transaction(async (trx) => {
+            const classExist = await KelasKuliah.findByPk(id, {
+                attributes: ['id', 'siakMataKuliahId'],
+                transaction: trx,
+            })
+            if(!classExist) {
+                throw new Error(`Kelas Kuliah tidak ditemukan`)
+            }
+
+            const mataKuliahExist = await MataKuliah.findByPk(classExist.siakMataKuliahId, {
+                attributes: ['id', 'siakProgramStudiId', 'siakTahunKurikulumId', 'totalSks', 'nilaiMin'],
+                include: {
+                    attributes: [
+                        'id', 'key', 'persentase'
+                    ],
+                    model: KomposisiNilaiMataKuliah,
+                    as: 'komposisiNilaiMataKuliah'
+                },
+                transaction: trx
+            })
+
+            const komposisiMataKuliah = _getKomposisiMataKuliah(mataKuliahExist)
+
+
+            const mahasiswaExist = await Mahasiswa.findByPk(body.siakMahasiswaId, {
+                attributes: ['id'],
+                include: {
+                    attributes: ['id'],
+                    model: KrsMahasiswa,
+                    as: 'krsMahasiswa',
+                },
+                transaction: trx,
+            })
+            if (!mahasiswaExist) {
+                throw new Error(`Mahasiswa tidak ditemukan`)
+            }
+
+            const nilai = (
+                ((komposisiMataKuliah.kehadiran/100) * body.kehadiran ) +
+                ((komposisiMataKuliah.tugas/100) * body.tugas) +
+                ((komposisiMataKuliah.uts/100) * body.uts) +
+                ((komposisiMataKuliah.uas/100) * body.uas)
+            )
+            const skalaPenilaian = await SkalaPenilaian.findOne({
+                attributes: ['hurufMutu', 'angkaMutu'],
+                where: {
+                    siakProgramStudiId: mataKuliahExist.siakProgramStudiId,
+                    siakTahunKurikulumId: mataKuliahExist.siakTahunKurikulumId,
+
+                    nilaiMax: { [Op.gte] : nilai },
+                    nilaiMin: { [Op.lte] : nilai },
+                },
+                transaction: trx
+            })
+
+            const nilaiMinMataKuliah = await SkalaPenilaian.findOne({
+                attributes: ['angkaMutu'],
+                where: {
+                    siakProgramStudiId: mataKuliahExist.siakProgramStudiId,
+                    siakTahunKurikulumId: mataKuliahExist.siakTahunKurikulumId,
+                    hurufMutu: mataKuliahExist.nilaiMin
+                },
+                transaction: trx
+            });
+            if (!nilaiMinMataKuliah) {
+                throw new Error(`Konfigurasi nilai minimum '${mataKuliahExist.nilaiMin}' tidak ditemukan.`);
+            }
+
+            let statusMahasiswa = 'Tidak Lulus';
+            if (skalaPenilaian.angkaMutu >= nilaiMinMataKuliah.angkaMutu) {
+                statusMahasiswa = 'Lulus';
+            } else {
+            }
+
+            await RincianKrsMahasiswa.update({
+                status: statusMahasiswa,
+                kehadiran: body.kehadiran,
+                tugas: body.tugas,
+                uts: body.uts,
+                uas: body.uas,
+                nilai: nilai,
+                hurufMutu: skalaPenilaian.hurufMutu,
+                angkaMutu: skalaPenilaian.angkaMutu,
+                nilaiAkhir: (mataKuliahExist.totalSks * skalaPenilaian.angkaMutu)
+            }, {
+                where: {
+                    siakKelasKuliahId: id,
+                    siakKrsMahasiswaId: mahasiswaExist.krsMahasiswa[0].id
+                }
+            })
+
+            return true
+        })
+    }
+    catch (error) {
+        console.log(error);
+        throw new Error(error.message);
+    }
+}
+
+const _getKomposisiMataKuliah = (mataKuliah) => {
+    let komposisiMataKuliah = {};
+    if (mataKuliah) {
+        const plainData = mataKuliah.get({ plain: true });
+
+        komposisiMataKuliah = plainData.komposisiNilaiMataKuliah.reduce((accumulator, currentItem) => {
+            const key = currentItem.key;
+            const percentage = parseFloat(currentItem.persentase);
+
+            accumulator[key] = (accumulator[key] || 0) + percentage;
+
+            return accumulator;
+        }, {});
+    }
+
+    return komposisiMataKuliah;
 }

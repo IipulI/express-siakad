@@ -49,6 +49,11 @@ export const createMataKuliah = async (mataKuliahData) => {
                     siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
                     siakKelompokMataKuliahId: mataKuliahData.kelompokMataKuliahId,
                     siakRumpunMataKuliahId: mataKuliahData.rumpunMataKuliahId,
+
+                    siakBidangIlmuId : mataKuliahData.siakBidangIlmuId,
+                    siakJenisMataKuliahId : mataKuliahData.siakJenisMataKuliahId,
+                    siakKelompokMataKuliahId : mataKuliahData.siakKelompokMataKuliahId,
+
                     nama: mataKuliahData.nama,
                     namaEn: mataKuliahData.namaEn,
                     kode: mataKuliahData.kode,

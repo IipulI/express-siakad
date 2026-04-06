@@ -26,28 +26,56 @@ import SkalaNilai from "./skala-nilai.route.js";
 import PredikatKelulusan from "./predikat-kelulusan.route.js";
 import Ekivalensi from "./ekivalensi.route.js";
 import MkKurikulum from "./mata-kuliah-kurikulum.route.js";
+import BidangIlmuRouter from "./bidang-ilmu.router.js";
+import JenisMataKuliahRouter from "./jenis-mata-kuliah.router.js";
+import KelompokMataKuliahRouter from "./kelompok-mata-kuliah.router.js";
+import MahasiswaRouter from "./mahasiswa.router.js";
 
 const router = Router();
 
-router.use("/tahun-ajaran", TahunAjaranRouter);
-router.use("/ruangan", RuanganRouter);
-router.use("/periode-akademik", PeriodeAkademikRouter);
-router.use("/tahun-kurikulum", TahunKurikulumRouter);
+// --- AKADEMIK ---
+// kurikulum
 router.use("/mata-kuliah", MataKuliahRouter);
 router.use("/kurikulum-prodi", KurikulumProdiRouter);
-router.use("/jenjang", JenjangRouter);
-router.use("/kebutuhan-khusus", KebutuhanKhususRouter);
-router.use("/kelas-kuliah", KelasKuliahRouter);
-router.use("/pembimbing-akademik", PembimbingAkademikRouter);
-router.use("/agama", AgamaRouter);
-router.use("/suku", SukuRouter);
-router.use("/pekerjaan", PekerjaanRouter);
-router.use("/pendidikan", PendidikanRouter);
-router.use("/penghasilan-pekerjaan", PenghasilanPekerjaan);
+router.use("/tahun-kurikulum", TahunKurikulumRouter);
 router.use("/rps", RpsRouter);
-router.use("/batas-sks", BatasSks);
-router.use("/jalur-pendaftaran", JalurPendaftaran);
 router.use("/obe", ObeRouter)
+router.use("/batas-sks", BatasSks);
+
+// kelas kuliah
+router.use("/kelas-kuliah", KelasKuliahRouter);
+
+
+// --- MAHASISWA ---
+router.use("/mahasiswa", MahasiswaRouter)
+router.use("/pembimbing-akademik", PembimbingAkademikRouter);
+
+
+// --- MASTER DATA ---
+// perguruan tinggi
+router.use("/ruangan", RuanganRouter);
+router.use("/jenjang", JenjangRouter);
+
+// perkuliahan
+router.use("/tahun-ajaran", TahunAjaranRouter);
+router.use("/bidang-ilmu", BidangIlmuRouter)
+router.use("/jenis-mata-kuliah", JenisMataKuliahRouter)
+router.use("/kelompok-mata-kuliah", KelompokMataKuliahRouter)
+
+// biodata
+router.use("/agama", AgamaRouter);
+router.use("/pekerjaan", PekerjaanRouter);
+router.use("/penghasilan-pekerjaan", PenghasilanPekerjaan);
+router.use("/suku", SukuRouter);
+router.use("/pendidikan", PendidikanRouter);
+
+// mahasiswa
+router.use("/jalur-pendaftaran", JalurPendaftaran);
+router.use("/kebutuhan-khusus", KebutuhanKhususRouter);
+
+
+// --- PENGATURAN ---
+router.use("/periode-akademik", PeriodeAkademikRouter);
 
 router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
 router.use("/template-evaluasi", TemplateEvaluasi)
