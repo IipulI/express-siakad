@@ -3,12 +3,15 @@ import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
-    class CapaianMataKuliah extends Model {
+ class CapaianMataKuliah extends Model {
         static associate(models) {
-            this.hasMany(models.PemetaanCplCpmk, {
-                foreignKey: 'siak_capaian_mata_kuliah_id',
-                as: "pemetaanCplCpmk"
-            })
+            // Relasi ke Master CPL (Many-to-Many via tabel pivot siak_pemetaan_cpl_cpmk)
+            this.belongsToMany(models.CapaianPembelajaranLulusan, {
+                through: models.PemetaanCplCpmk,
+                foreignKey: 'siakCapaianMataKuliahId',       // <-- Wajib camelCase
+                otherKey: 'siakCapaianPembelajaranLulusanId',// <-- Wajib camelCase
+                as: 'cplDiCPMK'                              // <-- Alias ini yang dipakai di Service
+            });
         }
     }
 
@@ -22,7 +25,7 @@ export default (sequelize) => {
             siakObeId: {
                 type: DataTypes.UUID,
                 field: "siak_obe_id",
-                allowNull: false,
+                allowNull: true,
             },
             siakMataKuliahId: {
                 type: DataTypes.UUID,

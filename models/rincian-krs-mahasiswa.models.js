@@ -14,6 +14,10 @@ export default (sequelize) => {
                 foreignKey: "siak_kelas_kuliah_id",
                 as: "kelasKuliah",
             })
+            this.hasMany(models.NilaiEvaluasiMahasiswa, {
+            foreignKey: "siak_rincian_krs_mahasiswa_id",
+            as: "daftarNilaiEvaluasi"
+            })
         }
     }
 

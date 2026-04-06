@@ -1,0 +1,47 @@
+import { Model, DataTypes } from "sequelize";
+import { v7 as uuid7 } from "uuid";
+
+export default (sequelize) => {
+    class PemetaanEvaluasiCpmk extends Model {
+        static associate(models) {
+            // FIX: Gunakan siak_cpmk_id sebagai foreignKey ke tabel CPMK
+            this.belongsTo(models.CapaianMataKuliah, {
+                foreignKey: 'siak_cpmk_id', 
+                as: 'capaianMataKuliah'
+            });
+
+            // Relasi ke Komposisi Nilai
+            // this.belongsTo(models.KomposisiNilaiMataKuliah, {
+            //     foreignKey: 'siak_komposisi_nilai_id',
+            //     as: 'komposisiNilai'
+            // });
+        }
+    }
+
+    PemetaanEvaluasiCpmk.init({
+        id: { type: DataTypes.UUID, primaryKey: true, defaultValue: uuid7 },
+        // siakKomposisiNilaiId: { 
+        //     type: DataTypes.UUID, 
+        //     field: 'siak_komposisi_nilai_id' 
+        // },
+        siakCapaianMataKuliahId: { 
+            type: DataTypes.UUID, 
+            // FIX: Ini yang paling penting, sesuai screenshot PgAdmin kamu!
+            field: 'siak_cpmk_id' 
+        },
+        siakCpmkId: {
+  type: DataTypes.UUID, // Atau DataTypes.INTEGER, sesuaikan dengan aslinya
+  field: 'siak_cpmk_id', // <--- INI KUNCINYA, kasih tahu nama kolom aslinya di DB
+  allowNull: true, 
+}
+    }, {
+        sequelize, 
+        underscored: true, 
+        timestamps: true, 
+        paranoid: true,
+        modelName: "PemetaanEvaluasiCpmk", 
+        tableName: "siak_pemetaan_evaluasi_cpmk"
+    });
+
+    return PemetaanEvaluasiCpmk;
+};

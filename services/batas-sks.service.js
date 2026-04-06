@@ -58,16 +58,28 @@ export const findAll = async (page, size) => {
 export const createBatasSks = async (batasSksData) => {
   const { siakJenjangId, ipsMin, ipsMax, batasSks } = batasSksData;
 
+  // FIX LOGIKA: Cek apakah di Jenjang yang sama, rentang IPS ini sudah ada
   const existingBatasSks = await BatasSks.findOne({
-    where: { batasSks },
+    where: { 
+        siak_jenjang_id: siakJenjangId,
+        ips_min: ipsMin,
+        ips_max: ipsMax
+    },
   });
 
   if (existingBatasSks) {
-    throw new Error(`Batas Sks dengan nilai "${BatasSks}" sudah ada`);
+    // FIX TYPO: Pakai batasSks (huruf kecil) agar muncul angka, bukan struktur class
+    throw new Error(`Aturan Batas SKS untuk rentang IPS ${ipsMin} - ${ipsMax} pada jenjang ini sudah ada.`);
   }
 
   try {
-    await BatasSks.create({ siakJenjangId, ipsMin, ipsMax, batasSks });
+    // Gunakan camelCase sesuai mapping Model Abang
+    await BatasSks.create({ 
+        siakJenjangId, 
+        ipsMin, 
+        ipsMax, 
+        batasSks 
+    });
   } catch (err) {
     if (err.name === "SequelizeUniqueConstraintError") {
       throw new Error(

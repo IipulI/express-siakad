@@ -19,6 +19,13 @@ import ObeRouter from "./obe.router.js";
 import RpsRouter from "./rps.router.js";
 import BatasSks from "./batas-sks.router.js";
 import JalurPendaftaran from "./jalur-pendaftaran.router.js";
+import TemplateEvaluasi from "./template-evaluasi.routes.js";
+import GrupMk from "./grup-mk.route.js";
+import KetentuanAkademik from "./ketentuan-akademik.route.js";
+import SkalaNilai from "./skala-nilai.route.js";
+import PredikatKelulusan from "./predikat-kelulusan.route.js";
+import Ekivalensi from "./ekivalensi.route.js";
+import MkKurikulum from "./mata-kuliah-kurikulum.route.js";
 
 const router = Router();
 
@@ -43,5 +50,13 @@ router.use("/jalur-pendaftaran", JalurPendaftaran);
 router.use("/obe", ObeRouter)
 
 router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
+router.use("/template-evaluasi", TemplateEvaluasi)
+router.use("/grup-mk", GrupMk)
+router.use("/ketentuan-akademik", KetentuanAkademik)
+router.use("/skala-nilai", SkalaNilai)
+router.use("/predikat-kelulusan", PredikatKelulusan)
+router.use("/ekivalensi", Ekivalensi)
+router.use("/mata-kuliah-kurikulum", MkKurikulum)
+
 
 export default router;

@@ -47,7 +47,7 @@ export default (sequelize) => {
             },
             siakProgramStudiId: {
                 type: DataTypes.UUID,
-                fields: "siak_program_studi_id"
+                field: "siak_program_studi_id" // Typo 'fields' sudah diperbaiki
             },
 
             // Info Mahasiswa
@@ -128,9 +128,9 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 field: "email_kampus"
             },
-
             // Kewarganegaraan
             kewarganegaraan: {
+                type: DataTypes.STRING, // SUDAH DITAMBAHKAN
             },
             paspor: {
                 type: DataTypes.STRING,
@@ -143,9 +143,9 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
             },
             status_nikah: {
+                type: DataTypes.STRING, // SUDAH DITAMBAHKAN
                 field: "status_nikah"
             },
-
 
 
 

@@ -9,4 +9,6 @@ router.post('/', MataKuliahController.create)
 router.put('/:id', MataKuliahController.update)
 router.delete('/:id', MataKuliahController.destroy)
 
+
+
 export default router;
