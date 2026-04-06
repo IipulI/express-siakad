@@ -42,11 +42,21 @@ for (const file of modelFiles) {
 }
 
 // Set up associations
-Object.keys(db).forEach(modelName => {
-    if (db[modelName].associate) {
-        db[modelName].associate(db);
-    }
-});
+// Object.keys(db).forEach(modelName => {
+//     if (db[modelName].associate) {
+//         db[modelName].associate(db);
+//     }
+// });
+
+// Set up associations (DENGAN GEMBOK GLOBAL ANTI-DOUBLE EXECUTION)
+if (!db._associationsConfigured) {
+    Object.keys(db).forEach(modelName => {
+        if (db[modelName].associate) {
+            db[modelName].associate(db);
+        }
+    });
+    db._associationsConfigured = true; // Tandai bahwa relasi sudah selesai dibuat
+}
 
 // ... kode sebelumnya ...
 

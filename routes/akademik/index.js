@@ -30,6 +30,10 @@ import BidangIlmuRouter from "./bidang-ilmu.router.js";
 import JenisMataKuliahRouter from "./jenis-mata-kuliah.router.js";
 import KelompokMataKuliahRouter from "./kelompok-mata-kuliah.router.js";
 import MahasiswaRouter from "./mahasiswa.router.js";
+import BidangIlmuRouter from "./bidang-ilmu.router.js";
+import JenisMataKuliahRouter from "./jenis-mata-kuliah.router.js";
+import KelompokMataKuliahRouter from "./kelompok-mata-kuliah.router.js";
+import MahasiswaRouter from "./mahasiswa.router.js";
 
 const router = Router();
 
