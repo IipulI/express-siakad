@@ -14,6 +14,11 @@ export default (sequelize) => {
                 foreignKey: "siak_user_id",
                 as: "mahasiswa",
             })
+
+            this.hasMany(models.UserRole, {
+                foreignKey: "siak_user_id",
+                as: "userRole",
+            })
         }
     }
 
@@ -24,9 +29,14 @@ export default (sequelize) => {
                 primaryKey: true,
                 defaultValue: uuid7,
             },
-            eportalUserId: {
-                type: DataTypes.UUID,
-                fields: "eportal_user_id",
+            username: {
+                type: DataTypes.STRING,
+            },
+            email: {
+                type: DataTypes.STRING,
+            },
+            password: {
+                type: DataTypes.STRING,
             }
         },
         {
