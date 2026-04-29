@@ -30,25 +30,38 @@ export const getFormDetailRps = async (req, res) => {
 // =========================================================
 // CONTROLLER: Simpan Data Detail RPS
 // =========================================================
-export const saveDetailRps = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
-    const { mataKuliahId } = req.params;
+// export const saveDetailRps = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     const { mataKuliahId } = req.params;
 
+//     try {
+//         // req.body harus mengandung siakPeriodeAkademikId
+//         const result = await rpsService.upsertDetailRps(mataKuliahId, req.body, req.file);
+
+//         return responseBuilder
+//             .status("success")
+//             .code(result.isNewRecord ? 201 : 200)
+//             .message(result.isNewRecord ? "Berhasil membuat Detail RPS baru" : "Berhasil memperbarui Detail RPS")
+//             .json(result.data);
+//     } catch (error) {
+//         return responseBuilder
+//             .status("failure")
+//             .code(500)
+//             .message(error.message)
+//             .json();
+//     }
+// };
+export const saveDetailRps = async (req, res, next) => {
     try {
-        // req.body harus mengandung siakPeriodeAkademikId
+        const { mataKuliahId } = req.params;
         const result = await rpsService.upsertDetailRps(mataKuliahId, req.body, req.file);
 
-        return responseBuilder
-            .status("success")
+        return new ResponseBuilder(res)
             .code(result.isNewRecord ? 201 : 200)
-            .message(result.isNewRecord ? "Berhasil membuat Detail RPS baru" : "Berhasil memperbarui Detail RPS")
+            .message("Data Detail RPS berhasil disimpan")
             .json(result.data);
     } catch (error) {
-        return responseBuilder
-            .status("failure")
-            .code(500)
-            .message(error.message)
-            .json();
+        next(error); // 👈 File otomatis dihapus oleh Middleware jika error
     }
 };
 
@@ -69,87 +82,127 @@ export const deleteDetailRps = async (req, res) => {
 };
 
 // --- Rencana Pembelajaran Controllers ---
-export const getRencanaPembelajaran = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
+// export const getRencanaPembelajaran = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     const { mataKuliahId } = req.params;
+//     const { periodeId } = req.query; // Tangkap periodeId dari Query URL
+
+//     try {
+//         const data = await rpsService.getRencanaPembelajaran(mataKuliahId, periodeId);
+//         return responseBuilder.status("success").code(200).message("Berhasil mengambil data Rencana Pembelajaran").json(data);
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
+export const getRencanaPembelajaran = async (req, res, next) => {
     try {
-        const data = await rpsService.getRencanaPembelajaran(req.params.mataKuliahId);
-        return responseBuilder.status("success").code(200).message("Berhasil mengambil data").json(data);
-    } catch (error) {
-        return responseBuilder.status("failure").code(500).message(error.message).json();
-    }
+        const data = await rpsService.getRencanaPembelajaran(req.params.mataKuliahId, req.query.periodeId);
+        return new ResponseBuilder(res).code(200).message("Berhasil mengambil data Rencana Pembelajaran").json(data);
+    } catch (error) { next(error); }
 };
 
-export const createRencanaPembelajaran = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
+// export const createRencanaPembelajaran = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         const data = await rpsService.createRencanaPembelajaran(req.params.mataKuliahId, req.body);
+//         return responseBuilder.status("success").code(201).message("Sesi pembelajaran berhasil ditambahkan").json(data);
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
+
+
+// export const createRencanaPembelajaran = async (req, res, next) => {
+//     try {
+//         const data = await rpsService.createRencanaPembelajaran(req.params.mataKuliahId, req.body);
+//         return new ResponseBuilder(res)
+//             .code(201)
+//             .message("Sesi pembelajaran berhasil ditambahkan")
+//             .json(data);
+//     } catch (error) {
+//         next(error);
+//     }
+// };
+
+
+
+// export const updateRencanaPembelajaran = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         const result = await rpsService.updateRencanaPembelajaran(req.params.id, req.body);
+//         if (result) return responseBuilder.status("success").code(200).message("Sesi pembelajaran berhasil diupdate").json(result);
+//         return responseBuilder.status("failure").code(404).message("Data tidak ditemukan").json();
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
+export const createRencanaPembelajaran = async (req, res, next) => {
     try {
         const data = await rpsService.createRencanaPembelajaran(req.params.mataKuliahId, req.body);
-        return responseBuilder.status("success").code(201).message("Sesi pembelajaran berhasil ditambahkan").json(data);
-    } catch (error) {
-        return responseBuilder.status("failure").code(500).message(error.message).json();
-    }
+        return new ResponseBuilder(res).code(201).message("Detail Rencana Pembelajaran berhasil disimpan").json(data);
+    } catch (error) { next(error); }
 };
 
-export const updateRencanaPembelajaran = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
+export const updateRencanaPembelajaran = async (req, res, next) => {
     try {
-        const result = await rpsService.updateRencanaPembelajaran(req.params.id, req.body);
-        if (result) return responseBuilder.status("success").code(200).message("Sesi pembelajaran berhasil diupdate").json(result);
-        return responseBuilder.status("failure").code(404).message("Data tidak ditemukan").json();
-    } catch (error) {
-        return responseBuilder.status("failure").code(500).message(error.message).json();
-    }
+        await rpsService.updateRencanaPembelajaran(req.params.id, req.body, req.params.mataKuliahId);
+        return new ResponseBuilder(res).code(200).message("Detail Rencana Pembelajaran berhasil diperbarui").json({});
+    } catch (error) { next(error); }
 };
 
-export const deleteRencanaPembelajaran = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
+export const deleteRencanaPembelajaran = async (req, res, next) => {
     try {
-        const success = await rpsService.deleteRencanaPembelajaran(req.params.id);
-        if (success) return responseBuilder.status("success").code(200).message("Sesi pembelajaran berhasil dihapus").json();
-        return responseBuilder.status("failure").code(404).message("Data tidak ditemukan").json();
-    } catch (error) {
-        return responseBuilder.status("failure").code(500).message(error.message).json();
-    }
+        await rpsService.deleteRencanaPembelajaran(req.params.id);
+        return new ResponseBuilder(res).code(200).message("Sesi berhasil dihapus").json({});
+    } catch (error) { next(error); }
 };
+
+
 // ==========================================
 // --- BAGIAN RENCANA EVALUASI (HALAMAN 8) ---
 // ==========================================
 export const getRencanaEvaluasi = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
+    const { mataKuliahId } = req.params;
+    const { periodeId } = req.query;
     try {
-        const data = await rpsService.getRencanaEvaluasi(req.params.mataKuliahId);
+        const data = await rpsService.getRencanaEvaluasi(mataKuliahId, periodeId);
         return responseBuilder.status("success").code(200).message("Berhasil mengambil data evaluasi").json(data);
     } catch (error) {
         return responseBuilder.status("failure").code(500).message(error.message).json();
     }
 };
 
-export const createRencanaEvaluasi = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
+// export const saveRencanaEvaluasi = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     const { mataKuliahId } = req.params;
+//     try {
+//         const data = await rpsService.upsertRencanaEvaluasi(mataKuliahId, req.body);
+//         return responseBuilder.status("success").code(200).message("Data evaluasi berhasil disimpan").json(data);
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(400).message(error.message).json();
+//     }
+// };
+
+
+
+export const saveRencanaEvaluasiList = async (req, res, next) => {
     try {
-        const data = await rpsService.createRencanaEvaluasi(req.params.mataKuliahId, req.body);
-        return responseBuilder.status("success").code(201).message("Rencana Evaluasi berhasil ditambahkan").json(data);
+        await rpsService.saveRencanaEvaluasi(req.params.mataKuliahId, req.body);
+        
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Komponen Evaluasi berhasil disimpan dan divalidasi!")
+            .json({});
     } catch (error) {
-        return responseBuilder.status("failure").code(500).message(error.message).json();
+        next(error);
     }
 };
-
-export const updateRencanaEvaluasi = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
-    try {
-        const result = await rpsService.updateRencanaEvaluasi(req.params.id, req.body);
-        if (result) return responseBuilder.status("success").code(200).message("Rencana Evaluasi berhasil diupdate").json(result);
-        return responseBuilder.status("failure").code(404).message("Data tidak ditemukan").json();
-    } catch (error) {
-        return responseBuilder.status("failure").code(500).message(error.message).json();
-    }
-};
-
 export const deleteRencanaEvaluasi = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     try {
-        const success = await rpsService.deleteRencanaEvaluasi(req.params.id);
-        if (success) return responseBuilder.status("success").code(200).message("Rencana Evaluasi berhasil dihapus").json();
-        return responseBuilder.status("failure").code(404).message("Data tidak ditemukan").json();
+        await rpsService.deleteRencanaEvaluasi(req.params.id);
+        return responseBuilder.status("success").code(200).message("Berhasil menghapus data evaluasi").json();
     } catch (error) {
         return responseBuilder.status("failure").code(500).message(error.message).json();
     }

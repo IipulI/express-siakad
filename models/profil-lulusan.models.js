@@ -35,7 +35,12 @@ export default (sequelize) => {
             },
             deskripsi: {
                 type: DataTypes.TEXT
-            }
+            },
+            deskripsiEn: {
+        type: DataTypes.TEXT,
+        field: 'deskripsi_en', // Mapping ke nama kolom snake_case di DB
+        allowNull: true
+    },
         },
         {
             sequelize,

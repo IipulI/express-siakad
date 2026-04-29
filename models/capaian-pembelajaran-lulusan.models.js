@@ -177,6 +177,11 @@ export default (sequelize) => {
                 otherKey: 'siak_mata_kuliah_id',
                 as: 'mataKuliahPemeta'
             });
+            this.hasMany(models.IndikatorKinerja, {
+        // Pakai nama kolom asli di DB (snake_case)
+        foreignKey: "siak_cpl_id", 
+        as: "indikatorKinerja"
+    });
         }
     }
 

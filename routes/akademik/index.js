@@ -31,6 +31,13 @@ import JenisMataKuliahRouter from "./jenis-mata-kuliah.router.js";
 import KelompokMataKuliahRouter from "./kelompok-mata-kuliah.router.js";
 import MahasiswaRouter from "./mahasiswa.router.js";
 
+import EkivalensiMataKuliah from "./ekivalensi-mata-kuliah.router.js";
+
+import CPLUmum from "./cpl-umum.router.js";
+
+import AturanEvaluasiRouter from "./aturan-evaluasi.router.js";
+import MonitoringRouter from "./monitoring.router.js";
+
 const router = Router();
 
 // --- AKADEMIK ---
@@ -41,6 +48,15 @@ router.use("/tahun-kurikulum", TahunKurikulumRouter);
 router.use("/rps", RpsRouter);
 router.use("/obe", ObeRouter)
 router.use("/batas-sks", BatasSks);
+
+
+
+// CPL UMUM TAHUN AKADEMIK
+router.use("/cpl-umum", CPLUmum);
+
+
+//aturan evaluasi
+router.use('/aturan-evaluasi', AturanEvaluasiRouter);
 
 // kelas kuliah
 router.use("/kelas-kuliah", KelasKuliahRouter);
@@ -85,6 +101,7 @@ router.use("/skala-nilai", SkalaNilai)
 router.use("/predikat-kelulusan", PredikatKelulusan)
 router.use("/ekivalensi", Ekivalensi)
 router.use("/mata-kuliah-kurikulum", MkKurikulum)
-
+router.use("/ekivalensi-mata-kuliah", EkivalensiMataKuliah)
+router.use("/monitoring", MonitoringRouter)
 
 export default router;

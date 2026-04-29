@@ -29,6 +29,8 @@ export default (sequelize) => {
                 foreignKey: "siak_kelas_kuliah_id",
                 as: "jadwalUtama"
             })
+
+            
         }
     }
 

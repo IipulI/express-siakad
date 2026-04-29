@@ -9,6 +9,12 @@ export default (sequelize) => {
                 foreignKey: 'siak_tahun_kurikulum_id',
                 as: 'tahunKurikulum',
             })
+            this.belongsToMany(models.Konsentrasi, {
+            through: models.PemetaanKonsentrasiMk,
+            foreignKey: 'siak_mata_kuliah_id',
+            otherKey: 'siak_konsentrasi_id',
+            as: 'konsentrasi' // 👈 Nama as ini wajib sama dengan include di controller
+        });
 
             this.belongsTo(models.ProgramStudi, {
                 foreignKey: 'siak_program_studi_id',
@@ -42,6 +48,7 @@ export default (sequelize) => {
             })
             
             
+            
            MataKuliah.hasMany(models.KomposisiNilaiMataKuliah, { // Sesuaikan nama model ini
     foreignKey: 'siak_mata_kuliah_id',
     as: 'komposisiNilai'
@@ -67,6 +74,7 @@ export default (sequelize) => {
         as: 'pengajarMataKuliah'
     });
     // Relasi Pemetaan CPL
+    
 
 
     // Relasi Pemetaan CPL
@@ -88,6 +96,7 @@ export default (sequelize) => {
     foreignKey: 'siak_kelompok_mata_kuliah_id',
     as: 'kelompokMk'
 });
+
 
 
         }
@@ -262,7 +271,25 @@ pengembangRpsId: { type: DataTypes.UUID, field: 'pengembang_rps_id' },
         metodePembobotan: {
             type: DataTypes.STRING,
             field: 'metode_pembobotan'
-        }
+        },
+        topik: {
+    type: DataTypes.TEXT,
+    field: 'topik'
+},
+kompetensiDasar: {
+    type: DataTypes.TEXT,
+    field: 'kompetensi_dasar'
+},
+sksMinimal: {
+    type: DataTypes.INTEGER,
+    field: 'sks_minimal',
+    defaultValue: 0
+},
+isPaket: {
+    type: DataTypes.BOOLEAN,
+    field: 'is_paket',
+    defaultValue: false
+}
         },
         
         {

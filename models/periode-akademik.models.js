@@ -6,6 +6,10 @@ export default (sequelize) => {
     class PeriodeAkademik extends Model {
         static associate(models) {
             // define assoc
+            this.hasMany(models.TahunKurikulum, {
+        as: 'tahunKurikulum',
+        foreignKey: 'siak_periode_akademik_id'
+    });
         }
     }
 

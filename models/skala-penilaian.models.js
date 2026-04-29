@@ -15,6 +15,13 @@ export default (sequelize) => {
                 foreignKey: 'siak_tahun_kurikulum_id',
                 as: 'tahunKurikulum'
             });
+          
+    this.belongsTo(models.PeriodeAkademik, {
+        foreignKey: 'siak_periode_akademik_id',
+        as: 'periode'
+    });
+            
+            
         }
     }
 
@@ -65,7 +72,12 @@ export default (sequelize) => {
                 field: 'is_default',
                 allowNull: true,
                 defaultValue: false
-            }
+            },
+            siakPeriodeAkademikId: {
+    type: DataTypes.UUID,
+    field: 'siak_periode_akademik_id', // 👈 Jembatan ke database
+    allowNull: true
+}
         },
         {
             sequelize,

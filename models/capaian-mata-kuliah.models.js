@@ -94,7 +94,23 @@ export default (sequelize) => {
             },
             deskripsi: {
                 type: DataTypes.TEXT,
-            }
+            },
+            // 👇 INI DIA TERSANGKA UTAMANYA, SUDAH SAYA TAMBAHKAN 👇
+            target: {
+                type: DataTypes.DOUBLE,
+                allowNull: true,
+                defaultValue: 0
+            },
+            bobot: {
+                type: DataTypes.DOUBLE,
+                allowNull: true,
+                defaultValue: 0
+            },
+            parentId: {
+                type: DataTypes.UUID,
+                field: "parent_id", // Nama kolom fisik di DB
+                allowNull: true,
+            },
         },
         {
             sequelize,
