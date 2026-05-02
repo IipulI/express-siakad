@@ -19,6 +19,13 @@ export default (sequelize) => {
                 foreignKey: "siak_unsur_nilai_id",
                 as: "unsurNilai"
             })
+
+            this.belongsToMany(models.CapaianMataKuliah, {
+                through: models.PemetaanKomposisiCpmk,
+                foreignKey: "siak_komposisi_nilai_id",
+                otherKey: "siak_cpmk_id",
+                as: "cpmkList"
+            })
         }
     }
 

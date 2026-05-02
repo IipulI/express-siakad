@@ -1,0 +1,37 @@
+@startuml
+left to right direction
+actor "Dosen" as Dosen
+usecase "Autentikasi SSO" as Auth
+
+rectangle "Use Cases - Dosen" {
+  usecase "Buat / Update RPS" as UC_BuatRPS
+  usecase "Definisikan CPMK per Mata Kuliah" as UC_DefCpmk
+  usecase "Pemetaan CPL <-> CPMK" as UC_MapCplCpmk
+  usecase "Buat Rencana Pembelajaran (per sesi)" as UC_Rencana
+  usecase "Kelola Komposisi & Komponen Evaluasi" as UC_Komponen
+  usecase "Input Nilai Mahasiswa" as UC_InputNilai
+  usecase "Lihat Monitoring Kelas" as UC_LihatKelas
+}
+
+Dosen -- UC_BuatRPS
+Dosen -- UC_DefCpmk
+Dosen -- UC_MapCplCpmk
+Dosen -- UC_Rencana
+Dosen -- UC_Komponen
+Dosen -- UC_InputNilai
+Dosen -- UC_LihatKelas
+
+UC_BuatRPS ..> Auth : <<include>>
+UC_DefCpmk ..> Auth : <<include>>
+UC_MapCplCpmk ..> Auth : <<include>>
+UC_Rencana ..> Auth : <<include>>
+UC_Komponen ..> Auth : <<include>>
+UC_InputNilai ..> Auth : <<include>>
+UC_LihatKelas ..> Auth : <<include>>
+
+note right of UC_InputNilai
+  Input Nilai mencakup: nilai komponen (tugas, UTS, UAS,
+  praktikum), perhitungan bobot, dan mapping ke CPMK.
+end note
+
+@enduml

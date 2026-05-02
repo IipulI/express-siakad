@@ -304,7 +304,7 @@ export const getDetailTemplate = async (kurikulumId, prodiId, jenisMk) => {
         komponenEvaluasi: item.metodeEvaluasi, 
         metodeEvaluasi: item.jenisEvaluasi,
         bobot: parseFloat(item.bobot),
-        syaratLulus: item.syaratLulus === 'WAJIB' ? 'Ya' : '-'
+        syaratLulus: item.syaratLulus || 'TIDAK_MENJADI_SYARAT_LULUS'
     }));
 
     // Tabel 2: Agregasi Pelaporan Metode Evaluasi
@@ -362,8 +362,16 @@ export const upsertTemplate = async (payload) => {
             
             bobot: item.bobot,
             
-            // Syarat Lulus: Handle jika kiriman berupa "WAJIB" atau "Ya"
-            syaratLulus: (item.syaratLulus === 'WAJIB' || item.syaratLulus === 'Ya') ? 'WAJIB' : 'TIDAK_WAJIB',
+            // Syarat Lulus: Normalkan ke enum baru
+            // Nilai lama 'WAJIB' / 'TIDAK_WAJIB' di-convert ke enum baru
+            syaratLulus: (() => {
+                const val = item.syaratLulus;
+                if (val === 'MENJADI_SYARAT_LULUS' || val === 'WAJIB' || val === 'Ya') 
+                    return 'MENJADI_SYARAT_LULUS';
+                if (val === 'LULUS_DENGAN_NILAI_MINIMUM') 
+                    return 'LULUS_DENGAN_NILAI_MINIMUM';
+                return 'TIDAK_MENJADI_SYARAT_LULUS';
+            })(),
             
             nilaiMinimum: item.nilaiMinimum || 0
         }));

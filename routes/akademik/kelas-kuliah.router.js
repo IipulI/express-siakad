@@ -4,6 +4,7 @@ import * as KelasKuliahController from '../../controllers/akademik/kelas-kuliah.
 const router = new Router();
 
 router.get('/', KelasKuliahController.findAll)
+router.post('/', KelasKuliahController.create)
 router.get('/:id', KelasKuliahController.findOne)
 router.get('/:id/schedule', KelasKuliahController.schedules)
 router.get('/:id/participant', KelasKuliahController.classParticipant)

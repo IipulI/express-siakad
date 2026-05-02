@@ -56,6 +56,7 @@ router.delete('/:obeId/mata-kuliah/:mataKuliahId/capaian-mata-kuliah/:cpmkId', O
 // 3. MANAJEMEN RPS & KOMPONEN EVALUASI (Referensi PDF Hal 6 - 8)
 // =====================================================================
 // FIX: Menggunakan PenilaianController (P Besar) sesuai baris import
+router.get('/mata-kuliah/:mataKuliahId/setup-evaluasi', PenilaianController.getKomposisiRPS);
 router.post('/mata-kuliah/:mataKuliahId/setup-evaluasi', PenilaianController.setupKomposisiRPS);
 
 

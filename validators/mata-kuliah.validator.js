@@ -7,8 +7,8 @@ export const validateCreateMkObe = [
     body('siakTahunKurikulumId').isUUID().withMessage('ID Tahun Kurikulum harus format UUID'),
     body('kode').notEmpty().withMessage('Kode Mata Kuliah wajib diisi'),
     body('nama').notEmpty().withMessage('Nama Mata Kuliah wajib diisi'),
-    body('koordinatorMkId').isUUID().withMessage('ID Koordinator wajib format UUID'),
-    body('pengembangRpsIds').isArray().withMessage('Pengembang RPS harus berupa Array'),
+    body('koordinatorMkId').optional({ checkFalsy: true }).isUUID().withMessage('ID Koordinator wajib format UUID'),
+    body('pengembangRpsIds').optional({ checkFalsy: true }).isArray().withMessage('Pengembang RPS harus berupa Array'),
     
     (req, res, next) => {
         const errors = validationResult(req);

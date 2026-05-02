@@ -319,7 +319,24 @@ export const getPredikatWithHeader = async (params) => {
         order: [['ipkMin', 'DESC']]
     });
 
-    return { header: headerLengkap, tabel: list };
+    return {
+        header: headerLengkap,
+        tabel: list.map(item => ({
+            id: item.id,
+            kode: item.kode,
+            nama: item.namaInd || '-',
+            namaEn: item.namaEng || '-',
+            ipkMin: parseFloat(item.ipkMin) || 0,
+            ipkMax: parseFloat(item.ipkMax) || 0,
+            masaStudi: parseInt(item.masaStudi) || 0,
+            // Kolom OBE Lanjutan (untuk validasi kelulusan)
+            nilaiMin: item.nilaiMin || null,       // Misal: 'C' → semua MK minimal nilai C
+            nilaiMinTa: item.nilaiMinTa || null,   // Misal: 'B' → Tugas Akhir minimal B
+            isCuti: item.isCuti || false,           // Berlaku untuk mahasiswa cuti
+            isMengulang: item.isMengulang || false, // Berlaku untuk mahasiswa mengulang
+            isMabaOnly: item.isMabaOnly || false    // Hanya berlaku untuk mahasiswa baru
+        }))
+    };
 };
 
 export const getPredikatById = async (id) => {

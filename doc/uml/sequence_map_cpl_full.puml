@@ -1,0 +1,20 @@
+@startuml
+actor Dosen
+participant Client
+participant MataKuliahController as Controller
+participant MataKuliahService as Service
+participant PemetaanCplMk as Pemetaan
+database DB
+
+Client -> Controller: POST /mata-kuliah/{id}/map-cpl { mappings }
+Controller -> Service: saveCplMapping(id, mappings)
+Service -> Service: validateMappings(mappings)
+Service -> Pemetaan: destroy({ where: { siakMataKuliahId: id } })
+Service -> Pemetaan: bulkCreate(mappings)
+Pemetaan -> DB: INSERT rows
+Service -> DB: update mata_kuliah.status_pemetaan = true
+Service --> Controller: { success: true }
+Controller --> Client: 200 OK
+
+note right of Service: validations: cek CPL & CPMK exist, total bobot per CPL
+@enduml

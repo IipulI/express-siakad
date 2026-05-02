@@ -1,0 +1,16 @@
+@startuml
+node "Client (Browser)" as client
+node "Reverse Proxy / Load Balancer" as proxy
+node "API Server (Node.js / Express)" as api
+database "Postgres DB" as db
+node "SSO Identity Provider" as sso
+
+client --> proxy
+proxy --> api
+api --> db
+api --> sso
+
+cloud "Storage (RPS files)" as storage
+api --> storage
+
+@enduml

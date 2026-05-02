@@ -113,6 +113,44 @@ export const findAll = async (page, size, filter) => {
     }
 }
 
+export const createClass = async (payload) => {
+    try {
+        const { 
+            siakMataKuliahId, 
+            siakPeriodeAkademikId, 
+            namaKelas, // For backward compatibility or if they use namaKelas
+            nama,      // The actual field name in their new JSON example might be 'nama'
+            kapasitas, 
+            sistem_kuliah, 
+            jumlah_pertemuan, 
+            tanggal_mulai, 
+            tanggal_selesai 
+        } = payload;
+        
+        // Cari MK untuk dapetin prodi
+        const mk = await MataKuliah.findByPk(siakMataKuliahId);
+        if (!mk) throw new Error("Mata Kuliah tidak ditemukan");
+
+        const newClass = await KelasKuliah.create({
+            siakMataKuliahId: siakMataKuliahId,
+            siakPeriodeAkademikId: siakPeriodeAkademikId,
+            siakProgramStudiId: mk.siakProgramStudiId,
+            nama: nama || namaKelas,
+            kapasitas: kapasitas || 40,
+            jumlahPeminat: 0,
+            sistemKuliah: sistem_kuliah,
+            statusKelas: "Dibuka",
+            jumlahPertemuan: jumlah_pertemuan,
+            tanggalMulai: tanggal_mulai,
+            tanggalSelesai: tanggal_selesai
+        });
+        
+        return newClass;
+    } catch (error) {
+        throw new Error(`Gagal membuat kelas: ${error.message}`);
+    }
+}
+
 export const detailClass = async (id) => {
     try {
         const dataClass = await KelasKuliah.findByPk(id, {

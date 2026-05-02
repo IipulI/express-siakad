@@ -28,7 +28,15 @@ export default (sequelize) => {
     jenisEvaluasi: { type: DataTypes.STRING, allowNull: false, field: "jenis_evaluasi" }, // UI: Metode (Kognitif)
     
     bobot: { type: DataTypes.DECIMAL(5,2), allowNull: false },
-    syaratLulus: { type: DataTypes.BOOLEAN, defaultValue: false, field: "syarat_lulus" },
+    syaratLulus: { 
+        type: DataTypes.STRING(255),
+        // Enum yang valid:
+        //   'TIDAK_MENJADI_SYARAT_LULUS' → tidak menjadi syarat lulus  
+        //   'MENJADI_SYARAT_LULUS'       → menjadi syarat lulus (wajib ditempuh)
+        //   'LULUS_DENGAN_NILAI_MINIMUM' → wajib lulus dengan nilai minimum tertentu
+        defaultValue: 'TIDAK_MENJADI_SYARAT_LULUS',
+        field: "syarat_lulus" 
+    },
     deskripsi: { type: DataTypes.TEXT, allowNull: true },
     deskripsiInggris: { type: DataTypes.TEXT, allowNull: true, field: "deskripsi_inggris" }
   }, {

@@ -1,0 +1,13 @@
+@startuml
+start
+:Login (SSO); 
+if ("Pilih Mata Kuliah ?") then (ya)
+  :Buat/Update RPS;
+  :Tambah Rencana Pembelajaran per sesi;
+  :Map CPMK ke RPS dan Komposisi Nilai;
+  :Simpan RPS;
+else (tidak)
+  :Pilih mata kuliah terlebih dahulu;
+endif
+stop
+@enduml

@@ -1,0 +1,15 @@
+@startuml
+actor Kaprodi
+participant Client
+participant MataKuliahController as Controller
+participant MataKuliahService as Service
+participant PemetaanCplMk as Pemetaan
+database DB
+
+Client -> Controller: POST /mata-kuliah/{id}/map-cpl
+Controller -> Service: saveCplMapping(id, payload)
+Service -> Pemetaan: bulkCreate(mapping)
+Pemetaan -> DB: INSERT
+Service --> Controller: OK
+Controller --> Client: 200 OK
+@enduml

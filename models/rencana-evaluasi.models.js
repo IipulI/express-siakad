@@ -47,8 +47,12 @@ export default (sequelize) => {
         allowNull: false 
     },
     syaratLulus: { 
-        type: DataTypes.BOOLEAN, 
-        defaultValue: false, 
+        type: DataTypes.STRING(255),
+        // Enum yang valid:
+        //   'TIDAK_MENJADI_SYARAT_LULUS' → tidak menjadi syarat lulus
+        //   'MENJADI_SYARAT_LULUS'       → menjadi syarat lulus (wajib ditempuh)
+        //   'LULUS_DENGAN_NILAI_MINIMUM' → wajib lulus dengan nilai minimum tertentu
+        defaultValue: 'TIDAK_MENJADI_SYARAT_LULUS', 
         field: "syarat_lulus" 
     },
     deskripsi: { 

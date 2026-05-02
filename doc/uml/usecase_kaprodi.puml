@@ -1,0 +1,39 @@
+@startuml
+left to right direction
+actor "Kepala Program Studi (Kaprodi)" as Kaprodi
+usecase "Autentikasi SSO" as Auth
+
+rectangle "Use Cases - Kaprodi" {
+  usecase "Kelola Mata Kuliah" as UC_KelolaMk
+  usecase "Kelola Kurikulum Prodi" as UC_KelolaKurikulum
+  usecase "Definisikan CPL & Indikator" as UC_DefCPL
+  usecase "Tetapkan Template Evaluasi" as UC_TemplEval
+  usecase "Tetapkan Komposisi Nilai per MK" as UC_Komposisi
+  usecase "Verifikasi & Publikasi RPS" as UC_VerifyRPS
+  usecase "Lihat & Export Laporan Monitoring OBE" as UC_LihatReport
+}
+
+Kaprodi -- UC_KelolaMk
+Kaprodi -- UC_KelolaKurikulum
+Kaprodi -- UC_DefCPL
+Kaprodi -- UC_TemplEval
+Kaprodi -- UC_Komposisi
+Kaprodi -- UC_VerifyRPS
+Kaprodi -- UC_LihatReport
+
+UC_KelolaMk ..> Auth : <<include>>
+UC_KelolaKurikulum ..> Auth : <<include>>
+UC_DefCPL ..> Auth : <<include>>
+UC_TemplEval ..> Auth : <<include>>
+UC_Komposisi ..> Auth : <<include>>
+UC_VerifyRPS ..> Auth : <<include>>
+UC_LihatReport ..> Auth : <<include>>
+
+note right of UC_LihatReport
+  Laporan Monitoring OBE termasuk:
+  - Ringkasan mapping CPL/CPMK per MK
+  - Kontribusi CPMK ke CPL per angkatan
+  - Status kelengkapan RPS/CPL/CPMK
+end note
+
+@enduml

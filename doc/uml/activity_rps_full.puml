@@ -1,0 +1,32 @@
+@startuml
+|Dosen|
+start
+:Login (SSO) dan pilih program studi;
+:Pilih tahun kurikulum / mata kuliah target;
+if (Mata Kuliah ada?) then (tidak)
+  :Buat entri Mata Kuliah (kode, nama, SKS, jenis);
+endif
+if (CPMK belum didefinisikan?) then (ya)
+  :Definisikan CPMK per mata kuliah (kode, deskripsi, target);
+endif
+:Buat RPS - isi deskripsi mata kuliah, standar capaian;
+:Tambahkan sesi Rencana Pembelajaran (per pertemuan):
+  - nomor sesi
+  - materi pembelajaran
+  - indikator penilaian
+  - metode pembelajaran
+fork
+  :Tambahkan Komposisi Nilai / Template Evaluasi;
+fork again
+  :Map CPMK ke sesi RencanaPembelajaran jika perlu;
+end fork
+:Validasi total bobot komposisi = 100% ?;
+if (Valid) then (ya)
+  :Simpan RPS (transaction);
+  :Generate preview RPS dan simpan file (opsional);
+  :Kirim notifikasi ke Kaprodi untuk verifikasi;
+else (tidak)
+  :Tampilkan error — minta perbaikan bobot;
+endif
+stop
+@enduml

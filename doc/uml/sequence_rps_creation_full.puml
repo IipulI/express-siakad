@@ -1,0 +1,29 @@
+@startuml
+actor Dosen
+participant Client
+participant RpsController as Controller
+participant RpsService as Service
+participant MataKuliah as MK
+participant RencanaPembelajaran as RP
+database DB
+
+Client -> Controller: POST /rps { rpsPayload }
+Controller -> Service: createRps(rpsPayload)
+Service -> MK: findByPk(mataKuliahId)
+alt mata kuliah tidak ada
+  Service --> Controller: throw 404
+  Controller --> Client: 404 Not Found
+else
+  Service -> DB: begin transaction
+  Service -> DB: insert into Rps
+  Service -> RP: bulkCreate(sessions)
+  Service -> DB: commit
+  Service -> Service: generateRpsFile(pdf/word)
+  Service -> DB: update Rps set file_link
+  Service -> Service: notifyKaprodi(rpsId)
+  Service --> Controller: rpsDetail
+  Controller --> Client: 201 Created (rpsDetail)
+end
+
+note over Service: Validasi: total bobot komposisi == 100%
+@enduml

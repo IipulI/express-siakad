@@ -1,0 +1,889 @@
+@startuml
+class agama_Controller {
+  +findAll()
+  +create()
+  +update()
+  +destroy()
+}
+
+class aturan_evaluasi_Controller {
+  +fetchAturanEvaluasi()
+  +saveAturanEvaluasi()
+  +deleteAturanEvaluasi()
+  +fetchAturanEvaluasi()
+  +saveAturanEvaluasi()
+  +deleteAturanEvaluasi()
+}
+
+class batas_sks_Controller {
+  +findAll()
+  +create()
+  +updateBatasSks()
+  +deleteBatasSks()
+  +fetchBatasSks()
+  +create()
+  +updateBatasSks()
+  +deleteBatasSks()
+}
+
+class bidang_ilmu_Controller {
+  +findAll()
+  +create()
+  +updateJenjang()
+  +deleteJenjang()
+}
+
+class cpl_umum_Controller {
+  +fetchCplUmum()
+  +saveCplUmum()
+  +deleteCplUmum()
+}
+
+class cpmk_Controller {
+  +getFormPemetaanCpmk()
+  +savePemetaanCpmk()
+  +getFormPemetaanCpmk()
+  +savePemetaanCpmk()
+}
+
+class ekivalensi_mata_kuliah_Controller {
+  +fetchListEkivalensi()
+  +fetchDropdownMkLama()
+  +saveBulkEkivalensi()
+  +deleteEkivalensiByMk()
+  +fetchListEkivalensi()
+  +fetchDropdownMkLama()
+  +saveBulkEkivalensi()
+  +deleteEkivalensiByMk()
+}
+
+class ekivalensi_Controller {
+  +fetchDaftarEkivalensi()
+  +saveEkivalensi()
+  +removeEkivalensi()
+}
+
+class export_Controller {
+  +exportExcelManajemenPL()
+  +exportExcelManajemenCPL()
+  +exportExcelMatriksPlCpl()
+  +exportPdfPemetaanCplMk()
+  +exportPdfLaporanLengkap()
+  +exportPdfMonitoringCplProdi()
+  +exportPdfMonitoringCplProdi()
+  +exportPdfLaporanCplPerMahasiswa()
+  +exportPdfLaporanCplPerMataKuliah()
+  +exportPdfLaporanMkPerMahasiswa()
+  +exportPdfLaporanMkPerMahasiswa()
+  +exportPdfTranskripObeMahasiswa()
+  +exportPdfTranskripObeMahasiswa()
+  +exportPdfLaporanCpmkPerMahasiswa()
+  +exportPdfLaporanCpmkPerMahasiswa()
+}
+
+class fakultas_Controller {
+  +findAll()
+  +create()
+  +updateFakultas()
+  +deleteFakultas()
+}
+
+class grup_mk_Controller {
+  +getOptions()
+  +getOptions()
+  +getTableData()
+  +getTableData()
+  +getSearchOptions()
+  +getSearchOptions()
+  +saveToGroup()
+  +saveToGroup()
+  +removeFromGroup()
+  +removeFromGroup()
+}
+
+class hasil_studi_Controller {
+  +getHasilStudi()
+  +test()
+}
+
+class jalur_pendaftaran_Controller {
+  +findAll()
+  +create()
+  +updateJalurPendaftaran()
+}
+
+class jenis_mata_kuliah_Controller {
+  +findAll()
+  +create()
+  +updateJenjang()
+  +deleteJenjang()
+}
+
+class jenjang_Controller {
+  +findAll()
+  +create()
+  +updateJenjang()
+  +deleteJenjang()
+}
+
+class kebutuhan_khusus_Controller {
+  +findAll()
+  +create()
+  +updateKebutuhanKhusus()
+  +deleteKebutuhanKhusus()
+}
+
+class kelas_kuliah_Controller {
+  +findAll()
+  +create()
+  +findOne()
+  +schedules()
+  +classParticipant()
+  +getGradingClass()
+  +submitGradingClass()
+}
+
+class kelompok_mata_kuliah_Controller {
+  +findAll()
+  +create()
+  +updateJenjang()
+  +deleteJenjang()
+}
+
+class ketentuan_akademik_Controller {
+  +fetchSkalaNilai()
+  +upsertSkalaNilai()
+  +destroySkalaNilai()
+  +fetchBatasSks()
+  +upsertBatasSks()
+  +destroyBatasSks()
+}
+
+class krs_Controller {
+  +createKrs()
+}
+
+class kurikulum_prodi_Controller {
+  +fetchKurikulumProdi()
+  +addCourseToKurikulumProdi()
+  +deleteCourseFromKurikulumProdi()
+  +fetchRekapTahunKurikulum()
+  +fetchListProdi()
+  +updateAturanObe()
+  +storeKurikulum()
+  +fetchRekapTahunKurikulum()
+  +fetchListProdi()
+  +fetchListProdi()
+  +updateAturanObe()
+  +updateAturanObe()
+  +fetchPredikat()
+  +savePredikat()
+  +destroyPredikat()
+}
+
+class mahasiswa_Controller {
+  +findAll()
+  +findOne()
+  +create()
+}
+
+class mata_kuliah_kurikulum_Controller {
+  +fetchRekapDistribusiSks()
+  +fetchRekapDistribusiSks()
+  +fetchMataKuliahPerSemester()
+  +fetchDetailMataKuliah()
+  +addMataKuliahKeKurikulum()
+  +updateDetailMataKuliah()
+  +addMataKuliahKeKurikulum()
+  +updateDetailMataKuliah()
+  +deleteMataKuliahKurikulum()
+  +deleteMataKuliahKurikulum()
+  +fetchDropdownPrasyarat()
+  +fetchDropdownKonsentrasi()
+}
+
+class mata_kuliah_Controller {
+  +findAll()
+  +findOne()
+  +create()
+  +update()
+  +destroy()
+  +getDaftarMataKuliahObe()
+  +getDetailMataKuliahObe()
+  +createMataKuliahObe()
+  +updateMataKuliahObe()
+  +deleteMataKuliahObe()
+  +getCplMapping()
+  +saveCplMapping()
+  +getCplMapping()
+  +saveCplMapping()
+  +clearCplMapping()
+  +fetchRekapDistribusiSks()
+  +fetchMataKuliahPerSemester()
+}
+
+class monitoring_Controller {
+  +getTranskripObeMahasiswa()
+  +getSemuaDataId()
+  +getMonitoringCplProdi()
+  +exportPdfLaporanLengkap()
+  +exportPdfMonitoringCplProdi()
+  +getLaporanCplPerMahasiswa()
+  +getLaporanCplPerMataKuliah()
+  +getLaporanMkPerMahasiswa()
+  +getTranskripObeMahasiswas()
+  +getLaporanCpmkPerMahasiswa()
+}
+
+class obe_Controller {
+  +getProfilLulusan()
+  +createProfilLulusan()
+  +updateProfilLulusan()
+  +deleteProfilLulusan()
+  +getCapaianPembelajaranLulusan()
+  +createCapaianPembelajaranLulusan()
+  +updateCapaianPembelajaraanLulusan()
+  +deleteCapaianPembelajaranLulusan()
+  +getCapaianMataKuliah()
+  +createCapaianMataKuliah()
+  +updateCapaianMataKuliah()
+  +deleteCapaianMataKuliah()
+  +createPemetaanPlCpl()
+  +getMatriksPemetaan()
+  +getManajemenCapaian()
+  +getManajemenCapaian()
+  +getProfilLulusan()
+  +storeProfilLulusan()
+  +updateProfilLulusan()
+  +destroyProfilLulusan()
+  +getProfilLulusan()
+  +storeProfilLulusan()
+  +updateProfilLulusan()
+  +destroyProfilLulusan()
+  +getCapaianPembelajaranLulusan()
+  +createCapaianPembelajaranLulusan()
+  +updateCapaianPembelajaraanLulusan()
+  +deleteCapaianPembelajaranLulusan()
+  +getCapaianPembelajaranLulusan()
+  +createCapaianPembelajaranLulusan()
+  +updateCapaianPembelajaraanLulusan()
+  +deleteCapaianPembelajaranLulusan()
+  +storeIndikatorKinerja()
+  +updateIndikatorKinerja()
+  +destroyIndikatorKinerja()
+  +getMatriksPemetaanPlCpl()
+  +getMatriksPemetaanPlCpl()
+  +createPemetaanPlCpl()
+  +createPemetaanPlCpl()
+  +getMatriksPemetaanCplMk()
+  +savePemetaanCplMk()
+  +getMatriksPemetaanCplMk()
+  +savePemetaanCplMk()
+  +getCetakLaporanObe()
+}
+
+class pekerjaan_Controller {
+  +findAll()
+  +create()
+  +updatePekerjaan()
+  +deletePekerjaan()
+}
+
+class pembimbing_akademik_Controller {
+  +getMahasiswa()
+  +assignDosen()
+  +acceptKrsMahasiswa()
+  +rejectKrsMahasiswa()
+}
+
+class pendidikan_Controller {
+  +findAll()
+  +create()
+  +updatePendidikan()
+  +deletePendidikan()
+}
+
+class penghasilan_pekerjaan_Controller {
+  +findAll()
+  +create()
+  +updatePenghasilanPekerjaan()
+  +deletePenghasilanPekerjaan()
+}
+
+class penilaian_Controller {
+  +getDropdownMasterEvaluasi()
+  +getDaftarTemplate()
+  +setupKomposisiRPS()
+  +getPesertaKelas()
+  +simpanNilaiMahasiswa()
+  +getRaporOBE()
+  +getProfilLulusan()
+  +createProfilLulusan()
+  +updateProfilLulusan()
+  +deleteProfilLulusan()
+  +getCapaianPembelajaranLulusan()
+  +createCapaianPembelajaranLulusan()
+  +updateCapaianPembelajaraanLulusan()
+  +deleteCapaianPembelajaranLulusan()
+  +createPemetaanPlCpl()
+  +getCapaianMataKuliah()
+  +createCapaianMataKuliah()
+  +updateCapaianMataKuliah()
+  +deleteCapaianMataKuliah()
+  +getKomposisiRPS()
+  +injectKrsTester()
+}
+
+class periode_akademik_Controller {
+  +findAll()
+  +create()
+  +updatePeriodeAkademik()
+  +deletePeriodeAkademik()
+}
+
+class predikat_kelulusan_Controller {
+  +fetchBulk()
+  +saveBulk()
+  +fetchAll()
+  +create()
+  +update()
+  +destroy()
+  +fetchBulk()
+  +saveBulk()
+  +fetchAll()
+  +create()
+  +update()
+  +destroy()
+  +fetchPredikat()
+  +getDetail()
+  +savePredikat()
+  +deletePredikat()
+}
+
+class rps_Controller {
+  +getFormDetailRps()
+  +saveDetailRps()
+  +saveDetailRps()
+  +deleteDetailRps()
+  +getRencanaPembelajaran()
+  +getRencanaPembelajaran()
+  +createRencanaPembelajaran()
+  +createRencanaPembelajaran()
+  +updateRencanaPembelajaran()
+  +createRencanaPembelajaran()
+  +updateRencanaPembelajaran()
+  +deleteRencanaPembelajaran()
+  +getRencanaEvaluasi()
+  +saveRencanaEvaluasi()
+  +saveRencanaEvaluasiList()
+  +deleteRencanaEvaluasi()
+}
+
+class ruangan_Controller {
+  +findAll()
+  +create()
+  +updateRuangan()
+  +deleteRuangan()
+}
+
+class skala_nilai_Controller {
+  +fetchSkalaNilai()
+  +saveSkalaNilai()
+  +destroySkalaNilai()
+  +fetchSkalaNilai()
+  +saveSkalaNilai()
+  +destroySkalaNilai()
+  +fetchSkalaNilai()
+  +saveSkalaNilai()
+  +destroySkalaNilai()
+}
+
+class suku_Controller {
+  +findAll()
+  +create()
+  +update()
+  +destroy()
+}
+
+class tahun_ajaran_Controller {
+  +findAll()
+  +create()
+  +updateTahunAjaran()
+  +deleteTahunAjaran()
+}
+
+class tahun_kurikulum_Controller {
+  +findAll()
+  +create()
+  +update()
+  +destroy()
+}
+
+class template_evaluasi_Controller {
+  +getListTemplate()
+  +getDetailTemplate()
+  +saveTemplate()
+  +deleteTemplate()
+  +getListTemplate()
+  +getDetailTemplate()
+  +saveTemplate()
+  +deleteTemplate()
+}
+
+class hasil_studi_Controller {
+  +getHasilStudi()
+}
+
+class krs_mahasiswa_Controller {
+  +getAvailableKrs()
+  +saveKrs()
+  +submitKrs()
+  +updateKrs()
+  +deleteKrs()
+  +savedKrs()
+  +getKrsHistory()
+}
+
+class pengumuman_Controller {
+  +findAll()
+  +create()
+  +updatePengumuman()
+  +deletePengumuman()
+}
+
+class transkrip_Controller {
+  +getTranskrip()
+}
+
+class agama_Service {
+  +findAll()
+  +createAgama()
+  +updateAgama()
+  +deleteAgama()
+}
+
+class aturan_evaluasi_Service {
+  +getAturanEvaluasiList()
+  +upsertAturanEvaluasi()
+  +destroyAturanEvaluasi()
+  +getAturanEvaluasiList()
+  +upsertAturanEvaluasi()
+  +destroyAturanEvaluasi()
+}
+
+class batas_sks_Service {
+  +findAll()
+  +createBatasSks()
+  +updateBatasSks()
+  +deleteBatasSks()
+  +getBatasSksList()
+  +createBatasSks()
+  +updateBatasSks()
+  +deleteBatasSks()
+}
+
+class bidang_ilmu_Service {
+  +findAll()
+  +createBidangIlmu()
+  +updateBidangIlmu()
+  +deleteBidangIlmu()
+}
+
+class cpl_umum_Service {
+  +getCplUmumList()
+  +upsertCplUmum()
+  +destroyCplUmum()
+}
+
+class cpmk_Service {
+  +getFormPemetaanCpmk()
+  +getFormPemetaanCpmk()
+  +savePemetaanCpmk()
+  +savePemetaanCpmk()
+}
+
+class ekivalensi_mata_kuliah_Service {
+  +getListEkivalensi()
+  +getDropdownMkLama()
+  +bulkSaveEkivalensi()
+  +removeEkivalensi()
+  +getListEkivalensi()
+  +getDropdownMkLama()
+  +bulkSaveEkivalensi()
+  +removeEkivalensi()
+}
+
+class ekivalensi_Service {
+  +getDaftarEkivalensi()
+  +setEkivalensi()
+  +hapusEkivalensi()
+}
+
+class fakultas_Service {
+  +findAll()
+  +createFakultas()
+}
+
+class grup_mk_Service {
+  +getFilterOptions()
+  +getFilterOptions()
+  +getMappedCourses()
+  +getMappedCourses()
+  +getUnmappedCourses()
+  +getUnmappedCourses()
+  +addCourseToGroup()
+  +addCourseToGroup()
+  +removeCourseFromGroup()
+  +removeCourseFromGroup()
+}
+
+class hasil_studi_Service {
+  +getHasilStudi()
+}
+
+class jadwal_minggu_ini_Service {
+}
+
+class jalur_pendaftaran_Service {
+  +findAll()
+  +createJalurPendaftaran()
+}
+
+class jenis_mata_kuliah_Service {
+  +findAll()
+  +createJenisMataKuliah()
+  +updateJenisMataKuliah()
+  +deleteJenisMataKuliah()
+}
+
+class jenjang_Service {
+  +findAll()
+  +createJenjang()
+  +updateJenjang()
+  +deleteJenjang()
+}
+
+class kebutuhan_khusus_Service {
+  +findAll()
+  +createKebutuhanKhusus()
+  +updateKebutuhanKhusus()
+  +deleteKebutuhanKhusus()
+}
+
+class kelas_kuliah_Service {
+  +findAll()
+  +createClass()
+  +detailClass()
+  +classSchedule()
+  +classParticipant()
+  +getGradingClass()
+  +submitGradingClass()
+}
+
+class kelompok_mata_kuliah_Service {
+  +findAll()
+  +createKelompokMataKuliah()
+  +updateKelompokMataKuliah()
+  +deleteKelompokMataKuliah()
+}
+
+class ketentuan_akademik_Service {
+  +getSkalaNilai()
+  +saveSkalaNilai()
+  +deleteSkalaNilai()
+  +getBatasSks()
+  +saveBatasSks()
+  +deleteBatasSks()
+}
+
+class krs_mahasiswa_Service {
+  +getAvailableKrs()
+  +saveKrs()
+  +submitKrs()
+  +updateKrs()
+  +deleteKrs()
+  +savedKrs()
+  +historyKrs()
+}
+
+class kurikulum_prodi_Service {
+  +fetchKurikulumProdi()
+  +addCourseToKurikulumProdi()
+  +deleteCourseFromKurikulumProdi()
+  +getRekapTahunKurikulum()
+  +getDaftarKurikulumProdi()
+  +setAturanObeProdi()
+  +createKurikulum()
+  +getRekapTahunKurikulum()
+  +getDaftarKurikulumProdi()
+  +setAturanObeProdi()
+  +getDetailKurikulum()
+  +saveAturanObeBulk()
+  +fetchPredikatKelulusan()
+  +upsertPredikatKelulusan()
+  +deletePredikatKelulusan()
+}
+
+class mahasiswa_Service {
+  +findAll()
+  +findOne()
+  +create()
+}
+
+class mata_kuliah_kurikulum_Service {
+  +getRekapDistribusiSks()
+  +getRekapDistribusiSks()
+  +getMataKuliahPerSemester()
+  +getDetailMataKuliah()
+  +assignMataKuliah()
+  +updateMataKuliahKurikulum()
+  +removeMataKuliah()
+  +updateMataKuliahKurikulum()
+  +removeMataKuliah()
+  +getDropdownPrasyarat()
+  +getDropdownKonsentrasi()
+}
+
+class mata_kuliah_Service {
+  +findAll()
+  +findOne()
+  +createMataKuliah()
+  +updateMataKuliah()
+  +deleteMataKuliah()
+  +getListMataKuliahObe()
+  +getDetailMataKuliahObe()
+  +findAll()
+  +findOne()
+  +createMataKuliah()
+  +createMataKuliahObe()
+  +updateMataKuliahObe()
+  +deleteMataKuliahObe()
+  +updateMataKuliah()
+  +deleteMataKuliah()
+  +getCplForMapping()
+  +savePemetaanCpl()
+  +getCplForMapping()
+  +savePemetaanCpl()
+  +deletePemetaanCpl()
+}
+
+class monitoring_Service {
+  +getCplPerProgramStudi()
+  +getLaporanCplPerMahasiswa()
+  +getLaporanCplPerMataKuliah()
+  +getLaporanMkPerMahasiswa()
+  +getTranskripObeMahasiswa()
+  +getTranskripObeMahasiswa()
+  +getLaporanCpmkPerMahasiswa()
+  +getLaporanCpmkPerMahasiswa()
+  +getLaporanCpmkPerMahasiswa()
+}
+
+class obe_Service {
+  +getProfilLulusan()
+  +createProfilLulusan()
+  +updateProfilLulusan()
+  +deleteProfilLulusan()
+  +getCapaianPembelajaranLulusan()
+  +createCapaianPembelajaranLulusan()
+  +updateCapaianPembelajaraanLulusan()
+  +deleteCapaianPembelajaranLulusan()
+  +getCapaianMataKuliah()
+  +createCapaianMataKuliah()
+  +updateCapaianMataKuliah()
+  +deleteCapaianMataKuliah()
+  +createPemetaanPlCpl()
+  +getMatriksPemetaan()
+  +getDropdownFilter()
+  +getListManajemenCapaian()
+  +getListManajemenCapaian()
+  +getDetailManajemenPl()
+  +getManajemenPlByObeId()
+  +createProfilLulusan()
+  +updateProfilLulusan()
+  +deleteProfilLulusan()
+  +getManajemenPlByObeId()
+  +createProfilLulusan()
+  +updateProfilLulusan()
+  +deleteProfilLulusan()
+  +getManajemenCplByObeId()
+  +getManajemenCplByObeId()
+  +createIK()
+  +updateIK()
+  +deleteIK()
+  +createCpl()
+  +updateCpl()
+  +deleteCpl()
+  +createCplBulk()
+  +createCpl()
+  +updateCpl()
+  +deleteCpl()
+  +getMatriksPemetaanPlCpl()
+  +getMatriksPemetaanPlCpl()
+  +saveMatriksPemetaanPlCpl()
+  +saveMatriksPemetaanPlCpl()
+  +getMatriksPemetaanCplMk()
+  +getMatriksPemetaanCplMk()
+  +saveMatriksPemetaanCplMk()
+  +saveMatriksPemetaanCplMk()
+  +getCetakLaporanObe()
+}
+
+class pekerjaan_Service {
+  +findAll()
+  +createPekerjaan()
+  +updatePekerjaan()
+  +deletePekerjaan()
+}
+
+class pembiming_akademik_Service {
+  +getAllMahasiswaFiltered()
+  +assignDosen()
+  +updateKrsMahasiswa()
+}
+
+class pendidikan_Service {
+  +findAll()
+  +createPendidikan()
+  +updatePendidikan()
+  +deletePendidikan()
+}
+
+class penghasilan_pekerjaan_Service {
+  +findAll()
+  +createPenghasilanPekerjaan()
+  +updatePenghasilanPekerjaan()
+  +deletePenghasilanPekerjaan()
+}
+
+class pengumuman_Service {
+  +findAll()
+  +createPengumuman()
+  +updatePengumuman()
+  +deletePengumuman()
+}
+
+class penilaian_Service {
+  +createKomposisiEvaluasi()
+  +getKomposisiEvaluasi()
+  +inputNilaiMahasiswa()
+  +hitungNilaiAkhir()
+  +hitungNilaiAkhir()
+  +hitungNilaiAkhir()
+  +getRaporOBEMahasiswa()
+  +getDropdownMasterEvaluasi()
+  +getTemplateEvaluasiList()
+  +getPesertaKelasList()
+}
+
+class periode_akademik_Service {
+  +findAll()
+  +findActive()
+  +createPeriodeAkademik()
+  +updatePeriodeAkademik()
+  +deletePeriodeAkademik()
+}
+
+class predikat_kelulusan_Service {
+  +getPredikatKelulusan()
+  +getPredikatWithHeader()
+  +upsertBulkPredikat()
+  +createPredikatKelulusan()
+  +updatePredikatKelulusan()
+  +deletePredikatKelulusan()
+  +getPredikatWithHeader()
+  +upsertBulkPredikat()
+  +getPredikatKelulusan()
+  +createPredikatKelulusan()
+  +updatePredikatKelulusan()
+  +deletePredikatKelulusan()
+  +getPredikatWithHeader()
+  +getPredikatById()
+  +createOrUpdate()
+  +deletePredikatKelulusan()
+}
+
+class program_studi_Service {
+  +findAll()
+  +createRuangan()
+  +updateRuangan()
+  +deleteRuangan()
+}
+
+class riwayat_krs_Service {
+  +getRiwayatKrs()
+}
+
+class rps_Service {
+  +getFormDetailRps()
+  +upsertDetailRps()
+  +deleteDetailRps()
+  +getRencanaPembelajaran()
+  +getRencanaPembelajaran()
+  +createRencanaPembelajaran()
+  +updateRencanaPembelajaran()
+  +createRencanaPembelajaran()
+  +updateRencanaPembelajaran()
+  +deleteRencanaPembelajaran()
+  +deleteRencanaPembelajaran()
+  +getRencanaEvaluasi()
+  +saveRencanaEvaluasi()
+  +deleteRencanaEvaluasi()
+}
+
+class ruangan_Service {
+  +findAll()
+  +createRuangan()
+  +updateRuangan()
+  +deleteRuangan()
+}
+
+class skala_nilai_Service {
+  +getSkalaNilaiByProdi()
+  +upsertSkalaNilai()
+  +deleteSkalaNilai()
+  +getSkalaNilaiByProdi()
+  +upsertSkalaNilai()
+  +deleteSkalaNilai()
+  +getSkalaNilaiList()
+  +upsertSkalaNilai()
+  +deleteSkalaNilai()
+}
+
+class suku_servise_js_Service {
+  +findAll()
+  +createSuku()
+  +updateSuku()
+  +deleteSuku()
+}
+
+class tahun_ajaran_Service {
+  +findAll()
+  +createTahunAjaran()
+  +updateTahunAjaran()
+  +deleteTahunAjaran()
+}
+
+class tahun_kurikulum_Service {
+  +findAll()
+  +createTahunKurikulum()
+  +updateTahunKurikulum()
+  +deleteTahunKurikulum()
+}
+
+class template_evaluasi_Service {
+  +getListTemplate()
+  +getDetailTemplate()
+  +upsertTemplate()
+  +deleteTemplate()
+  +getListTemplate()
+  +getDetailTemplate()
+  +upsertTemplate()
+  +deleteTemplate()
+}
+
+class transkrip_Service {
+  +getTranskrip()
+}
+
+@enduml

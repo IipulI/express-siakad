@@ -1,0 +1,26 @@
+@startuml
+|Dosen|
+start
+:Login SSO;
+:Pilih Periode Akademik dan Kelas Kuliah;
+:Load daftar mahasiswa & komposisi nilai;
+partition "Input Nilai" {
+  repeat
+    :Pilih mahasiswa;
+    :Input nilai per komponen (tugas, kuis, UTS, UAS, praktikum);
+    :Simpan nilai komponen ke `NilaiEvaluasiMahasiswa`;
+  repeat while (masih ada mahasiswa)
+}
+:Validasi apakah semua mahasiswa sudah diinput?;
+if (ya) then (ya)
+  :Hitung skor akhir per mahasiswa berdasarkan bobot komposisi;
+  :Map skor akhir ke Nilai CPMK (menggunakan `PemetaanKomposisiCpmk`);
+  :Aggregrate CPMK -> CPL (menggunakan `PemetaanCplCpmk`);
+  :Simpan `NilaiCpmkMahasiswa` & update rekap CPL per mahasiswa;
+  :Tandai nilai sebagai final/publish (opsional);
+  :Generate laporan ringkasan kelas;
+else (tidak)
+  :Simpan progres dan kembali input nilai;
+endif
+stop
+@enduml

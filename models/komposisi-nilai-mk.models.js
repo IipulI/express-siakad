@@ -4,12 +4,12 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class KomposisiNilaiMataKuliah extends Model {
         static associate(models) {
-            // this.belongsToMany(models.CapaianMataKuliah, {
-            //     through: models.PemetaanEvaluasiCpmk,
-            //     foreignKey: "siak_komposisi_nilai_id",
-            //     otherKey: "siak_cpmk_id", // INI SUDAH BENAR
-            //     as: "cpmkList"
-            // });
+            this.belongsToMany(models.CapaianMataKuliah, {
+                through: models.PemetaanKomposisiCpmk,
+                foreignKey: "siakKomposisiNilaiId",
+                otherKey: "siakCpmkId",
+                as: "cpmkList"
+            });
             
             this.hasMany(models.NilaiEvaluasiMahasiswa, {
                 foreignKey: "siak_komposisi_nilai_id",

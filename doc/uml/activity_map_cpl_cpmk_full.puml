@@ -1,0 +1,20 @@
+@startuml
+|Dosen|
+start
+:Login (SSO);
+:Pilih Mata Kuliah (search / kode);
+:Tampilkan daftar CPL (program) dan CPMK (mata kuliah);
+repeat
+  :Pilih CPL yang ingin dipetakan;
+  :Pilih/definisikan CPMK target;
+  :Tentukan bobot relasi (bobotCpl);
+  if (Bobot total CPL > 100?) then (ya)
+    :Tampilkan peringatan dan jangan simpan;
+  else (tidak)
+    :Tambahkan ke daftar mapping sementara;
+  endif
+repeat while (ada CPL tersisa?)
+:Simpan mapping (hapus mapping lama jika perlu, lalu bulkInsert baru);
+:Update view status pemetaan pada MataKuliah;
+stop
+@enduml

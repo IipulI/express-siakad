@@ -1570,7 +1570,10 @@ export const getMatriksPemetaanCplMk = async (obeId) => {
 
     // 3. Ambil Daftar MK (Rows)
     const listMk = await MataKuliah.findAll({
-        where: { siakProgramStudiId: obeData.siakProgramStudiId },
+        where: { 
+            siakProgramStudiId: obeData.siakProgramStudiId,
+            siakTahunKurikulumId: obeData.siakTahunKurikulumId 
+        },
         attributes: [
             'id', 
             'semester', 

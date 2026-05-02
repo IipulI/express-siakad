@@ -36,6 +36,7 @@ import EkivalensiMataKuliah from "./ekivalensi-mata-kuliah.router.js";
 import CPLUmum from "./cpl-umum.router.js";
 
 import AturanEvaluasiRouter from "./aturan-evaluasi.router.js";
+import KrsRouter from "./krs.router.js";
 import MonitoringRouter from "./monitoring.router.js";
 
 const router = Router();
@@ -60,6 +61,7 @@ router.use('/aturan-evaluasi', AturanEvaluasiRouter);
 
 // kelas kuliah
 router.use("/kelas-kuliah", KelasKuliahRouter);
+router.use("/krs-mahasiswa", KrsRouter);
 
 
 // --- MAHASISWA ---

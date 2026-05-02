@@ -1,0 +1,16 @@
+@startuml
+actor Dosen
+participant Client
+participant RincianKrsController as Controller
+participant NilaiService as Service
+participant NilaiEvaluasiMahasiswa as NilaiModel
+database DB
+
+Client -> Controller: POST /nilai/input
+Controller -> Service: upsertNilaiEvaluasi(payload)
+Service -> NilaiModel: create/update records
+NilaiModel -> DB: INSERT/UPDATE
+Service -> Service: recalculateCpmkAggregates()
+Service --> Controller: OK
+Controller --> Client: 200 OK
+@enduml

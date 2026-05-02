@@ -1,0 +1,587 @@
+@startuml
+skinparam classAttributeIconSize 0
+class Agama {
+  +id : UUID
+  +nama : VARCHAR(255)
+}
+
+class AturanEvaluasi {
+  +id : UUID
+  +siakTahunKurikulumId : UUID
+  +siakJenjangId : UUID
+  +semesterKe : INTEGER
+  +totalSksMinimal : INTEGER
+  +batasIpkMinimal : DOUBLE PRECISION
+}
+
+class BatasSks {
+  +id : UUID
+  +siakJenjangId : UUID
+  +ipsMin : DOUBLE PRECISION
+  +ipsMax : DOUBLE PRECISION
+  +batasSks : INTEGER
+}
+
+class BidangIlmu {
+  +id : UUID
+  +kode : VARCHAR(255)
+  +nama : INTEGER
+}
+
+class CapaianMataKuliah {
+  + : UUID
+  + : UUID
+  + : UUID
+  + : VARCHAR(255)
+  + : TEXT
+}
+
+class CapaianPembelajaranLulusan {
+  + : UUID
+  + : UUID
+  + : VARCHAR(255)
+  + : TEXT
+  + : VARCHAR(255)
+}
+
+class CplUmum {
+  +id : UUID
+  +siakTahunKurikulumId : UUID
+  +kode : VARCHAR(255)
+  +deskripsiInd : TEXT
+  +deskripsiEng : TEXT
+  +targetCpl : DOUBLE PRECISION
+  +kategori : VARCHAR(255)
+  +tingkatCpl : VARCHAR(255)
+}
+
+class Dosen {
+  +id : UUID
+  +nama : VARCHAR(255)
+  +nidn : VARCHAR(255)
+}
+
+class EkivalensiMataKuliah {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  +siakMataKuliahLamaId : UUID
+}
+
+class Fakultas {
+  +id : UUID
+  +nama : VARCHAR(255)
+}
+
+class HasilStudi {
+  +id : UUID
+  +siakMahasiswaId : UUID
+  +siakPeriodeAkademikId : UUID
+  +semester : INTEGER
+  +ips : DOUBLE PRECISION
+  +ipk : DOUBLE PRECISION
+  +sksDiambil : INTEGER
+  +sksLulus : INTEGER
+}
+
+class IndikatorKinerja {
+  +id : UUID
+  +siakCplId : UUID
+  +kode : VARCHAR(255)
+  +deskripsi : TEXT
+  +deskripsiEn : TEXT
+}
+
+class JadwalKuliah {
+  +id : UUID
+  +siakKelasKuliahId : UUID
+  +siakRuanganId : UUID
+  +siakDosenId : UUID
+  +hari : VARCHAR(255)
+  +jamMulai : TEXT
+  +jamSelesai : TEXT
+  +jenisPertemuan : VARCHAR(255)
+  +metodePembelajaran : VARCHAR(255)
+}
+
+class Mahasiswa {
+  +nama : VARCHAR(255)
+  +nim : VARCHAR(255)
+}
+
+class JenisMataKuliah {
+  +id : UUID
+  +kode : VARCHAR(255)
+  +nama : INTEGER
+}
+
+class Jenjang {
+  +id : UUID
+  +nama : VARCHAR(255)
+  +jenjang : VARCHAR(255)
+}
+
+class KebutuhanKhusus {
+  +id : UUID
+  +nama : VARCHAR(255)
+}
+
+class KelasKuliah {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  +siakPeriodeAkademikId : UUID
+  +siakProgramStudiId : UUID
+  +siakRpsId : UUID
+  +nama : VARCHAR(255)
+  +kapasitas : INTEGER
+  +jumlahPeminat : INTEGER
+  +sistemKuliah : VARCHAR(255)
+  +statusKelas : VARCHAR(255)
+  +jumlahPertemuan : INTEGER
+  +tanggalMulai : TIMESTAMP
+  +tanggalSelesai : TIMESTAMP
+}
+
+class KelompokMataKuliah {
+  +id : UUID
+  +kode : VARCHAR(255)
+  +nama : VARCHAR(255)
+}
+
+class KomposisiNilaiMataKuliah {
+  +id : UUID
+  +siakTahunKurikulumId : UUID
+  +siakMataKuliahId : UUID
+  +siakUnsurNilaiId : UUID
+  +persentase : DOUBLE PRECISION
+  +key : VARCHAR(255)
+}
+
+class KomposisiNilaiMataKuliah {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  + : TEXT
+  +kolomnya : VARCHAR(255)
+  +persentase : DECIMAL(10,2)
+}
+
+class Konsentrasi {
+  +id : UUID
+  +siakProgramStudiId : UUID
+  +kode : VARCHAR(255)
+  +nama : VARCHAR(255)
+}
+
+class KrsMahasiswa {
+  +id : UUID
+  +siakMahasiswaId : UUID
+  +siakPeriodeAkademikId : UUID
+  +status : VARCHAR(255)
+  +sksDiambil : INTEGER
+  +semester : INTEGER
+}
+
+class Mahasiswa {
+  +id : UUID
+  + : VARCHAR(255)
+  +npm : VARCHAR(255)
+  + : UUID
+  + : TEXT
+  +siakProgramStudiId : UUID
+  + : UUID
+  + : TEXT
+  +periodeMasuk : VARCHAR(255)
+  + : UUID
+  + : TEXT
+  +siakSistemKuliahId : UUID
+  +siakJenisPendaftaranId : UUID
+  +gelombang : VARCHAR(255)
+  + : TIMESTAMP
+  + : TEXT
+  + : TIMESTAMP
+  + : TIMESTAMP
+  + : TEXT
+  + : TIMESTAMP
+  +kebutuhanKhusus : BOOLEAN
+  +siakStatusMahasiswaId : TEXT
+  + : VARCHAR(255)
+  + : BOOLEAN
+  +angkatan : VARCHAR(255)
+  +semester : INTEGER
+  +periodeKeluar : VARCHAR(255)
+  + : TEXT
+  +siakSukuId : TEXT
+  +jenisKelamin : VARCHAR(255)
+  +tempatLahir : VARCHAR(255)
+  +tanggalLahir : TIMESTAMP
+  +beratBadan : INTEGER
+  +tinggiBadan : INTEGER
+  +golonganDarah : VARCHAR(255)
+  +siakTransportasiId : UUID
+  + : VARCHAR(255)
+  +noWhatsapp : VARCHAR(255)
+  +emailPribadi : VARCHAR(255)
+  +emailKampus : VARCHAR(255)
+  + : VARCHAR(255)
+  +paspor : VARCHAR(255)
+  +noKk : VARCHAR(255)
+  + : VARCHAR(255)
+  + : TEXT
+  +nik : VARCHAR(255)
+  +statusNikah : VARCHAR(255)
+}
+
+class MasterKomponenEvaluasi {
+  +id : UUID
+  +namaKomponen : VARCHAR(255)
+}
+
+class MataKuliah {
+  +id : UUID
+  +siakProgramStudiId : UUID
+  +siakTahunKurikulumId : UUID
+  + : TEXT
+  + : UUID
+  + : TEXT
+  + : UUID
+  + : UUID
+  +nama : VARCHAR(255)
+  +kode : VARCHAR(255)
+  +jenis : VARCHAR(255)
+  +semester : INTEGER
+  +nilaiMin : VARCHAR(255)
+  +adaPraktikum : BOOLEAN
+  +opsiWajib : BOOLEAN
+  +sksTatapMuka : INTEGER
+  +sksPraktikum : INTEGER
+  +sksPraktikLapangan : INTEGER
+  +totalSks : INTEGER
+  +prasyaratMataKuliah1 : UUID
+  +prasyaratMataKuliah2 : UUID
+  +prasyaratMataKuliah3 : UUID
+  +namaEn : VARCHAR(255)
+  +siakKelompokMataKuliahId : UUID
+  +siakRumpunMataKuliahId : UUID
+  +sksSimulasi : INTEGER
+  +merupakanMku : BOOLEAN
+  +adaSap : BOOLEAN
+  +adaSilabus : BOOLEAN
+  +adaBahanAjar : BOOLEAN
+  +adaDiktat : BOOLEAN
+  + : INTEGER
+  +sksPraktikum : INTEGER
+  +sksPraktikLapangan : INTEGER
+  +sksSimulasi : INTEGER
+  +koordinatorMkId : UUID
+  +pengembangRpsId : UUID
+  + : VARCHAR(255)
+  +metodePembobotan : VARCHAR(255)
+  +topik : TEXT
+  +kompetensiDasar : TEXT
+  +sksMinimal : INTEGER
+  +isPaket : BOOLEAN
+}
+
+class MetodeEvaluasi {
+  +id : UUID
+  +kode : VARCHAR(255)
+  +nama : VARCHAR(255)
+}
+
+class NilaiCpmkMahasiswa {
+  +id : UUID
+  +siakKelasKuliahId : UUID
+  +siakMahasiswaId : UUID
+  +siakCapaianMataKuliahId : UUID
+  +nilai : DECIMAL(10,2)
+}
+
+class NilaiEvaluasiMahasiswa {
+  +id : UUID
+  +siakRincianKrsMahasiswaId : UUID
+  +siakKomposisiNilaiId : UUID
+  +skor : DECIMAL(10,2)
+}
+
+class Obe {
+  +id : UUID
+  +siakProgramStudiId : UUID
+  +siakTahunKurikulumId : UUID
+  + : DOUBLE PRECISION
+  +targetCpl : DOUBLE PRECISION
+  +targetCpmk : DOUBLE PRECISION
+}
+
+class Pekerjaan {
+  +id : UUID
+  +nama : VARCHAR(255)
+}
+
+class PembimbingAkademik {
+  +id : UUID
+  +siakDosenId : UUID
+  +siakMahasiswaId : UUID
+  +siakPeriodeAkademikId : UUID
+  +noSk : VARCHAR(255)
+  +tanggalSk : TIMESTAMP
+}
+
+class PemetaanCplCpmk {
+  +id : UUID
+  +siakCapaianPembelajaranLulusanId : UUID
+  +siakCapaianMataKuliahId : UUID
+  +bobotCpl : DOUBLE PRECISION
+}
+
+class PemetaanCplMk {
+  + : UUID
+  + : UUID
+  + : UUID
+}
+
+class PemetaanEvaluasiCpmk {
+  +id : UUID
+  + : UUID
+  +siakCpmkId : UUID
+  +bobotCpmk : DECIMAL(5,2)
+}
+
+class PemetaanKomposisiCpmk {
+  +id : UUID
+  +siakKomposisiNilaiId : UUID
+  +siakCpmkId : UUID
+}
+
+class PemetaanKonsentrasiMk {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  +siakKonsentrasiId : UUID
+}
+
+class PemetaanPembelajaranCpmk {
+  +id : UUID
+  +siakRencanaPembelajaranId : UUID
+  +siakCpmkId : UUID
+}
+
+class PemetaanPlCpl {
+  + : UUID
+  + : UUID
+  + : UUID
+}
+
+class Pendidikan {
+  +id : UUID
+  +nama : VARCHAR(255)
+  +jenjang : VARCHAR(255)
+}
+
+class PengembanganRps {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  +siakDosenId : UUID
+}
+
+class PenghasilanPekerjaan {
+  +id : UUID
+  +range : VARCHAR(255)
+}
+
+class Pengumuman {
+  +id : UUID
+  +siakPegawaiId : UUID
+  +judul : VARCHAR(255)
+  +isi : TEXT
+  +isActive : BOOLEAN
+  +isPriority : BOOLEAN
+  +banner : TEXT
+}
+
+class PeriodeAkademik {
+  +id : UUID
+  +siak_tahun_ajaran_id : UUID
+  +nama : VARCHAR(255)
+  +kode : VARCHAR(255)
+  +tanggal_mulai : TIMESTAMP
+  +tanggal_selesai : TIMESTAMP
+  +status : VARCHAR(255)
+}
+
+class PredikatKelulusan {
+  +id : UUID
+  +siakTahunKurikulumId : UUID
+  +siakJenjangId : UUID
+  +kode : VARCHAR(255)
+  +namaInd : VARCHAR(255)
+  +namaEng : VARCHAR(255)
+  +ipkMin : DECIMAL(10,2)
+  +ipkMax : DECIMAL(10,2)
+  +masaStudi : INTEGER
+  +isCuti : BOOLEAN
+  +isMengulang : BOOLEAN
+  +nilaiMin : VARCHAR(255)
+  +nilaiMinTa : VARCHAR(255)
+  +isMabaOnly : BOOLEAN
+}
+
+class ProfilLulusan {
+  +id : UUID
+  +siakObeId : UUID
+  +kode : VARCHAR(255)
+  +profil : VARCHAR(255)
+  +profesi : VARCHAR(255)
+  +deskripsi : TEXT
+  +deskripsiEn : TEXT
+}
+
+class ProgramStudi {
+  +id : UUID
+  +siakFakultasId : UUID
+  +siakJenjangId : UUID
+  +nama : VARCHAR(255)
+  +kode : VARCHAR(255)
+  +kaprodiId : UUID
+}
+
+class RencanaEvaluasi {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  +metodeEvaluasi : VARCHAR(255)
+  +jenisEvaluasi : VARCHAR(255)
+  +bobot : DECIMAL(5,2)
+  +syaratLulus : VARCHAR(255)
+  +deskripsi : TEXT
+  +deskripsiInggris : TEXT
+  +siakPeriodeAkademikId : UUID
+}
+
+class RencanaPembelajaran {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  +siakPeriodeAkademikId : UUID
+  +sesi : INTEGER
+  +jenisPertemuan : VARCHAR(255)
+  +materiPembelajaran : TEXT
+  +materiPembelajaranEng : TEXT
+  +indikatorPenilaian : TEXT
+  +kriteriaPenilaian : TEXT
+  +metodePembelajaranLuring : TEXT
+  +metodePembelajaranDaring : TEXT
+  +bobotPenilaian : DECIMAL(5,2)
+  + : TEXT
+  +metodePembelajaran : TEXT
+}
+
+class RincianKrsMahasiswa {
+  +id : UUID
+  +siakKrsMahasiswaId : UUID
+  +siakKelasKuliahId : UUID
+  +kategori : VARCHAR(255)
+  +status : VARCHAR(255)
+  +kehadiran : DOUBLE PRECISION
+  +tugas : DOUBLE PRECISION
+  +uts : DOUBLE PRECISION
+  +uas : DOUBLE PRECISION
+  +nilai : DOUBLE PRECISION
+  +hurufMutu : VARCHAR(255)
+  +angkaMutu : DECIMAL(5,2)
+  +nilaiAkhir : DECIMAL(5,2)
+}
+
+class Rps {
+  +id : UUID
+  +siakMataKuliahId : UUID
+  +siakPeriodeAkademikId : UUID
+  + : TIMESTAMP
+  +deskripsiMataKuliah : TEXT
+  +deskripsiMataKuliahEng : TEXT
+  + : TEXT
+  +materiPembelajaran : TEXT
+  +pustakaUtama : TEXT
+  +pustakaPendukung : TEXT
+  +mediaPerangkatLunak : TEXT
+  + : TEXT
+  + : TEXT
+}
+
+class Ruangan {
+  +id : UUID
+  +siakFakultasId : UUID
+  +nama : VARCHAR(255)
+  +ruangan : VARCHAR(255)
+  +kapasitas : INTEGER
+  +lantai : INTEGER
+}
+
+class SkalaPenilaian {
+  +id : UUID
+  +siakProgramStudiId : UUID
+  +siakTahunKurikulumId : UUID
+  +hurufMutu : VARCHAR(255)
+  +angkaMutu : DECIMAL(10,2)
+  +nilaiMin : DECIMAL(10,2)
+  +nilaiMax : DECIMAL(10,2)
+  + : VARCHAR(255)
+  +isDefault : BOOLEAN
+  +siakPeriodeAkademikId : UUID
+}
+
+class Suku {
+  +id : UUID
+  +nama : VARCHAR(255)
+}
+
+class TahunAjaran {
+  +id : UUID
+  +tahun : VARCHAR(255)
+  +nama : VARCHAR(255)
+}
+
+class TahunKurikulum {
+  +id : UUID
+  +siakPeriodeAkademikId : UUID
+  +tahun : VARCHAR(255)
+  +keterangan : VARCHAR(255)
+  +tanggalMulai : TIMESTAMP
+  +tanggalSelesai : TIMESTAMP
+}
+
+class TeamPenyusunRps {
+  +id : UUID
+  +siakFakultasId : UUID
+  +siakJenjangId : UUID
+  +nama : VARCHAR(255)
+  +kode : VARCHAR(255)
+}
+
+class TemplateEvaluasi {
+  +id : UUID
+  +siakTahunKurikulumId : UUID
+  +siakProgramStudiId : UUID
+  +jenisMataKuliah : VARCHAR(255)
+  + : VARCHAR(255)
+  +allowNull : TEXT
+  +field : TEXT
+  + : VARCHAR(255)
+  +allowNull : TEXT
+  +field : TEXT
+  + : DECIMAL(10,2)
+  +2 : TEXT
+  +syaratLulus : VARCHAR(255)
+  +deskripsi : TEXT
+  +deskripsiInggris : TEXT
+}
+
+class UnsurNilai {
+  +id : UUID
+  +siakMetodeEvaluasiId : UUID
+  +kode : VARCHAR(255)
+  +nama : VARCHAR(255)
+  +namaSingkat : VARCHAR(255)
+}
+
+class User {
+  +id : UUID
+  +eportalUserId : UUID
+}
+
+@enduml

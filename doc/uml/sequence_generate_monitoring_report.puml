@@ -1,0 +1,22 @@
+@startuml
+actor Kaprodi
+participant Client
+participant ReportController as Controller
+participant ReportService as Service
+database DB
+
+Client -> Controller: GET /reports/obe?prodiId=&tahunKurikulum=
+Controller -> Service: generateObeReport(params)
+Service -> DB: query PemetaanCplMk, NilaiCpmkMahasiswa, RekapCplMahasiswa
+DB --> Service: raw data
+Service -> Service: aggregate per angkatan, per MK, per CPL
+Service --> Controller: reportPayload (JSON / XLSX)
+Controller --> Client: 200 OK (file/JSON)
+
+note right of Service: Report includes:
+- Status pemetaan CPL/CPMK per MK
+- Distribusi capaian CPL per angkatan
+- Daftar MK dengan kesenjangan target vs aktual
+end note
+
+@enduml

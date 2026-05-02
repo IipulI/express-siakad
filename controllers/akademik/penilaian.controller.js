@@ -38,8 +38,10 @@ export const setupKomposisiRPS = async (req, res) => {
             return responseBuilder.status('failure').code(400)
                 .message(`Total persentase harus 100%. Saat ini: ${totalBobot}%`).json();
         }
-        await penilaianService.createKomposisiEvaluasi(mkId, komposisiData);
-        return responseBuilder.code(201).message("Struktur Evaluasi RPS berhasil disimpan").json();
+        const createdData = await penilaianService.createKomposisiEvaluasi(mkId, komposisiData);
+        return responseBuilder.code(201).message("Struktur Evaluasi RPS berhasil disimpan").json({
+            komposisi: createdData
+        });
     } catch (error) {
         return responseBuilder.status('failure').code(500).json(error.message);
     }
@@ -228,3 +230,35 @@ export const getKomposisiRPS = async (req, res) => {
         return responseBuilder.status('failure').code(500).json(error.message);
     }
 };
+
+export const injectKrsTester = async (req, res) => {
+    const responseBuilder = new ResponseBuilder(res);
+    const { id_mhs, id_periode, id_kelas } = req.body;
+    
+    try {
+        const models = (await import('../../models/index.js')).default;
+
+        // 1. Buat KRS
+        const krs = await models.KrsMahasiswa.create({
+            siakMahasiswaId: id_mhs,
+            siakPeriodeAkademikId: id_periode,
+            status: "Disetujui",
+            sksDiambil: 3,
+            semester: 1
+        });
+
+        // 2. Buat Rincian KRS
+        await models.RincianKrsMahasiswa.create({
+            siakKrsMahasiswaId: krs.id,
+            siakKelasKuliahId: id_kelas,
+            status: "Disetujui"
+        });
+
+        return responseBuilder.code(200).message("Mahasiswa berhasil dimasukkan ke KRS Kelas!").json({
+            id_krs: krs.id
+        });
+    } catch (error) {
+        return responseBuilder.status('failure').code(500).json(error.message);
+    }
+};
+

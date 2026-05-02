@@ -601,7 +601,7 @@ export const getRencanaEvaluasi = async (mataKuliahId, periodeId = null) => {
                 metodeEvaluasi: e.metodeEvaluasi,
                 jenisEvaluasi: e.jenisEvaluasi,
                 bobotEvaluasi: parseFloat(e.bobot || 0),
-                syaratLulus: e.syaratLulus ? "Ya" : "-",
+                syaratLulus: e.syaratLulus || 'TIDAK_MENJADI_SYARAT_LULUS',
                 deskripsi: e.deskripsi,
                 deskripsiInggris: e.deskripsiInggris,
                 mappingBobotCpmk: mappingBobot 
@@ -679,7 +679,7 @@ export const saveRencanaEvaluasi = async (mkId, payload) => {
                 bobot: row.bobotEvaluasi,
                 deskripsi: row.deskripsi || '-',
                 deskripsiInggris: row.deskripsiInggris || '-',
-                syaratLulus: false // Default false, sesuaikan jika ada di form
+                syaratLulus: row.syaratLulus || 'TIDAK_MENJADI_SYARAT_LULUS' // Enum: 'TIDAK_MENJADI_SYARAT_LULUS' | 'MENJADI_SYARAT_LULUS' | 'LULUS_DENGAN_NILAI_MINIMUM'
             }, { transaction: trx });
 
             // C. Masukkan Mapping ke CPMK-nya
