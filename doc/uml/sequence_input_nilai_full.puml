@@ -24,7 +24,10 @@ Service --> Controller: { success: true, summary: { count, averages, distribusi 
 Controller --> Client: 200 OK
 
 note over Service: Setelah input nilai, sistem dapat:
+@enduml
+note over Service
+Setelah input nilai, sistem dapat:
 - menghitung nilai akhir per mahasiswa
 - menyimpan rekap CPMK (NilaiCpmkMahasiswa)
 - menghitung kontribusi ke CPL dan menyimpan rekap
-@enduml
+end note

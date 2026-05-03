@@ -13,7 +13,8 @@ Service -> Service: aggregate per angkatan, per MK, per CPL
 Service --> Controller: reportPayload (JSON / XLSX)
 Controller --> Client: 200 OK (file/JSON)
 
-note right of Service: Report includes:
+note right of Service
+Report includes:
 - Status pemetaan CPL/CPMK per MK
 - Distribusi capaian CPL per angkatan
 - Daftar MK dengan kesenjangan target vs aktual

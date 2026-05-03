@@ -17,6 +17,8 @@ Service -> RekapModel: aggregate CPL per mahasiswa (weighted)
 RekapModel -> DB: insert/update rekap_cpl_mahasiswa
 Service --> Caller: summary hasil perhitungan
 
-note right: Perhitungan harus memperhatikan bobot komponen,
+note right
+Perhitungan harus memperhatikan bobot komponen,
 pemetaan komposisi->CPMK, dan bobot CPMK->CPL.
+end note
 @enduml
