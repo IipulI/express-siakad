@@ -39,9 +39,32 @@ export const getAvailableKrs = async (req, res) => {
   }
 };
 
+export const infoKrs = async (req, res) => {
+  const responseBuilder = new ResponseBuilder(res)
+  const mahasiswa = req.user.mahasiswa
+
+  try {
+    const data = await KrsMahasiswaService.infoKrs(mahasiswa.id)
+
+    responseBuilder
+        .status('success')
+        .code(200)
+        .message("Successfully retrieve data")
+        .json(data)
+  } catch (error) {
+    console.error("Error in handleGetInfoKrs:", error);
+
+    responseBuilder
+        .status('failure')
+        .code(500)
+        .message("Failed to retrieve data")
+        .json()
+  }
+}
+
 export const saveKrs = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
-  const kelasKuliahIds = req.body.kelasKuliahIds;
+  const kelasKuliahIds = req.body.kelasIds;
 
   try {
     const user = req.user;
@@ -65,14 +88,12 @@ export const saveKrs = async (req, res) => {
 
 export const submitKrs = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
-  const siakKrsId = req.body.siakKrsId;
 
   try {
     const user = req.user;
     const mahasiswa = user?.mahasiswa;
 
     const updateData = await KrsMahasiswaService.submitKrs(
-      siakKrsId,
       mahasiswa.id
     );
 
@@ -94,11 +115,15 @@ export const submitKrs = async (req, res) => {
 
 export const updateKrs = async (req, res) => {
   const responseBuilder = new ResponseBuilder(res);
-  const kelasKuliahIds = req.body.kelasKuliahIds;
-  const krsId = req.params.id;
+  const kelasKuliahIds = req.body.kelasIds;
+  const user = req.user;
+  const mahasiswa = user?.mahasiswa;
 
   try {
-    const data = await KrsMahasiswaService.updateKrs(krsId, kelasKuliahIds);
+    const data = await KrsMahasiswaService.updateKrs(
+        mahasiswa.id,
+        kelasKuliahIds
+    );
 
     responseBuilder.code(201).message("Successfully update data").json(data);
   } catch (error) {

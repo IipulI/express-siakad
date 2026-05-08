@@ -56,12 +56,12 @@ export const create = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        await MataKuliahService.createMataKuliah(req.body);
+        const data = await MataKuliahService.createMataKuliah(req.body);
 
         responseBuilder
             .code(201)
             .message("Data Mata Kuliah berhasil dibuat")
-            .json();
+            .json(data);
     }
     catch (error) {
         if(error.message.includes('already exists')) {
@@ -87,24 +87,28 @@ export const update = async (req, res) => {
     try {
         const isUpdated = await MataKuliahService.updateMataKuliah(id, req.body)
 
+        console.log(isUpdated)
+
         if (isUpdated) {
             return responseBuilder
                 .status("success")
                 .code(200)
                 .message("Data berhasil diperbarui")
-                .json();
+                .json(isUpdated);
         }
         else {
             return responseBuilder
                 .status("failure")
                 .code(404)
                 .message(
-                    `Periode Akademik dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`
+                    `Mata kuliah dengan ID ${id} tidak ditemukan atau tidak ada perubahan yang dilakukan`
                 )
                 .json();
         }
     }
     catch (error) {
+        console.error(error)
+
         return responseBuilder
             .status("failure")
             .code(500)
@@ -115,12 +119,16 @@ export const update = async (req, res) => {
 
 export const destroy = async (req, res) => {
     const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
 
     try {
         const isDeleted = await MataKuliahService.deleteMataKuliah(id)
 
         if (isDeleted) {
-            return res.status(204).end();
+            responseBuilder
+                .status("success")
+                .message("Data berhasil dihapus")
+                .json();
         }
         else {
             return responseBuilder

@@ -3,136 +3,92 @@ import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
 
-export const findAll = async (req, res) => {
-  const page = req.query.page ? parseInt(req.query.page) : null;
-  const size = req.query.size ? parseInt(req.query.size) : null;
-  const responseBuilder = new ResponseBuilder(res);
+export const findAll = async (req, res, next) => {
+    const page = req.query.page ? parseInt(req.query.page) : null;
+    const size = req.query.size ? parseInt(req.query.size) : null;
+    const responseBuilder = new ResponseBuilder(res);
 
-  try {
-    const data = await BatasSks.findAll(page, size);
+    try {
+        const data = await BatasSks.findAll(page, size);
 
-    let payload;
-    if (data.isPaginated === true) {
-      payload = getPagingData(data, page, size);
-    } else {
-      payload = data.rows;
+        let payload;
+        if (data.isPaginated === true) {
+          payload = getPagingData(data, page, size);
+        } else {
+          payload = data.rows;
+        }
+
+        responseBuilder
+            .code(200)
+            .message("Berhasil Menggambil data")
+            .json(payload);
+
+    } catch (error) {
+        next(error)
     }
-
-    responseBuilder.code(200).message("Berhasil Menggambil data").json(payload);
-  } catch (error) {
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message(error.message || "Terjadi kesalahan yang tidak terduga")
-      .json();
-  }
-};
-export const create = async (req, res) => {
-  const responseBuilder = new ResponseBuilder(res);
-
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return responseBuilder
-      .status("failure")
-      .code(422)
-      .message("Validasi gagal")
-      .json(errors.array());
-  }
-
-  try {
-    const { siakJenjangId, ipsMin, ipsMax, batasSks } = req.body;
-
-    await BatasSks.createBatasSks({
-      siakJenjangId, ipsMin, ipsMax, batasSks
-    });
-
-    responseBuilder
-      .code(201)
-      .message("Data Batas Sks berhasil ditambahkan.")
-      .json();
-  } catch (err) {
-    if (err.message.includes("already exists")) {
-      return responseBuilder
-        .status("failure")
-        .code(409)
-        .message(err.message)
-        .json();
-    }
-
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message(
-        err.message ||
-          "Terjadi kesalahan saat menambahkan data Batas Sks"
-      )
-      .json();
-  }
 };
 
-export const updateBatasSks = async (req, res) => {
-  const { id } = req.params;
-  const { ipsMin, ipsMax, batasSks } = req.body;
-  const responseBuilder = new ResponseBuilder(res);
+export const findOneById = async (req, res, next) => {
+    const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
 
-  try {
-    const isUpdated = await BatasSks.updateBatasSks(id, {
-      ipsMin, ipsMax, batasSks,
-    });
+    try {
+        const data = await BatasSks.findOneById(id);
 
-    if (isUpdated) {
-      return responseBuilder
-        .status("success")
-        .code(200)
-        .message("Data berhasil diperbarui")
-        .json();
-    } else {
-      return responseBuilder
-        .status("failure")
-        .code(404)
-        .message(
-          `Data Batas Sks dengan ID ${id} tidak ditemukan atau tidak ada perubahan`
-        )
-        .json();
+        responseBuilder
+            .code(200)
+            .message("Berhasil Mengambil data")
+            .json(data);
+    } catch (error) {
+        next(error)
     }
-  } catch (error) {
-    console.error(error);
-    return responseBuilder
-      .status("failure")
-      .code(500)
-      .message(
-        "Terjadi kesalahan internal server saat memperbarui Batas Sks Models."
-      )
-      .json();
-  }
+}
+
+export const create = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res);
+    const body = req.body;
+
+    try {
+        const data = await BatasSks.createBatasSks(body);
+
+        responseBuilder
+            .code(201)
+            .message("Data Batas Sks berhasil ditambahkan.")
+            .json(data);
+    } catch (err) {
+        next(err)
+    }
 };
 
-export const deleteBatasSks = async (req, res) => {
+export const updateBatasSks = async (req, res, next) => {
+      const { id } = req.params;
+      const responseBuilder = new ResponseBuilder(res);
+
+      try {
+          const data = await BatasSks.updateBatasSks(id, req.body);
+
+          responseBuilder
+              .code(200)
+              .message("Data Batas Sks berhasil diperbarui")
+              .json(data);
+      } catch (error) {
+          next(error)
+      }
+};
+
+export const deleteBatasSks = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
     const id= req.params.id
-    try {
-        const isDeleted = await BatasSks.deleteBatasSks(id);
 
-        if (isDeleted) {
-        return responseBuilder
+    try {
+        await BatasSks.deleteBatasSks(id);
+
+        responseBuilder
+            .status("success")
             .code(200)
-            .message(`Data Batas Sks Berhasil Dihapus`)
+            .message("Data Batas Sks berhasil dihapus")
             .json();
-        } else {
-        return responseBuilder
-            .status("failure")
-            .code(404)
-            .message(`Batas Sks dengan ID ${id} tidak ditemukan`)
-            .json();
-        }
     } catch (error) {
-        console.error(error);
-        return responseBuilder
-        .status("failure")
-        .code(500)
-        .message(
-            "Terjadi kesalahan internal server saat menghapus Batas Sks."
-        )
-        .json(error.message);
-    };
+        next(error)
+    }
 }

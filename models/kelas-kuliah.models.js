@@ -20,6 +20,11 @@ export default (sequelize) => {
                 as: "periodeAkademik",
             })
 
+            this.hasMany(models.RincianKrsMahasiswa, {
+                foreignKey: "siak_kelas_kuliah_id",
+                as: "rincianKrsMahasiswa"
+            })
+
             this.hasMany(models.JadwalKuliah, {
                 foreignKey: "siak_kelas_kuliah_id",
                 as: "jadwalKuliah",

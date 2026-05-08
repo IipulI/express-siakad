@@ -1,5 +1,5 @@
 import models from '../models/index.js'
-const { User, Mahasiswa, Dosen } = models;
+const { User, UserRole, Role, Mahasiswa, Dosen } = models;
 
 export const attachUser = async (req, res, next) => {
     try {
@@ -13,9 +13,9 @@ export const attachUser = async (req, res, next) => {
 
         // Fetch the full, current user data from the 'siak_user' table.
         const userFromDb = await User.findOne({
-            attributes: ["id", "eportalUserId"],
+            attributes: ["id"],
             where: {
-                eportalUserId: userId,
+                id: userId,
             },
             include: [
                 {
@@ -27,6 +27,16 @@ export const attachUser = async (req, res, next) => {
                     attributes: ["id", "nama"],
                     model: Dosen,
                     as: "dosen"
+                },
+                {
+                    attributes: ["id", "siakUserId", "siakRoleId"],
+                    model: UserRole,
+                    as: "userRole",
+                    include: {
+                        attributes: ["id", "nama"],
+                        model: Role,
+                        as: "role"
+                    }
                 }
             ]
         });

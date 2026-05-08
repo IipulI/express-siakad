@@ -44,11 +44,12 @@ export const assignDosen = async (req, res) => {
 
 export const acceptKrsMahasiswa = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res)
+    const krsIds = req.body.krsIds ? req.body.krsIds : null;
+    const mahasiswaIds = req.body.mahasiswaIds ? req.body.mahasiswaIds : null;
+    const periodeAkademikId = req.body.periodeAkademikId ? req.body.periodeAkademikId : null;
 
     try {
-        const { krsIds } = req.body;
-
-        await pembimbingAkademikService.updateKrsMahasiswa(krsIds, "Disetujui")
+        await pembimbingAkademikService.updateKrsMahasiswa(krsIds, mahasiswaIds, periodeAkademikId, "Disetujui")
 
         responseBuilder
             .code(200)
@@ -67,11 +68,10 @@ export const acceptKrsMahasiswa = async (req, res) => {
 
 export const rejectKrsMahasiswa = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res)
+    const { krsIds, mahasiswaIds, periodeAkademikId } = req.body;
 
     try {
-        const { krsIds } = req.body;
-
-        await pembimbingAkademikService.updateKrsMahasiswa(krsIds, "Ditolak")
+        await pembimbingAkademikService.updateKrsMahasiswa(krsIds, mahasiswaIds, periodeAkademikId,"Ditolak")
 
         responseBuilder
             .code(200)

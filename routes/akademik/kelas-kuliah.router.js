@@ -7,6 +7,7 @@ router.get('/', KelasKuliahController.findAll)
 router.get('/:id', KelasKuliahController.findOne)
 router.get('/:id/schedule', KelasKuliahController.schedules)
 router.get('/:id/participant', KelasKuliahController.classParticipant)
+router.post('/:id/participant', KelasKuliahController.addClassParticipant)
 router.get('/:id/grading', KelasKuliahController.getGradingClass)
 router.post('/:id/grading', KelasKuliahController.submitGradingClass)
 

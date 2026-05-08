@@ -1,109 +1,96 @@
 import models from "../models/index.js"
 import { Op } from "sequelize"
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 
 const { Agama } = models;
 
 export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
+    const isPaginated = page !== null && size !== null;
 
-      const { count, rows } = await Agama.findAndCountAll({
-        attributes: [
-          "id",
-          "nama"
-        ],
-        limit,
-        offset,
-        raw: true,
-      });
-
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
-
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
-    } else {
-      const { count, rows } = await Agama.findAndCountAll({
-        attributes: [
-          "id",
-          "nama"
-        ],
-        // raw: true,
-      });
-
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
+    const queryBuilder = {
+        attributes: ['id', 'nama'],
+        order: [['id', 'DESC']]
     }
-  } catch (error) {
-    console.log(error)
-    throw new Error(`Gagal mengambil data : ${error.message}`);
-  }
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await Agama.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    }
+    else {
+        const data = await Agama.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
+    }
 };
+
+export const findOneById = async (id) => {
+    const cekDataAgama = await Agama.findByPk(id, {
+        attributes: ['id', 'nama'],
+    })
+
+    if (!cekDataAgama) {
+        throw new NotFoundError(`Agama tidak ditemukan`)
+    }
+
+    return cekDataAgama
+}
 
 export const createAgama = async (agamaData) => {
     const { nama } = agamaData;
 
-    const cekDataAgama = await Agama.findOne({ 
+    const cekDataAgama = await Agama.findOne({
       attributes: ['nama'],
       where: {
-        nama: { [Op.iLike] : nama}
+        nama: { [Op.iLike] : nama }
       }
     });
     if (cekDataAgama) {
-        throw new Error(`Agama : ${nama} sudah ada.`);
+        throw new ConflictError(`Agama : ${nama} sudah ada.`);
     }
 
-    try {
-        await Agama.create({ nama });
-    } catch (err) {
-        if (err.name === 'SequelizeUniqueConstraintError') {
-            throw new Error(`Data yang Anda masukkan sudah ada : ${err.errors.map(e => e.message).join(', ')}`);
-        }
-        throw new Error(`Gagal membuat data Agama : ${err.message}`);
-    }
+    return await Agama.create({ nama });
 };
 
 export const updateAgama = async (id, agamaData) => {
     const { nama } = agamaData;
 
-    try {
-        const cekDataAgama = await Agama.findByPk(id)
-        if (!cekDataAgama) {
-            throw new Error (`Agama tidak ditemukan`)
+    const cekDataAgama = await Agama.findByPk(id)
+    if (!cekDataAgama) {
+        throw new NotFoundError(`Agama tidak ditemukan`)
+    }
+
+    const existingNameAgama = await Agama.findOne({
+        where: {
+            nama: { [Op.iLike] : nama }
         }
-
-        const [updatedRowsCount] = await Agama.update({
-            nama: nama,
-        }, {
-            where: { id: id }
-        });
-
-        return updatedRowsCount > 0;
+    })
+    if (existingNameAgama && existingNameAgama.id !== id) {
+        throw new ConflictError(`Agama : ${nama} sudah ada.`);
     }
-    catch (error) {
-        throw new Error(`Gagal memperbarui data agama : ${error.message}`);
-    }
+
+    return cekDataAgama.update({ nama })
 }
 
 export const deleteAgama = async (id) => {
-    try {
-        const deletedRowsCount = await Agama.destroy({
-            where: { id: id }
-        });
+    const cekDataAgama = await Agama.findByPk(id)
 
-        return deletedRowsCount > 0;
+    if (!cekDataAgama) {
+        throw new NotFoundError(`Agama tidak ditemukan`)
     }
-    catch (error) {
-        throw new Error(`Gagal menghapus data agama : ${error.message}`);
-    }
+
+    await cekDataAgama.destroy()
 }

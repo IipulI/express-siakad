@@ -4,11 +4,16 @@ import * as KrsMahasiswaController from "../../controllers/mahasiswa/krs-mahasis
 const router = new Router();
 
 router.get("/", KrsMahasiswaController.getAvailableKrs);
-router.get("/tersimpan", KrsMahasiswaController.savedKrs);
-router.post("/ajukan", KrsMahasiswaController.submitKrs);
+router.get("/info-krs", KrsMahasiswaController.infoKrs);
+router.get("/status-menunggu", KrsMahasiswaController.savedKrs);
+
 router.post("/", KrsMahasiswaController.saveKrs);
-router.put("/:id", KrsMahasiswaController.updateKrs);
+
+router.put("/", KrsMahasiswaController.updateKrs);
+router.put("/status", KrsMahasiswaController.submitKrs);
+
 router.delete("/:id", KrsMahasiswaController.deleteKrs);
+
 router.use("/riwayat-krs", KrsMahasiswaController.getKrsHistory);
 
 // Riwayat KRS
