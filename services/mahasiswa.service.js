@@ -1,6 +1,8 @@
 import models from "../models/index.js";
-import {getPagination} from "../utils/pagination.js";
-import {Op} from "sequelize";
+import { getPagination } from "../utils/pagination.js";
+import { Op } from "sequelize";
+import slug from 'slug'
+import bcrypt from 'bcrypt';
 
 const {
     sequelize,
@@ -15,6 +17,7 @@ const {
     ProgramStudi,
     RincianKrsMahasiswa,
     Ruangan,
+    User,
 } = models;
 
 
@@ -194,12 +197,45 @@ export const findOne = async (mahasiswaId) => {
 
 export const create = async (dataMahasiswa) => {
     try {
-        await sequelize.transaction(async (trx) => {
+        // Validasi Logika: Cek apakah NIM sudah ada (Integritas Data)
+        const existingMahasiswa = await Mahasiswa.findOne({
+            where: { npm: dataMahasiswa.npm }
+        });
 
+        if (existingMahasiswa) {
+            throw new Error('NPM sudah terdaftar dalam sistem.');
+        }
+
+        // Menyimpan data jika validasi lolos
+        return await sequelize.transaction(async (trx) => {
+            const username = slug(dataMahasiswa.nama, '_')
+            const password = await bcrypt.hash(dataMahasiswa.noTelepon, 12)
+
+            const user = await User.create({
+                username: username,
+                email: dataMahasiswa.emailPribadi,
+                password: password,
+            }, {
+                transaction: trx,
+            })
+
+            dataMahasiswa.siakUserId = user.id;
+
+            return await Mahasiswa.create(dataMahasiswa, {
+                transaction: trx
+            })
         })
     }
     catch (error) {
         console.log(error);
         throw new Error(error.message);
     }
+}
+
+export const updateMahasiswa = async (mahasiswaId, dataMahasiswa) => {
+
+}
+
+export const deleteMahasiswa = async (mahasiswaId) => {
+
 }

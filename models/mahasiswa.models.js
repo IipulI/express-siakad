@@ -5,11 +5,38 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class Mahasiswa extends Model {
         static associate(models) {
+            // --- belongsTo Relation ---
             this.belongsTo(models.ProgramStudi, {
                 foreignKey: 'siak_program_studi_id',
                 as: 'programStudi'
             })
 
+            this.belongsTo(models.StatusMahasiswa, {
+                foreignKey: 'siak_status_mahasiswa_id',
+                as: 'statusMahasiswa'
+            })
+
+            // this.belongsTo(models.Konsentrasi, {
+            //     foreignKey: 'siak_konsentrasi_id',
+            //     as: 'konsentrasi'
+            // })
+            //
+            // this.belongsTo(models.TahunKurikulum, {
+            //     foreignKey: 'siak_tahun_kurikulum_id',
+            //     as: 'tahunKurikulum'
+            // })
+            //
+            // this.belongsTo(models.SistemKuliah, {
+            //     foreignKey: 'siak_sistem_kuliah_id',
+            //     as: 'sistemKuliah'
+            // })
+            //
+            // this.belongsTo(models.JenisPendaftaran, {
+            //     foreignKey: 'siak_jenis_pendaftaran_id',
+            // })
+
+
+            // --- has Relation ---
             this.hasMany(models.KrsMahasiswa, {
                 foreignKey: 'siak_mahasiswa_id',
                 as: 'krsMahasiswa',
@@ -50,6 +77,10 @@ export default (sequelize) => {
                 primaryKey: true,
                 defaultValue: uuid7,
             },
+            siakUserId: {
+                type: DataTypes.UUID,
+                field: 'siak_user_id',
+            },
 
             // Info Mahasiswa
             nama: {
@@ -64,23 +95,25 @@ export default (sequelize) => {
                 type: DataTypes.UUID,
                 fields: "siak_program_studi_id"
             },
-            // TODO : konsenterasi
-            // siakKonsentrasiId: {
-            //     type: DataTypes.UUID,
-            //     fields: "siak_konsentrasi_id"
-            // },
+            siakKonsentrasiId: {
+                type: DataTypes.UUID,
+                fields: "siak_konsentrasi_id"
+            },
             periodeMasuk: {
                 type: DataTypes.STRING,
                 field: "periode_masuk"
             },
-            // TODO : tahun kurikulum
-            // siakTahunKurikulumId: {
-            //     type: DataTypes.UUID,
-            //     field: "siak_tahun_kurikulum_id"
-            // },
+            siakTahunKurikulumId: {
+                type: DataTypes.UUID,
+                field: "siak_tahun_kurikulum_id"
+            },
             siakSistemKuliahId: {
                 type: DataTypes.UUID,
                 field: "siak_sistem_kuliah_id"
+            },
+            siakJalurPendaftaranId: {
+                type: DataTypes.UUID,
+                field: "siak_jalur_pendaftaran_id"
             },
             siakJenisPendaftaranId: {
                 type: DataTypes.UUID,
@@ -89,15 +122,14 @@ export default (sequelize) => {
             gelombang: {
                 type: DataTypes.STRING,
             },
-            // TODO : Tanggal daftar ulang dan masuk
-            // tanggalDaftarUlang: {
-            //     type: DataTypes.DATEONLY,
-            //     field: "tanggal_daftar_ulang"
-            // },
-            // tanggalAwalMasuk: {
-            //     type: DataTypes.DATEONLY,
-            //     field: "tanggal_awal_masuk"
-            // },
+            tanggalDaftarUlang: {
+                type: DataTypes.DATEONLY,
+                field: "tanggal_daftar_ulang"
+            },
+            tanggalAwalMasuk: {
+                type: DataTypes.DATEONLY,
+                field: "tanggal_awal_masuk"
+            },
             kebutuhanKhusus: {
                 type: DataTypes.BOOLEAN,
                 field: "kebutuhan_khusus"
@@ -105,10 +137,6 @@ export default (sequelize) => {
             siakStatusMahasiswaId: {
                 type: UUID,
                 field: "siak_status_mahasiswa_id"
-            },
-            // TODO : Kolom status hapus nantinya
-            status: {
-                type: DataTypes.STRING,
             },
             biodataValid: {
                 type: DataTypes.BOOLEAN,
@@ -194,11 +222,10 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 field: "no_kk"
             },
-            // TODO : no_kps
-            // noKps: {
-            //     type: DataTypes.STRING,
-            //     field: "no_kps"
-            // },
+            noKps: {
+                type: DataTypes.STRING,
+                field: "no_kps"
+            },
             nik: {
                 type: DataTypes.STRING,
             },
@@ -210,33 +237,24 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 field: "ukuran_jas_almamater"
             },
-            // TODO : dokumen/file akta kelahiran
-            // dokumenAktaKelahiran: {
-            //     type: DataTypes.STRING,
-            //     field: "dokumen_akta_kelahiran"
-            // },
+            dokumenAktaKelahiran: {
+                type: DataTypes.STRING,
+                field: "dokumen_akta_kelahiran"
+            },
 
             // Pekerjaan
             siakPekerjaanId: {
                 type: DataTypes.UUID,
                 field: "siak_pekerjaan_id"
             },
-            // TODO : hapus kolom pekerjaan
-            pekerjaan: {
-                type: DataTypes.STRING
-            },
             instansiPekerjaan: {
                 type: DataTypes.STRING,
                 field: "instansi_pekerjaan"
             },
-            penghasilan: {
-                type: DataTypes.STRING
+            siakPenghasilanPekerjaanId: {
+                type: DataTypes.UUID,
+                field: "siak_penghasilan_pekerjaan_id"
             },
-            // TODO : siakPenghasilanId
-            // siakPenghasilanId: {
-            //     type: DataTypes.UUID,
-            //     field: "siak_penghasilan_id"
-            // },
 
             // Bank
             noRekening : {
@@ -320,15 +338,10 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 field: "kode_pos"
             },
-            // TODO : rubah status tinggal jadi id (narik dari master data)
-            statusTinggal: {
-                type: DataTypes.STRING,
-                field: "status_tinggal"
+            siakJenisTinggalId: {
+                type: DataTypes.UUID,
+                field: "siak_jenis_tinggal_id"
             },
-            // siakJenisTinggalId: {
-            //     type: DataTypes.UUID,
-            //     field: "siak_jenis_tinggal_id"
-            // },
 
             // sekolah
             siakPendidikanTerakhirId: {
@@ -374,9 +387,6 @@ export default (sequelize) => {
                 type: DataTypes.TEXT,
                 field: "dokumen_ijazah"
             },
-
-
-
         },
         {
             sequelize,

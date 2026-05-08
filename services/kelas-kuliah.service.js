@@ -1,11 +1,14 @@
 import {getPagination} from "../utils/pagination.js";
 import models from "../models/index.js"
-import {sequelize} from "../config/database.js";
-import { Op } from "sequelize";
+import { QueryTypes, Op } from "sequelize";
+import ResponseBuilder from "../utils/response.js";
+import { NotFoundError } from "../utils/custom-error.js";
 
 const {
+    BidangIlmu,
     Dosen,
     JadwalKuliah,
+    Jenjang,
     KelasKuliah,
     KomposisiNilaiMataKuliah,
     KrsMahasiswa,
@@ -17,6 +20,7 @@ const {
     Ruangan,
     SkalaPenilaian,
     UnsurNilai,
+    sequelize,
 } = models;
 
 export const findAll = async (page, size, filter) => {
@@ -164,41 +168,35 @@ export const detailClass = async (id) => {
 }
 
 export const classSchedule = async(id) => {
-    try {
-        const existClass = await KelasKuliah.findByPk(id)
-        if (!existClass) {
-            throw new Error(`Kelas Kuliah tidak ditemukan`)
-        }
+    const existClass = await KelasKuliah.findByPk(id)
+    if (!existClass) {
+        throw new NotFoundError(`Kelas Kuliah tidak ditemukan`)
+    }
 
-        return await JadwalKuliah.findAll({
-            attributes: {
-                exclude: ['createdAt', 'updatedAt', 'deletedAt', 'siak_dosen_id', 'siak_kelas_kuliah_id', 'siak_ruangan_id']
+    return await JadwalKuliah.findAll({
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt', 'siak_dosen_id', 'siak_kelas_kuliah_id', 'siak_ruangan_id']
+        },
+        where: {
+            siakKelasKuliahId: id
+        },
+        include: [
+            {
+                attributes: [
+                    'id', 'nama', 'nidn'
+                ],
+                model: Dosen,
+                as: 'dosen'
             },
-            where: {
-                siakKelasKuliahId: id
-            },
-            include: [
-                {
-                    attributes: [
-                        'id', 'nama', 'nidn'
-                    ],
-                    model: Dosen,
-                    as: 'dosen'
-                },
-                {
-                    attributes: [
-                        'id', 'nama', 'ruangan'
-                    ],
-                    model: Ruangan,
-                    as: 'ruangan'
-                }
-            ]
-        });
-    }
-    catch (error) {
-        console.log(error)
-        throw new Error(error);
-    }
+            {
+                attributes: [
+                    'id', 'nama', 'ruangan'
+                ],
+                model: Ruangan,
+                as: 'ruangan'
+            }
+        ]
+    });
 }
 
 export const classParticipant = async(id) => {
@@ -209,28 +207,178 @@ export const classParticipant = async(id) => {
         }
 
         return await Mahasiswa.findAll({
-            attributes: ['id', 'nama', 'npm'],
-            include : {
-                attributes: ['status'],
-                required: true,
-                model: KrsMahasiswa,
-                as: 'krsMahasiswa',
-                include: {
-                    attributes: [],
+            attributes: ['id', 'nama', 'npm', 'angkatan'],
+            include : [
+                {
+                    attributes: ['id','nama'],
+                    model: ProgramStudi,
+                    as: 'programStudi',
+                    include: {
+                        attributes: ['jenjang'],
+                        model: Jenjang,
+                        as: 'jenjang'
+                    }
+                },
+                {
+                    attributes: ['status'],
                     required: true,
-                    model: RincianKrsMahasiswa,
-                    as: 'rincianKrsMahasiswa',
-                    where: {
-                        siak_kelas_kuliah_id: id
+                    model: KrsMahasiswa,
+                    as: 'krsMahasiswa',
+                    include: {
+                        attributes: [],
+                        required: true,
+                        model: RincianKrsMahasiswa,
+                        as: 'rincianKrsMahasiswa',
+                        where: {
+                            siak_kelas_kuliah_id: id
+                        }
                     }
                 }
-            }
+            ]
         })
     }
     catch (error) {
         console.log(error)
         throw new Error(error);
     }
+}
+
+export const enrollMahasiswaToClass = async(mahasiswaId, kelasKuliahId, periodeAkademikId) => {
+    const GET_SKS_SUMMARY_SQL = `
+        WITH LatestHasilStudi AS (
+          SELECT
+            hs.siak_mahasiswa_id,
+            hs.ips,
+            ROW_NUMBER() OVER(PARTITION BY hs.siak_mahasiswa_id ORDER BY hs.semester DESC) as rn
+          FROM
+            siak_hasil_studi hs
+          WHERE hs.siak_mahasiswa_id = :mahasiswaId
+        )
+        SELECT
+          COALESCE(bs.batas_sks, 21) AS "maxSksAllowed",
+          COALESCE(krs.sks_diambil, 0) AS "sksTaken"
+        FROM
+          siak_mahasiswa m
+        LEFT JOIN
+          (SELECT * FROM LatestHasilStudi WHERE rn = 1) AS hs ON m.id = hs.siak_mahasiswa_id
+        LEFT JOIN
+          siak_batas_sks bs ON hs.ips >= bs.ips_min AND hs.ips < bs.ips_max
+        LEFT JOIN
+          siak_krs_mahasiswa krs ON m.id = krs.siak_mahasiswa_id AND krs.siak_periode_akademik_id = :periodeAkademikId
+        WHERE
+          m.id = :mahasiswaId;
+    `;
+
+    // --- 1. GATHER DATA ---
+    const targetKelas = await KelasKuliah.findByPk(kelasKuliahId, {
+        attributes: ['id', 'jumlahPeminat'],
+        include: {
+            attributes: ['id','nama', 'totalSks'],
+            model: MataKuliah,
+            as: 'mataKuliah',
+            required: true
+        },
+    });
+    if (!targetKelas) throw new Error('Kelas kuliah tidak ditemukan.');
+
+    const targetMataKuliah = targetKelas.mataKuliah;
+    const sksSummaryResult = await sequelize.query(GET_SKS_SUMMARY_SQL, {
+        replacements: { mahasiswaId, periodeAkademikId },
+        type: QueryTypes.SELECT,
+        plain: true,
+    });
+    if (!sksSummaryResult) throw new Error('Mahasiswa tidak ditemukan atau data SKS tidak lengkap.');
+
+    // --- 2. VALIDATION CHECKS ---
+    // Check #1: SKS Limit
+    const sksNeeded = targetMataKuliah.totalSks;
+    if ((sksSummaryResult.sksTaken + sksNeeded) > sksSummaryResult.maxSksAllowed) {
+        throw new Error(`Batas SKS tidak mencukupi. Sisa: ${sksSummaryResult.maxSksAllowed - sksSummaryResult.sksTaken}, dibutuhkan: ${sksNeeded}.`);
+    }
+
+    // Check #2: Duplicate course in the same semester
+    const existingEnrollment = await RincianKrsMahasiswa.findOne({
+        attributes: ['id', 'siakKelasKuliahId'],
+        include: [
+            { model: KrsMahasiswa, as: 'krsMahasiswa', where: { siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: periodeAkademikId }, required: true },
+            { model: KelasKuliah, as: 'kelasKuliah', where: { siakMataKuliahId: targetMataKuliah.id }, required: true },
+        ],
+    });
+    if (existingEnrollment) {
+        // Check if the existing enrollment is for the exact same class
+        if (existingEnrollment.siakKelasKuliahId === kelasKuliahId) {
+            throw new Error('Mahasiswa sudah terdaftar di kelas ini.');
+        } else {
+            // Otherwise, it's for a different class of the same course
+            throw new Error('Mahasiswa sudah mengambil mata kuliah ini di kelas lain.');
+        }
+    }
+
+    // Check #3: Passed course in a past semester
+    const pastPassedEnrollment = await RincianKrsMahasiswa.findOne({
+        attributes: ['id', 'hurufMutu', 'nilai'],
+        where: { status: "Lulus" },
+        include: [
+            { model: KrsMahasiswa, as: 'krsMahasiswa', where: { siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: { [Op.ne]: periodeAkademikId } }, required: true },
+            { model: KelasKuliah, as: 'kelasKuliah', where: { siakMataKuliahId: targetMataKuliah.id }, required: true },
+        ],
+    });
+    if (pastPassedEnrollment) throw new Error(`Sudah lulus mata kuliah ini dengan nilai ${pastPassedEnrollment.nilai}.`);
+
+    // --- 3. WRITE TRANSACTION ---
+    return sequelize.transaction(async (t) => {
+        const [krs] = await KrsMahasiswa.findOrCreate({
+            where: { siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: periodeAkademikId },
+            defaults: { status: 'Draft', sksDiambil: 0 },
+            transaction: t,
+        });
+
+        const newRincianKrs = await RincianKrsMahasiswa.create({
+            siakKrsMahasiswaId: krs.id,
+            siakKelasKuliahId: kelasKuliahId,
+            kategori: 'Baru', // You could add logic here to check for past failures and set this to 'MENGULANG'
+        }, { transaction: t });
+
+        // Update the total SKS taken and the class participant count
+        await krs.increment('sksDiambil', { by: sksNeeded, transaction: t });
+        await targetKelas.increment('jumlahPeminat', { by: 1, transaction: t });
+
+        return newRincianKrs;
+    });
+}
+
+export const moveMahasiswaToOtherClass = async (mahasiswaId, sourceKelasKuliahId, targetKelasKuliahId, periodeAkademikId) => {
+
+}
+
+export const deleteMahasiswaFromClass = async(mahasiswaId, kelasKuliahId, periodeAkademikId) => {
+    const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
+        attributes: ['id', 'nama'],
+        where: { id: mahasiswaId }
+    })
+    if(!mahasiswa){
+        throw new Error("Mahasiswa tidak ditemukan")
+    }
+
+    const rincianKrs = await RincianKrsMahasiswa.findOne({
+        attributes: ['id'],
+        where: {
+            siakKelasKuliahId: kelasKuliahId
+        },
+        include: {
+            model: KrsMahasiswa,
+            as: 'krsMahasiswa',
+            where: {
+                siakMahasiswaId: mahasiswaId,
+                siakPeriodeAkademikId: periodeAkademikId,
+            }
+        }
+    })
+    if(!rincianKrs){
+        throw new Error("Kelas kuliah tidak ditemukan")
+    }
+
+    await rincianKrs.destroy()
 }
 
 export const getGradingClass = async(id) => {

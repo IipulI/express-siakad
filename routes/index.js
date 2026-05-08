@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import akademikRoutes from './akademik/index.js';
 import mahasiswaRoutes from './mahasiswa/index.js';
+import dosenRoutes from './dosen/index.js';
 import { verifySsoToken } from "../middleware/auth.middleware.js";
+import * as programStudiController from "../controllers/akademik/program-studi.controller.js"
 import { attachUser } from "../middleware/attachUser.middleware.js";
 import * as authController from '../controllers/auth.controller.js'
 import { findAll } from "../controllers/akademik/periode-akademik.controller.js"
@@ -14,6 +16,7 @@ router.get('/periode-akademik/dropdown', findAll)
 router.get('/program-studi', programStudiController.findAll)
 
 router.use('/akademik', akademikRoutes);
-router.use('/mahasiswa', verifySsoToken, mahasiswaRoutes)
+router.use('/mahasiswa', verifySsoToken, attachUser, mahasiswaRoutes)
+router.use('/dosen', verifySsoToken, attachUser, dosenRoutes)
 
 export default router;

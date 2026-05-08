@@ -38,6 +38,10 @@ export default (sequelize) => {
             password: {
                 type: DataTypes.STRING,
             }
+            // eportalUserId: {
+            //     type: DataTypes.UUID,
+            //     fields: "eportal_user_id",
+            // }
         },
         {
             sequelize,

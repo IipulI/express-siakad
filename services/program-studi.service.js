@@ -4,58 +4,28 @@ import { getPagination } from "../utils/pagination.js";
 const { ProgramStudi } = models;
 
 export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
+  const isPaginated = page !== null && size !== null
+  const { limit, offset } = getPagination(page, size);
 
-      const { count, rows } = await ProgramStudi.findAndCountAll({
-        attributes: [
-          "id",
-          "siak_fakultas_id",
-          "siak_jenjang_id",
-          "nama",
-          "kode",
-        ],
-        limit,
-        offset,
-        order: [["id", "DESC"]],
-        raw: true,
-      });
+  const { count, rows } = await ProgramStudi.findAndCountAll({
+    attributes: [
+      "id",
+      "siak_fakultas_id",
+      "siak_jenjang_id",
+      "nama",
+      "kode",
+    ],
+    limit: isPaginated ? limit : undefined,
+    offset: isPaginated ? offset : undefined,
+    order: [["id", "DESC"]],
+    raw: true,
+  });
 
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
-
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
-    } else {
-      const { count, rows } = await ProgramStudi.findAndCountAll({
-        attributes: [
-          "id",
-          "siak_fakultas_id",
-          "siak_jenjang_id",
-          "nama",
-          "kode",
-        ],
-        include: [
-          { model: Fakultas, as: "fakultas", attributes: ["id", "nama"] },
-        ],
-        // raw: true,
-      });
-
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
-    }
-  } catch (error) {
-    throw new Error(`Gagal mengambil data: ${error.message}`);
-  }
+  return {
+    count,
+    rows,
+    isPaginated,
+  };
 };
 
 export const createRuangan = async (ruanganData) => {

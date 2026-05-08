@@ -4,41 +4,22 @@ import { getPagination } from "../utils/pagination.js";
 const { PeriodeAkademik } = db
 
 export const findAll = async (page, size) => {
-    try {
-        if (page !== null && size !== null) {
-            const { limit, offset } = getPagination(page, size);
+    const isPaginated = page !== null && size !== null
+    const { limit, offset } = getPagination(page, size);
 
-            const {count, rows} = await PeriodeAkademik.findAndCountAll({
-                attributes: {
-                    exclude: ['createdAt', 'updatedAt', 'deletedAt']
-                },
-                limit,
-                offset,
-                order: [['kode', 'DESC']],
-            });
+    const { count, rows} = await PeriodeAkademik.findAndCountAll({
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        limit: isPaginated ? limit : undefined,
+        offset: isPaginated ? offset : undefined,
+        order: [['kode', 'DESC']],
+    });
 
-            return {
-                count,
-                rows,
-                isPaginated: true,
-            }
-        }
-        else {
-            const {count, rows}= await PeriodeAkademik.findAndCountAll({
-                attributes: {
-                    exclude: ['createdAt', 'updatedAt', 'deletedAt']
-                },
-            })
-
-            return {
-                count : count,
-                rows,
-                isPaginated: false,
-            }
-        }
-    }
-    catch (error) {
-        throw new Error(`Gagal mengambil data: ${error.message}`);
+    return {
+        count,
+        rows,
+        isPaginated,
     }
 }
 

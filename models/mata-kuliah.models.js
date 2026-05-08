@@ -40,7 +40,6 @@ export default (sequelize) => {
                 foreignKey: "prasyarat_mata_kuliah_3",
                 as: "prasyarat3"
             })
-
         }
     }
 
@@ -62,22 +61,11 @@ export default (sequelize) => {
                 type: DataTypes.UUID,
                 field: "siak_tahun_kurikulum_id"
             },
-            // TODO :
-            // siakBidangIlmuId: {
-            //     allowNull: true,
-            //     type: DataTypes.UUID,
-            //     field: "siak_bidang_ilmu_id"
-            // },
-            // siakJenisMataKuliahId: {
-            //     allowNull: true,
-            //     type: DataTypes.UUID,
-            //     field: "siak_jenis_mata_kuliah_id"
-            // },
-            // siakKelompokMataKuliahId: {
-            //     allowNull: true,
-            //     type: DataTypes.UUID,
-            //     field: "siak_kelompok_mata_kuliah_id"
-            // },
+            siakKelompokMataKuliahId: {
+                allowNull: true,
+                type: DataTypes.UUID,
+                field: "siak_kelompok_mata_kuliah_id"
+            },
             nama: {
                 allowNull: false,
                 type: DataTypes.STRING

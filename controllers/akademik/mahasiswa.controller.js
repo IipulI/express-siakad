@@ -56,7 +56,13 @@ export const create = async (req, res) => {
     const response = new ResponseBuilder(res)
 
     try {
+        const data = await mahasiswaService.create(req.body)
 
+        response
+            .status('success')
+            .code(201)
+            .message("Berhasil membuat data mahasiswa")
+            .json(data)
     }
     catch (error) {
         response

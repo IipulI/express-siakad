@@ -1,115 +1,140 @@
+import { Op } from "sequelize";
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { NotFoundError, UnprocessableEntityError } from "../utils/custom-error.js";
 
 const { BatasSks } = models;
 
 export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
+    const isPaginated = page !== null && size !== null
 
-      const { count, rows } = await BatasSks.findAndCountAll({
+    const queryBuilder = {
         attributes: [
-          "id",
-          "siak_jenjang_id",
-          "ips_min",
-          "ips_max",
-          "batas_sks"
+            "id",
+            "siakJenjangId",
+            "ipsMin",
+            "ipsMax",
+            "batasSks"
         ],
-        limit,
-        offset,
-        raw: true,
-      });
-
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
-
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
-    } else {
-      const { count, rows } = await BatasSks.findAndCountAll({
-        attributes: [
-          "id",
-          "siak_jenjang_id",
-          "ips_min",
-          "ips_max",
-          "batas_sks"
-        ],
-        // raw: true,
-      });
-
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
     }
-  } catch (error) {
-    console.log(error)
-    throw new Error(`Gagal mengambil data : ${error.message}`);
-  }
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await BatasSks.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        };
+    } else {
+        const data = await BatasSks.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        };
+    }
 };
 
-export const createBatasSks = async (batasSksData) => {
-  const { siakJenjangId, ipsMin, ipsMax, batasSks } = batasSksData;
+export const findOneById = async(id) => {
+    const batasSks = BatasSks.findOne({
+        attributes: [
+            'id',
+            'siakJenjangId',
+            'ipsMin',
+            'ipsMax',
+            'batasSks'
+        ],
+        where: {
+            id: id
+        }
+    })
 
-  const existingBatasSks = await BatasSks.findOne({
-    where: { batasSks },
-  });
-
-  if (existingBatasSks) {
-    throw new Error(`Batas Sks dengan nilai "${BatasSks}" sudah ada`);
-  }
-
-  try {
-    await BatasSks.create({ siakJenjangId, ipsMin, ipsMax, batasSks });
-  } catch (err) {
-    if (err.name === "SequelizeUniqueConstraintError") {
-      throw new Error(
-        `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
-      );
+    if (!batasSks) {
+        throw new NotFoundError(`Batas Sks tidak ditemukan`)
     }
-    throw new Error(`Terjadi kesalahan saat membuat Batas Sks: ${err.message}`);
-  }
+
+    return batasSks
+}
+
+
+export const createBatasSks = async (batasSksData) => {
+    const { siakJenjangId, ipsMin, ipsMax, batasSks } = batasSksData;
+
+    if (parseFloat(ipsMax) < parseFloat(ipsMin)) {
+        throw new UnprocessableEntityError("Nilai maksimal ips tidak boleh lebih kecil dari minimal ips");
+    }
+
+    // Cek apakah ada range yang beririsan untuk siakJenjangId yang sama
+    const overlap = await BatasSks.findOne({
+        where: {
+            siakJenjangId,
+            [Op.and]: [
+                { ipsMin: { [Op.lte]: ipsMax } },
+                { ipsMax: { [Op.gte]: ipsMin } }
+            ]
+        }
+    });
+
+    if (overlap) {
+        throw new UnprocessableEntityError(`Range IPS (${ipsMin} - ${ipsMax}) beririsan dengan data yang sudah ada (Range: ${overlap.ipsMin} - ${overlap.ipsMax})`);
+    }
+
+    return await BatasSks.create({
+        siakJenjangId,
+        ipsMin,
+        ipsMax,
+        batasSks
+    });
 };
 
 export const updateBatasSks = async (id, batasSksData) => {
-    const { ipsMin, ipsMax, batasSks } = batasSksData;
+    const { siakJenjangId, ipsMin, ipsMax, batasSks } = batasSksData;
 
-    try {
-        const cekDataBatasSks = await BatasSks.findByPk(id)
-        if (!cekDataBatasSks) {
-            throw new Error (`Batas Sks tidak ditemukan`)
+    const cekDataBatasSks = await BatasSks.findByPk(id);
+    if (!cekDataBatasSks) {
+        throw new NotFoundError(`Batas Sks tidak ditemukan`);
+    }
+
+    if (parseFloat(ipsMax) < parseFloat(ipsMin)) {
+        throw new Error("Nilai maksimal ips tidak boleh lebih kecil dari minimal ips");
+    }
+
+    // Cek apakah ada range yang beririsan untuk siakJenjangId yang sama, selain record ini sendiri
+    const overlap = await BatasSks.findOne({
+        where: {
+            siakJenjangId: siakJenjangId,
+            id: { [Op.ne]: id },
+            [Op.and]: [
+                { ipsMin: { [Op.lte]: ipsMax } },
+                { ipsMax: { [Op.gte]: ipsMin } }
+            ]
         }
+    });
 
-        const [updatedRowsCount] = await BatasSks.update({
-            ipsMin,
-            ipsMax,
-            batasSks
-        }, {
-            where: { id: id }
-        });
+    if (overlap) {
+        throw new Error(`Range IPS (${ipsMin} - ${ipsMax}) beririsan dengan data yang sudah ada (Range: ${overlap.ipsMin} - ${overlap.ipsMax})`);
+    }
 
-        return updatedRowsCount > 0;
-    }
-    catch (error) {
-        throw new Error(`Gagal memperbarui data Batas Sks : ${error.message}`);
-    }
+    return await cekDataBatasSks.update({
+        siakJenjangId,
+        ipsMin,
+        ipsMax,
+        batasSks
+    })
 }
 
 export const deleteBatasSks = async (id) => {
-  try {
-    const deletedRowsCount = await BatasSks.destroy({
-      where: { id },
-    });
+    const cekDataBatasSks = await BatasSks.findByPk(id)
 
-    return deletedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Gagal menghapus batas sks: ${error.message}`);
-  }
+    if (!cekDataBatasSks) {
+        throw new NotFoundError(`Batas Sks tidak ditemukan`)
+    }
+
+    await cekDataBatasSks.destroy()
 };
