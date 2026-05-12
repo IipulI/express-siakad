@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as jadwalAkademikController from  "../../controllers/dosen/jadwal-akademik.controller.js"
+import * as jadwalAkademikController from  "../../controllers/mahasiswa/jadwal-akademik.controller.js"
 
 const router = Router();
 
