@@ -21,12 +21,14 @@ export const attachUser = async (req, res, next) => {
                 {
                     attributes: ["id", "nama"],
                     model: Mahasiswa,
-                    as: "mahasiswa"
+                    as: "mahasiswa",
+                    required: false
                 },
                 {
                     attributes: ["id", "nama"],
                     model: Dosen,
-                    as: "dosen"
+                    as: "dosen",
+                    required: false
                 },
                 {
                     attributes: ["id", "siakUserId", "siakRoleId"],

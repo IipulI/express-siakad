@@ -1,69 +1,93 @@
 import { getPagination } from "../utils/pagination.js";
 import models from "../models/index.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 const { Fakultas, Ruangan } = models;
 
 export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
+    const isPaginated = page !== null && size !== null
 
-      const { count, rows } = await Fakultas.findAndCountAll({
-        attributes: ["id", "nama"],
-        limit,
-        offset,
-        order: [["ruangan", "DESC"]],
-      });
-
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
-
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
-    } else {
-      const { count, rows } = await Ruangan.findAndCountAll({
-        attributes: [
-          "id",
-          "siak_fakultas_id",
-          "nama",
-          "ruangan",
-          "kapasitas",
-          "lantai",
-        ],
-      });
-
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
+    const queryBuilder = {
+        attributes: ['id', 'nama'],
+        order: [['id', 'DESC']]
     }
-  } catch (error) {
-    throw new Error(`Kesalahan saat mengambil data : ${error.message}`);
-  }
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await Fakultas.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    } else {
+        const data = await Fakultas.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
+    }
 };
+
+export const findOneById = async (id) => {
+    const data = await Fakultas.findByPk(id, {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        }
+    })
+
+    if (!data) {
+        throw new NotFoundError(`Fakultas tidak dapat ditemukan`)
+    }
+
+    return data
+}
 
 export const createFakultas = async (fakultasData) => {
-  const { nama } = fakultasData;
+    const dataFakultasExist = await Fakultas.findOne({
+        where: {
+            nama: fakultasData.nama
+        }
+    })
 
-  const existingFakultas = await Fakultas.findOne({ where: { nama } });
-
-  if (existingRuangan) {
-    throw new Error(`Fakultas dengan nama "${ruangan}" sudah ada`);
-  }
-
-  try {
-    await Ruangan.create({ siakFakultasId, nama, ruangan, kapasitas, lantai });
-  } catch (err) {
-    if (err.name === "SequelizeUniqueConstraintError") {
-      throw new Error(
-        `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
-      );
+    if (dataFakultasExist) {
+        throw new ConflictError(`Fakultas : ${fakultasData.nama} sudah ada.`);
     }
-    throw new Error(`Terjadi kesalahan saat membuat Ruangan: ${err.message}`);
-  }
+
+    return await Fakultas.create(fakultasData);
 };
+
+export const updateFakultas = async (id, fakultasData) => {
+    const dataFakultasExist = await Fakultas.findByPk(id)
+
+    if (!dataFakultasExist) {
+        throw new NotFoundError(`Fakultas tidak dapat ditemukan`)
+    }
+
+    const existingNamaFakultas = await Fakultas.findOne({
+        where: {
+            nama: fakultasData.nama
+        }
+    })
+
+    if (existingNamaFakultas && existingNamaFakultas.id !== id) {
+        throw new ConflictError(`Fakultas : ${fakultasData.nama} sudah ada.`);
+    }
+
+    return dataFakultasExist.update(fakultasData)
+}
+
+export const deleteFakultas = async(id) => {
+    const dataFakultasExist = await Fakultas.findByPk(id)
+
+    if (!dataFakultasExist) {
+        throw new NotFoundError(`Fakultas tidak dapat ditemukan`)
+    }
+
+    await dataFakultasExist.destroy()
+}
