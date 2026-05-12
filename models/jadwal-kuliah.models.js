@@ -14,6 +14,11 @@ export default (sequelize) => {
                 foreignKey: "siak_ruangan_id",
                 as: "ruangan",
             })
+
+            this.belongsTo(models.KelasKuliah, {
+                foreignKey: "siak_kelas_kuliah_id",
+                as: "kelasKuliah",
+            })
         }
     }
 

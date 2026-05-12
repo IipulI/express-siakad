@@ -6,7 +6,7 @@ export const getWeeklySchedule = async (req, res) => {
     const user = req.user
 
     try {
-        const data = await jadwalService.getWeeklyScheduleStudent(user.mahasiswa.id)
+        const data = await jadwalService.getWeeklyScheduleLecturer(user.dosen.id)
 
         responseBuilder
             .status('success')
@@ -15,6 +15,8 @@ export const getWeeklySchedule = async (req, res) => {
             .json(data)
     }
     catch (error) {
+        console.error(error)
+
         responseBuilder
             .status('failure')
             .status(500)
