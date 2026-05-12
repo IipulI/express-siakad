@@ -48,6 +48,8 @@ router.use("/pembimbing-akademik", PembimbingAkademikRouter);
 // perguruan tinggi
 router.use("/ruangan", RuanganRouter);
 router.use("/jenjang", JenjangRouter);
+// router.use("/fakultas", )
+// router.use("/program-studi", )
 
 // perkuliahan
 router.use("/tahun-ajaran", TahunAjaranRouter);

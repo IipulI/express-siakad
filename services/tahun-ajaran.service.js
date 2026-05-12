@@ -1,98 +1,95 @@
 import models from "../models/index.js"
 import { getPagination } from "../utils/pagination.js";
 import { formatTimestamp } from "../utils/date-formatter.js";
+import { Op } from "sequelize";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 const { TahunAjaran } = models;
 
 export const findAll = async (page, size) => {
-    try {
-        if (page !== null && size !== null) {
-            const { limit, offset } = getPagination(page, size);
-
-            const {count, rows} = await TahunAjaran.findAndCountAll({
-                attributes: ['id', 'tahun', 'nama'],
-                limit,
-                offset,
-                order: [
-                    ['tahun', 'DESC']
-                ],
-                raw: true,
-            });
-
-            // const formattedRows = rows.map(record => ({
-            //     ...record,
-            //     createdAt: formatTimestamp(record.createdAt),
-            // }));
-
-            return {
-                count,
-                rows,
-                isPaginated: true,
-            }
-        }
-        else {
-            const {count, rows}= await TahunAjaran.findAndCountAll({
-                attributes: ['id', 'tahun', 'nama'],
-                raw: true,
-            })
-
-            return {
-                count : count,
-                rows,
-                isPaginated: false,
-            }
-        }
-
-
+    const isPaginated = page !== null && size !== null;
+    const queryBuilder = {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        order: [['id', 'DESC']],
     }
-    catch (error) {
-        throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await TahunAjaran.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    } else {
+        const data = await TahunAjaran.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
     }
 }
 
+export const findOneById = async(id) => {
+    const existDataTahunAjaran = await TahunAjaran.findByPk(id)
+    if (!existDataTahunAjaran) {
+        throw new NotFoundError(`Tahun Ajaran tidak dapat ditemukan`)
+    }
+
+    return existDataTahunAjaran
+}
+
 export const createTahunAjaran = async (tahunAjaranData) => {
-    const { tahun, nama } = tahunAjaranData;
-
-    const existingTahunAjaran = await TahunAjaran.findOne({ attributes: ['tahun'], where: { tahun } });
-    if (existingTahunAjaran) {
-        throw new Error(`Tahun Ajaran dengan tahun "${tahun}" sudah ada`);
-    }
-
-    try {
-        await TahunAjaran.create({ tahun, nama });
-    } catch (err) {
-        if (err.name === 'SequelizeUniqueConstraintError') {
-            throw new Error(`Duplicate entry: ${err.errors.map(e => e.message).join(', ')}`);
+    const existingDataTahunAjaran = await TahunAjaran.findOne({
+        where: {
+            [Op.or] : [
+                { tahun: tahunAjaranData.tahun },
+                { nama: tahunAjaranData.nama }
+            ]
         }
-        throw new Error(`Gagal membuat Tahun Ajaran: ${err.message}`);
+    })
+
+    if (existingDataTahunAjaran) {
+        throw new ConflictError(`Tahun Ajaran : ${tahunAjaranData.nama}, atau tahun : ${tahunAjaranData.tahun} sudah ada.`);
     }
-};
 
-export const updateTahunAjaran = async (id, updateData) => {
-    try {
-        const tahunAjaran = await TahunAjaran.findByPk(id);
+    return await TahunAjaran.create(tahunAjaranData);
+}
 
-        if (!tahunAjaran) {
-            return null;
+export const updateTahunAjaran = async(id, tahunAjaranData) => {
+    const existDataTahunAjaran = await TahunAjaran.findByPk(id)
+    if (!existDataTahunAjaran) {
+        throw new NotFoundError(`Tahun Ajaran tidak dapat ditemukan`)
+    }
+
+    const existingDataTahunAjaran = await TahunAjaran.findOne({
+        where: {
+            [Op.or] : [
+                { tahun: tahunAjaranData.tahun },
+                { nama: tahunAjaranData.nama }
+            ]
         }
+    })
 
-        const [updatedRowsCount] = await TahunAjaran.update(updateData, {
-            where: { id: id }
-        });
-
-        return updatedRowsCount > 0;
-    } catch (error) {
-        throw new Error(`Gagal memperbarui Tahun Ajaran: ${error.message}`);
+    if (existingDataTahunAjaran && existingDataTahunAjaran.id !== id) {
+        throw new ConflictError(`Tahun Ajaran : ${tahunAjaranData.nama}, atau tahun : ${tahunAjaranData.tahun} sudah ada.`);
     }
-};
 
-export const deleteTahunAjaran = async (id) => {
-    try {
-        const deletedRowsCount = await TahunAjaran.destroy({
-            where: { id: id }
-        });
+    return existDataTahunAjaran.update(tahunAjaranData)
+}
 
-        return deletedRowsCount > 0;
-    } catch (error) {
-        throw new Error(`Gagal menghapus Tahun Ajaran: ${error.message}`);
+export const deleteTahunAjaran = async(id) => {
+    const existDataTahunAjaran = await TahunAjaran.findByPk(id)
+    if (!existDataTahunAjaran) {
+        throw new NotFoundError(`Tahun Ajaran tidak dapat ditemukan`)
     }
-};
+
+    await existDataTahunAjaran.destroy()
+}

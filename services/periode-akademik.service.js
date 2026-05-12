@@ -1,25 +1,39 @@
 import db from '../models/index.js'
 import { getPagination } from "../utils/pagination.js";
+import { NotFoundError } from "../utils/custom-error.js";
 
 const { PeriodeAkademik } = db
 
 export const findAll = async (page, size) => {
     const isPaginated = page !== null && size !== null
-    const { limit, offset } = getPagination(page, size);
 
-    const { count, rows} = await PeriodeAkademik.findAndCountAll({
+    let queryBuilder = {
         attributes: {
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
         },
-        limit: isPaginated ? limit : undefined,
-        offset: isPaginated ? offset : undefined,
         order: [['kode', 'DESC']],
-    });
+    }
 
-    return {
-        count,
-        rows,
-        isPaginated,
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows} = await PeriodeAkademik.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated,
+        }
+    } else {
+        const data = await PeriodeAkademik.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
     }
 }
 
@@ -46,55 +60,31 @@ export const createPeriodeAkademik = async (periodeAkademikData) => {
         throw new Error (`Tahun Ajaran tidak ditemukan`)
     }
 
-    try {
-        await PeriodeAkademik.create({
-            siak_tahun_ajaran_id: siakTahunAjaranId,
-            nama,
-            kode,
-            tanggal_mulai: tanggalMulai,
-            tanggal_selesai: tanggalSelesai,
-            status: "Inaktif"
-        })
-    }
-    catch (error) {
-        throw new Error(`Gagal membuat data Periode Akademik: ${error.message}`);
-    }
+    return await PeriodeAkademik.create({
+        siak_tahun_ajaran_id: siakTahunAjaranId,
+        nama,
+        kode,
+        tanggal_mulai: tanggalMulai,
+        tanggal_selesai: tanggalSelesai,
+        status: "Inaktif"
+    })
 }
 
 export const updatePeriodeAkademik = async (id, updateData) => {
-    const { nama, kode, tanggalMulai, tanggalSelesai, status } = updateData;
+    const existDataPeriodeAkademik = await PeriodeAkademik.findByPk(id)
 
-    try {
-        const periodeAkademik = await PeriodeAkademik.findByPk(id);
-
-        if (!periodeAkademik) {
-            return null;
-        }
-
-        const [updatedRowsCount] = await PeriodeAkademik.update({
-            nama: nama,
-            kode: kode,
-            tanggal_mulai: tanggalMulai,
-            tanggal_selesai: tanggalSelesai,
-            status: status
-        }, {
-            where: { id: id }
-        });
-
-        return updatedRowsCount > 0;
-    } catch (error) {
-        throw new Error(`Gagal memperbarui data Periode Akademik: ${error.message}`);
+    if (!existDataPeriodeAkademik) {
+        throw new NotFoundError(`Periode Akademik tidak dapat ditemukan`)
     }
+
+    return existDataPeriodeAkademik.update(updateData)
 };
 
 export const deletePeriodeAkademik = async (id) => {
-    try {
-        const deletedRowsCount = await PeriodeAkademik.destroy({
-            where: { id: id }
-        });
-
-        return deletedRowsCount > 0;
-    } catch (error) {
-        throw new Error(`Gagal menghapus data Periode Akademik: ${error.message}`);
+    const existDataPeriodeAkademik = await PeriodeAkademik.findByPk(id)
+    if (!existDataPeriodeAkademik) {
+        throw new NotFoundError(`Periode Akademik tidak dapat ditemukan`)
     }
+
+    await existDataPeriodeAkademik.destroy()
 };

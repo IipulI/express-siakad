@@ -23,148 +23,150 @@ const {
     sequelize,
 } = models;
 
+export const test = async () => {
+    const test = await BidangIlmu.findByPk("1120cbc9-415d-499e-bf74-9ff4ab5ed331", {
+        attributes: ['id']
+    })
+
+    await test.destroy()
+}
+
 export const findAll = async (page, size, filter) => {
-    try {
-        let kelasKuliahWhere = {}
-        let mataKuliahWhere = {}
-        let dosenWhere = {}
+    let kelasKuliahWhere = {}
+    let mataKuliahWhere = {}
+    let dosenWhere = {}
 
-        if (filter.siakPeriodeAkademikId !== undefined) {
-            kelasKuliahWhere.siakPeriodeAkademikId = filter.siakPeriodeAkademikId
-        }
-        if (filter.siakProgramStudiId !== undefined) {
-            kelasKuliahWhere.siakProgramStudiId = filter.siakProgramStudiId
-        }
-        // if (filter.siakSistemKuliahId !== undefined) {
-        //     kelasKuliahWhere.siakSistemKuliahId = filter.siakSistemKuliahId
-        // }
-        if (filter.siakTahunKurikulumId !== undefined) {
-            mataKuliahWhere.siakTahunKurikulumId = filter.siakTahunKurikulumId
-        }
-        if (filter.siakDosenId !== undefined) {
-            dosenWhere.id = filter.siakDosenId
-        }
+    if (filter.siakPeriodeAkademikId !== undefined) {
+        kelasKuliahWhere.siakPeriodeAkademikId = filter.siakPeriodeAkademikId
+    }
+    if (filter.siakProgramStudiId !== undefined) {
+        kelasKuliahWhere.siakProgramStudiId = filter.siakProgramStudiId
+    }
+    // if (filter.siakSistemKuliahId !== undefined) {
+    //     kelasKuliahWhere.siakSistemKuliahId = filter.siakSistemKuliahId
+    // }
+    if (filter.siakTahunKurikulumId !== undefined) {
+        mataKuliahWhere.siakTahunKurikulumId = filter.siakTahunKurikulumId
+    }
+    if (filter.siakDosenId !== undefined) {
+        dosenWhere.id = filter.siakDosenId
+    }
 
-        let kelasKuliahQueryBuilder = {
-            attributes: [
-                'id', 'siakMataKuliahId', 'siakPeriodeAkademikId', 'siakProgramStudiId',
-                'nama', 'kapasitas', 'jumlah_peminat', 'sistem_kuliah', 'status_kelas'
-            ],
-            where: kelasKuliahWhere,
-            include: [
-                {
-                    attributes: [
-                        'id', 'nama', 'kode', 'totalSks'
-                    ],
-                    where: mataKuliahWhere,
-                    model: MataKuliah,
-                    as: 'mataKuliah',
-                },
-                {
-                    attributes: [
-                        'id', 'nama',
-                    ],
-                    model: PeriodeAkademik,
-                    as: 'periodeAkademik'
-                },
-                {
-                    attributes: [
-                        'id', 'hari', 'jamMulai', 'jamSelesai', 'jenisPertemuan', 'metodePembelajaran'
-                    ],
-                    model: JadwalKuliah,
-                    as: 'jadwalKuliah',
-                    separate: true,
-                    include: [
-                        {
-                            attributes: [
-                                'id', 'nama', 'nidn'
-                            ],
-                            model: Dosen,
-                            as: 'dosen'
-                        },
-                        {
-                            attributes: [
-                                'id', 'nama', 'ruangan'
-                            ],
-                            model: Ruangan,
-                            as: 'ruangan'
-                        }
-                    ]
-                }
-            ]
-        }
+    let kelasKuliahQueryBuilder = {
+        attributes: [
+            'id', 'siakMataKuliahId', 'siakPeriodeAkademikId', 'siakProgramStudiId',
+            'nama', 'kapasitas', 'jumlah_peminat', 'sistem_kuliah', 'status_kelas'
+        ],
+        where: kelasKuliahWhere,
+        include: [
+            {
+                attributes: [
+                    'id', 'nama', 'kode', 'totalSks'
+                ],
+                where: mataKuliahWhere,
+                model: MataKuliah,
+                as: 'mataKuliah',
+            },
+            {
+                attributes: [
+                    'id', 'nama',
+                ],
+                model: PeriodeAkademik,
+                as: 'periodeAkademik'
+            },
+            {
+                attributes: [
+                    'id', 'hari', 'jamMulai', 'jamSelesai', 'jenisPertemuan', 'metodePembelajaran'
+                ],
+                model: JadwalKuliah,
+                as: 'jadwalKuliah',
+                separate: true,
+                include: [
+                    {
+                        attributes: [
+                            'id', 'nama', 'nidn'
+                        ],
+                        model: Dosen,
+                        as: 'dosen'
+                    },
+                    {
+                        attributes: [
+                            'id', 'nama', 'ruangan'
+                        ],
+                        model: Ruangan,
+                        as: 'ruangan'
+                    }
+                ]
+            }
+        ]
+    }
 
-        let isPaginated = false;
-        if (page !== null && size !== null) {
-            const { limit, offset } = getPagination(page, size);
-            kelasKuliahQueryBuilder.limit = limit;
-            kelasKuliahQueryBuilder.offset = offset;
-            isPaginated = true;
-        }
+    const isPaginated = page !== null && size !== null;
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        kelasKuliahQueryBuilder.limit = limit;
+        kelasKuliahQueryBuilder.offset = offset;
 
         const { count, rows } = await KelasKuliah.findAndCountAll(kelasKuliahQueryBuilder)
 
         return {
             count,
             rows,
-            isPaginated
+            isPaginated: true
         }
-    }
-    catch (error) {
-        console.log(error)
+    } else{
+        const data = await KelasKuliah.findAll(kelasKuliahQueryBuilder)
 
-        throw new Error(`Gagal mengambil data: ${error}`);
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false
+        }
     }
 }
 
 export const detailClass = async (id) => {
-    try {
-        const dataClass = await KelasKuliah.findByPk(id, {
-            attributes: {
-                exclude: ['createdAt', 'updatedAt', 'deletedAt']
+    const dataClass = await KelasKuliah.findByPk(id, {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        include: [
+            {
+                attributes: [
+                    'id', 'nama'
+                ],
+                model: ProgramStudi,
+                as: 'programStudi',
             },
-            include: [
-                {
-                    attributes: [
-                        'id', 'nama'
-                    ],
-                    model: ProgramStudi,
-                    as: 'programStudi',
-                },
-                {
-                    attributes: [
-                        'id', 'nama', 'kode', 'totalSks'
-                    ],
-                    model: MataKuliah,
-                    as: 'mataKuliah',
-                },
-                {
-                    attributes: [
-                        'id', 'nama',
-                    ],
-                    model: PeriodeAkademik,
-                    as: 'periodeAkademik'
-                },
-                {
-                    attributes: [
-                        'id', 'hari', 'jamMulai', 'jamSelesai', 'jenisPertemuan', 'metodePembelajaran'
-                    ],
-                    model: JadwalKuliah,
-                    as: 'jadwalKuliah',
-                    separate: true
-                }
-            ]
-        })
-        if (!dataClass) {
-            throw new Error(`Kelas Kuliah tidak ditemukan`)
-        }
+            {
+                attributes: [
+                    'id', 'nama', 'kode', 'totalSks'
+                ],
+                model: MataKuliah,
+                as: 'mataKuliah',
+            },
+            {
+                attributes: [
+                    'id', 'nama',
+                ],
+                model: PeriodeAkademik,
+                as: 'periodeAkademik'
+            },
+            {
+                attributes: [
+                    'id', 'hari', 'jamMulai', 'jamSelesai', 'jenisPertemuan', 'metodePembelajaran'
+                ],
+                model: JadwalKuliah,
+                as: 'jadwalKuliah',
+                separate: true
+            }
+        ]
+    })
+    if (!dataClass) {
+        throw new NotFoundError(`Kelas Kuliah tidak dapat ditemukan`)
+    }
 
-        return dataClass
-    }
-    catch (error) {
-        console.log(error)
-        throw new Error(error);
-    }
+    return dataClass
 }
 
 export const classSchedule = async(id) => {
@@ -200,47 +202,41 @@ export const classSchedule = async(id) => {
 }
 
 export const classParticipant = async(id) => {
-    try {
-        const existClass = await KelasKuliah.findByPk(id, {attributes: ['id']})
-        if (!existClass) {
-            throw new Error(`Kelas Kuliah tidak ditemukan`)
-        }
+    const existClass = await KelasKuliah.findByPk(id, {attributes: ['id']})
+    if (!existClass) {
+        throw new NotFoundError(`Kelas Kuliah tidak ditemukan`)
+    }
 
-        return await Mahasiswa.findAll({
-            attributes: ['id', 'nama', 'npm', 'angkatan'],
-            include : [
-                {
-                    attributes: ['id','nama'],
-                    model: ProgramStudi,
-                    as: 'programStudi',
-                    include: {
-                        attributes: ['jenjang'],
-                        model: Jenjang,
-                        as: 'jenjang'
-                    }
-                },
-                {
-                    attributes: ['status'],
+    return await Mahasiswa.findAll({
+        attributes: ['id', 'nama', 'npm', 'angkatan'],
+        include : [
+            {
+                attributes: ['id','nama'],
+                model: ProgramStudi,
+                as: 'programStudi',
+                include: {
+                    attributes: ['jenjang'],
+                    model: Jenjang,
+                    as: 'jenjang'
+                }
+            },
+            {
+                attributes: ['status'],
+                required: true,
+                model: KrsMahasiswa,
+                as: 'krsMahasiswa',
+                include: {
+                    attributes: [],
                     required: true,
-                    model: KrsMahasiswa,
-                    as: 'krsMahasiswa',
-                    include: {
-                        attributes: [],
-                        required: true,
-                        model: RincianKrsMahasiswa,
-                        as: 'rincianKrsMahasiswa',
-                        where: {
-                            siak_kelas_kuliah_id: id
-                        }
+                    model: RincianKrsMahasiswa,
+                    as: 'rincianKrsMahasiswa',
+                    where: {
+                        siak_kelas_kuliah_id: id
                     }
                 }
-            ]
-        })
-    }
-    catch (error) {
-        console.log(error)
-        throw new Error(error);
-    }
+            }
+        ]
+    })
 }
 
 export const enrollMahasiswaToClass = async(mahasiswaId, kelasKuliahId, periodeAkademikId) => {
@@ -357,7 +353,7 @@ export const deleteMahasiswaFromClass = async(mahasiswaId, kelasKuliahId, period
         where: { id: mahasiswaId }
     })
     if(!mahasiswa){
-        throw new Error("Mahasiswa tidak ditemukan")
+        throw new NotFoundError("Mahasiswa tidak dapat ditemukan")
     }
 
     const rincianKrs = await RincianKrsMahasiswa.findOne({
@@ -375,7 +371,7 @@ export const deleteMahasiswaFromClass = async(mahasiswaId, kelasKuliahId, period
         }
     })
     if(!rincianKrs){
-        throw new Error("Kelas kuliah tidak ditemukan")
+        throw new NotFoundError("Kelas kuliah tidak dapat ditemukan")
     }
 
     await rincianKrs.destroy()

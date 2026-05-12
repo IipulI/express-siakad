@@ -1,107 +1,87 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 const  { TahunKurikulum, PeriodeAkademik } = models;
 
-export const findAll = async (page, size) => {
-    try {
-        if (page !== null && size !== null) {
-            const { limit, offset } = getPagination(page, size)
+export const findAll = async (page, size, search) => {
+    const isPaginated = page !== null && size !== null
 
-            const { count, rows } = await TahunKurikulum.findAndCountAll({
-                attributes: ['id', 'siakPeriodeAkademikId', 'tahun', 'keterangan', 'tanggalMulai', 'tanggalSelesai'],
-                limit,
-                offset,
-                order: [
-                    ['id', 'DESC']
-                ],
-                raw: true
-            })
-
-            return {
-                count,
-                rows,
-                isPaginated: true,
-            }
-        }
-        else {
-            const { count, rows } = await TahunKurikulum.findAndCountAll({
-                attributes: ['id', 'siakPeriodeAkademikId', 'tahun', 'keterangan', 'tanggalMulai', 'tanggalSelesai'],
-                raw: true,
-            })
-
-            return {
-                count,
-                rows,
-                isPaginated: false
-            }
-        }
+    const queryBuilder = {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        order: [['id', 'DESC']]
     }
-    catch (error) {
-        throw new Error(`Gagal mengambil data: ${error.message}`);
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await TahunKurikulum.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    } else {
+        const data = await TahunKurikulum.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
     }
 }
 
-export const createTahunKurikulum = async (tahunKurikulumData) => {
-    const existingPeriodeAkademik = await PeriodeAkademik.findByPk(tahunKurikulumData.siakPeriodeAkademikId)
-    if (!existingPeriodeAkademik) {
-        throw new Error (`Periode Akademik tidak ditemukan`)
+export const findOneById = async(id) => {
+    const existDataTahunKurikulum = await TahunKurikulum.findByPk(id)
+
+    if (!existDataTahunKurikulum) {
+        throw new NotFoundError(`Tahun Kurikulum tidak dapat ditemukan`)
     }
 
-    try {
-        await TahunKurikulum.create({
-            siak_periode_akademik_id: tahunKurikulumData.siakPeriodeAkademikId,
-            tahun: tahunKurikulumData.tahun,
-            kode: tahunKurikulumData.kode,
-            tanggal_mulai: tahunKurikulumData.tanggalMulai,
-            tanggal_selesai: tahunKurikulumData.tanggalSelesai,
-        })
-    }
-    catch (error) {
-        throw new Error(`Gagal mengambil data: ${error.message}`);
-    }
+    return existDataTahunKurikulum
 }
 
-export const updateTahunKurikulum = async (id, tahunKurikulumData) => {
-    const { siakPeriodeAkademikId, tahun, nama, keterangan, tanggalMulai, tanggalSelesai } = tahunKurikulumData;
-
-    try {
-        const existingTahunKurikulum = await TahunKurikulum.findByPk(id)
-        if (!existingTahunKurikulum) {
-            throw new Error (`Periode Akademik tidak ditemukan`)
+export const createTahunKurikulum = async(tahunKurikulumData) => {
+    const existingDataTahunKurikulum = await TahunKurikulum.findOne({
+        where: {
+            tahun : tahunKurikulumData.tahun
         }
-
-        const periodeAkademik = await PeriodeAkademik.findByPk(siakPeriodeAkademikId)
-        if (!periodeAkademik) {
-            throw new Error (`Periode Akademik tidak ditemukan`)
-        }
-
-        const [updatedRowsCount] = await TahunKurikulum.update({
-            siak_periode_akademik_id: siakPeriodeAkademikId,
-            tahun: tahun,
-            nama: nama,
-            keterangan: keterangan,
-            tanggal_mulai: tanggalMulai,
-            tanggal_selesai: tanggalSelesai,
-        }, {
-            where: { id: id }
-        });
-
-        return updatedRowsCount > 0;
+    })
+    if (existingDataTahunKurikulum) {
+        throw new ConflictError(`Tahun Kurikulum : ${tahunKurikulumData.tahun} sudah ada.`);
     }
-    catch (error) {
-        throw new Error(`Gagal memperbarui tahun kurikulum: ${error.message}`);
-    }
+
+    return await TahunKurikulum.create(tahunKurikulumData);
 }
 
-export const deleteTahunKurikulum = async (id) => {
-    try {
-        const deletedRowsCount = await TahunKurikulum.destroy({
-            where: { id: id }
-        });
+export const updateTahunKurikulum = async(id, tahunKurikulumData) => {
+    const existDataTahunKurikulum = await TahunKurikulum.findByPk(id)
+    if (!existDataTahunKurikulum) {
+        throw new NotFoundError(`Tahun Kurikulum tidak dapat ditemukan`)
+    }
 
-        return deletedRowsCount > 0;
+    const existingDataTahunKurikulum = await TahunKurikulum.findOne({
+        where: {
+            tahun : tahunKurikulumData.tahun
+        }
+    })
+    if (existingDataTahunKurikulum && existingDataTahunKurikulum.id !== id) {
+        throw new ConflictError(`Tahun Kurikulum : ${tahunKurikulumData.tahun} sudah ada.`);
     }
-    catch (error) {
-        throw new Error(`Gagal menghapus tahun kurikulum: ${error.message}`);
+
+    return existDataTahunKurikulum.update(tahunKurikulumData)
+}
+
+export const deleteTahunKurikulum = async(id) => {
+    const existDataTahunKurikulum = await TahunKurikulum.findByPk(id)
+    if (!existDataTahunKurikulum) {
+        throw new NotFoundError(`Tahun Kurikulum tidak dapat ditemukan`)
     }
+
+    await existDataTahunKurikulum.destroy()
 }

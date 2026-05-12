@@ -1,111 +1,95 @@
 import models from '../models/index.js';
 import {getPagination} from "../utils/pagination.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
+import { Op } from "sequelize";
 
 const {
-    sequelize,
     KelompokMataKuliah
 } = models;
 
-export const findAll = async (page, size) => {
-    try {
-        if (page !== null && size !== null) {
-            const { limit, offset } = getPagination(page, size);
-
-            const { count, rows } = await KelompokMataKuliah.findAndCountAll({
-                attributes: ["id", "kode", "nama"],
-                limit,
-                offset,
-                order: [["id", "DESC"]],
-                raw: true,
-            });
-
-            return {
-                count,
-                rows,
-                isPaginated: true,
-            };
-        } else {
-            const { count, rows } = await KelompokMataKuliah.findAndCountAll({
-                attributes: ["id", "kode", "nama"],
-                // raw: true,
-            });
-
-            return {
-                count: count,
-                rows,
-                isPaginated: false,
-            };
-        }
-    } catch (error) {
-        throw new Error(error.message);
+export const findAll = async (page, size, search, order) => {
+    const isPaginated = page !== null && size !== null;
+    const queryBuilder = {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        order: [['id', 'DESC']],
     }
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await KelompokMataKuliah.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    } else {
+        const data = await KelompokMataKuliah.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
+    }
+}
+
+export const findOneById = async (id) => {
+    const existDataKelompokMataKuliah = await KelompokMataKuliah.findOne(id);
+    if (!existDataKelompokMataKuliah) {
+        throw new NotFoundError(`Kelompok Mata Kuliah tidak dapat ditemukan`)
+    }
+
+    return existDataKelompokMataKuliah;
 }
 
 export const createKelompokMataKuliah = async (data) => {
-    try {
-        sequelize.transaction(async (trx) => {
-            const existingJenisMk = await KelompokMataKuliah.findOne({
-                where : {
-                    nama: data.nama,
-                },
-                transaction: trx
-            })
-            if (existingJenisMk) {
-                throw new Error(`Kelompok Mata Kuliah dengan nama ${data.nama} sudah ada`);
-            }
-
-            await KelompokMataKuliah.create({
-                kode: data.kode,
-                nama: data.nama,
-            }, {
-                transaction: trx
-            })
-        })
-
-        return true
+    const existingDataKelompokMataKuliah = await KelompokMataKuliah.findOne({
+        where: {
+            [Op.or] : [
+                { nama: data.nama },
+                { kode: data.kode }
+            ]
+        }
+    })
+    if (existingDataKelompokMataKuliah) {
+        throw new ConflictError(`Kelompok Mata Kuliah dengan nama ${data.nama} atau kode ${data.kode} sudah ada`);
     }
-    catch (error) {
-        throw new Error(error.message);
-    }
+
+    return await KelompokMataKuliah.create(data);
 }
 
 export const updateKelompokMataKuliah = async (id, data) => {
-    try {
-        const updatedData = sequelize.transaction(async (trx) => {
-            const JenisMk = await KelompokMataKuliah.findByPk(id, {
-                transaction: trx
-            })
-            if (!JenisMk) {
-                return null
-            }
-
-            const [updatedRowsCount] = await KelompokMataKuliah.update(data, {
-                where: { id: id },
-                transaction: trx
-            })
-
-            return updatedRowsCount
-        })
-
-        return updatedData > 0
+    const existDataKelompokMataKuliah = await KelompokMataKuliah.findByPk(id)
+    if (!existDataKelompokMataKuliah) {
+        throw new NotFoundError(`Kelompok Mata Kuliah tidak dapat ditemukan`)
     }
-    catch (error) {
-        throw new Error(error.message);
+
+    const existingDataKelompokMataKuliah = await KelompokMataKuliah.findOne({
+        where: {
+            [Op.or] : [
+                { nama: data.nama },
+                { kode: data.kode }
+            ]
+        }
+    })
+    if (existingDataKelompokMataKuliah && existingDataKelompokMataKuliah.id !== id) {
+        throw new ConflictError(`Kelompok Mata Kuliah dengan nama ${data.nama} atau kode ${data.kode} sudah ada`);
     }
+
+    return existDataKelompokMataKuliah.update(data)
 }
 
-export const deleteKelompokMataKuliah = async (id) => {
-    try {
-        const deletedData = sequelize.transaction(async (trx) => {
-            return await KelompokMataKuliah.destroy({
-                where: {id: id},
-                transaction: trx
-            })
-        })
+export const deleteKelompokMataKuliah = async(id) => {
+    const existDataKelompokMataKuliah = await KelompokMataKuliah
+    if (!existDataKelompokMataKuliah) {
+        throw new NotFoundError(`Kelompok Mata Kuliah tidak dapat ditemukan`)
+    }
 
-        return deletedData > 0;
-    }
-    catch (error) {
-        throw new Error(error.message);
-    }
+    await existDataKelompokMataKuliah.destroy()
 }

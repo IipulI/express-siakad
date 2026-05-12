@@ -1,80 +1,98 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
+import { Op } from "sequelize";
 
 const { ProgramStudi } = models;
 
-export const findAll = async (page, size) => {
-  const isPaginated = page !== null && size !== null
-  const { limit, offset } = getPagination(page, size);
+export const findAll = async(page, size, search) => {
+    const isPaginated = page !== null && size !== null
 
-  const { count, rows } = await ProgramStudi.findAndCountAll({
-    attributes: [
-      "id",
-      "siak_fakultas_id",
-      "siak_jenjang_id",
-      "nama",
-      "kode",
-    ],
-    limit: isPaginated ? limit : undefined,
-    offset: isPaginated ? offset : undefined,
-    order: [["id", "DESC"]],
-    raw: true,
-  });
-
-  return {
-    count,
-    rows,
-    isPaginated,
-  };
-};
-
-export const createRuangan = async (ruanganData) => {
-  const { siakFakultasId, nama, ruangan, kapasitas, lantai } = ruanganData;
-
-  const existingRuangan = await Ruangan.findOne({ where: { ruangan } });
-
-  if (existingRuangan) {
-    throw new Error(`Ruangan dengan nama "${ruangan}" sudah ada`);
-  }
-
-  try {
-    await Ruangan.create({ siakFakultasId, nama, ruangan, kapasitas, lantai });
-  } catch (err) {
-    if (err.name === "SequelizeUniqueConstraintError") {
-      throw new Error(
-        `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
-      );
-    }
-    throw new Error(`Terjadi kesalahan saat membuat Ruangan: ${err.message}`);
-  }
-};
-
-export const updateRuangan = async (id, updateData) => {
-  try {
-    const ruangan = await Ruangan.findByPk(id);
-
-    if (!ruangan) {
-      return null;
+    const queryBuilder = {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        order: [['id', 'DESC']]
     }
 
-    const [updatedRowsCount] = await Ruangan.update(updateData, {
-      where: { id: id },
-    });
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
 
-    return updatedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Terjadi kesalahan saat memperbarui Ruangan: ${error.message}`);
-  }
-};
+        const { count, rows } = await ProgramStudi.findAndCountAll(queryBuilder);
 
-export const deleteRuangan = async (id) => {
-  try {
-    const deletedRowsCount = await Ruangan.destroy({
-      where: { id: id },
-    });
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    } else {
+        const data = await ProgramStudi.findAll(queryBuilder);
 
-    return deletedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Terjadi kesalahan saat menghapus Ruangan: ${error.message}`);
-  }
-};
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
+    }
+}
+
+export const findOneById = async(id) => {
+    const existDataProdi = await ProgramStudi.findByPk(id)
+
+    if (!existDataProdi) {
+        throw new NotFoundError(`Program Studi tidak dapat ditemukan`)
+    }
+
+    return existDataProdi
+}
+
+export const createProgramStudi = async (programStudiData) => {
+    const existingDataProdi = await ProgramStudi.findOne({
+        where: {
+            [Op.or]: [
+                { nama: programStudiData.nama },
+                { kode: programStudiData.kode }
+            ]
+        }
+    })
+
+    if (existingDataProdi) {
+        throw new ConflictError(`Program Studi : ${programStudiData.nama}, atau kode : ${programStudiData.kode} sudah ada.`);
+    }
+
+    return await ProgramStudi.create(programStudiData);
+}
+
+export const updateProgramStudi = async (id, programStudiData) => {
+    const existDataProdi = await ProgramStudi.findByPk(id)
+
+    if (!existDataProdi) {
+        throw new NotFoundError(`Program Studi tidak dapat ditemukan`)
+    }
+
+    const existingDataProdiNameKode = await ProgramStudi.findOne({
+        where: {
+            [Op.or] : [
+                { nama: programStudiData.nama },
+                { kode: programStudiData.kode }
+            ]
+        }
+    })
+    if (existingDataProdiNameKode && existingDataProdiNameKode.id !== id) {
+        throw new ConflictError(`Program Studi : ${programStudiData.nama}, atau kode : ${programStudiData.kode} sudah ada.`);
+    }
+
+    return existDataProdi.update(programStudiData)
+}
+
+export const deleteProgramStudi = async(id) => {
+    const existDataProdi = await ProgramStudi.findByPk(id)
+
+    if (!existDataProdi) {
+        throw new NotFoundError(`Program Studi tidak dapat ditemukan`)
+    }
+
+    await existDataProdi.destroy()
+}

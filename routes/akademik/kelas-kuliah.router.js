@@ -11,4 +11,6 @@ router.post('/:id/participant', KelasKuliahController.addClassParticipant)
 router.get('/:id/grading', KelasKuliahController.getGradingClass)
 router.post('/:id/grading', KelasKuliahController.submitGradingClass)
 
+// router.get('/test/test', KelasKuliahController.test)
+
 export default router;
