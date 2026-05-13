@@ -49,7 +49,6 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
       "hurufMutu",
       "angkaMutu",
       "nilaiAkhir",
-      "siakKelasKuliahId",
     ],
     include: [
       {
@@ -63,7 +62,7 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
         required: true,
       },
       {
-        attributes: [],
+        attributes: ['id', 'nama'],
         model: KelasKuliah,
         as: "kelasKuliah",
         include: {
