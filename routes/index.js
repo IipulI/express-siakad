@@ -8,6 +8,8 @@ import * as programStudiController from "../controllers/akademik/program-studi.c
 import { attachUser } from "../middleware/attachUser.middleware.js";
 import * as authController from '../controllers/auth.controller.js'
 import { findAll } from "../controllers/akademik/periode-akademik.controller.js"
+import * as jadwalAkademikMahasiswaController from "../controllers/mahasiswa/jadwal-akademik.controller.js"
+import * as hasilStudiMahasiswaController from "../controllers/mahasiswa/hasil-studi.controller.js"
 
 const router = Router();
 
@@ -15,7 +17,8 @@ const router = Router();
 router.post('/auth/login', authController.login)
 router.get('/periode-akademik/dropdown', findAll)
 router.get('/program-studi', programStudiController.findAll)
-
+router.get('/jadwal-akademik/minggu/:npm', jadwalAkademikMahasiswaController.getWeeklyScheduleByNpm)
+router.get('/hasil-studi/:npm', hasilStudiMahasiswaController.getHasilStudiByNpm)
 router.use('/akademik', akademikRoutes);
 router.use('/mahasiswa', verifySsoToken, attachUser, mahasiswaRoutes)
 router.use('/dosen', verifySsoToken, attachUser, dosenRoutes)
