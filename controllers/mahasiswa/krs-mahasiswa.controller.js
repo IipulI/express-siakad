@@ -3,7 +3,7 @@ import * as riwayatKrsService from "../../services/riwayat-krs.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 
-export const getAvailableKrs = async (req, res) => {
+export const getAvailableKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
@@ -33,13 +33,12 @@ export const getAvailableKrs = async (req, res) => {
       .message("Successfully retrieve data")
       .json(courses);
   } catch (error) {
-    // Send an error response if something goes wrong
-    console.error("Error in handleGetAvailableKrs:", error);
-    responseBuilder.code(500).message("Failed to retrieve data").json(error);
+    console.error(error)
+    next(error)
   }
 };
 
-export const infoKrs = async (req, res) => {
+export const infoKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res)
   const mahasiswa = req.user.mahasiswa
 
@@ -52,17 +51,12 @@ export const infoKrs = async (req, res) => {
         .message("Successfully retrieve data")
         .json(data)
   } catch (error) {
-    console.error("Error in handleGetInfoKrs:", error);
-
-    responseBuilder
-        .status('failure')
-        .code(500)
-        .message("Failed to retrieve data")
-        .json()
+    console.error(error)
+    next(error)
   }
 }
 
-export const saveKrs = async (req, res) => {
+export const saveKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
   const kelasKuliahIds = req.body.kelasIds;
 
@@ -77,16 +71,12 @@ export const saveKrs = async (req, res) => {
 
     responseBuilder.code(201).message("Successfully update data").json(data);
   } catch (error) {
-    console.log("Error in handleSaveKrs:", error);
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message("Failed to retrieve data")
-      .json(error);
+    console.error(error)
+    next(error)
   }
 };
 
-export const submitKrs = async (req, res) => {
+export const submitKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
 
   try {
@@ -108,12 +98,12 @@ export const submitKrs = async (req, res) => {
         .message("Gagal mengajukan krs");
     }
   } catch (error) {
-    console.log("Terdapat error di ketika submit krs : ", error);
-    responseBuilder.status("failure").code(500).json(error.message);
+    console.error(error);
+    next(error);
   }
 };
 
-export const updateKrs = async (req, res) => {
+export const updateKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
   const kelasKuliahIds = req.body.kelasIds;
   const user = req.user;
@@ -128,15 +118,11 @@ export const updateKrs = async (req, res) => {
     responseBuilder.code(201).message("Successfully update data").json(data);
   } catch (error) {
     console.log("Error in handleSaveKrs:", error);
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message("Failed to retrieve data")
-      .json(error);
+    next(error);
   }
 };
 
-export const deleteKrs = async (req, res) => {
+export const deleteKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
   const kelasKuliahIds = req.body.kelasKuliahIds;
   const krsId = req.params.id;
@@ -146,16 +132,12 @@ export const deleteKrs = async (req, res) => {
 
     responseBuilder.code(200).message("Successfully delete data").json();
   } catch (error) {
-    console.log("Error in handleDeleteKrs:", error);
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message("Failed to retrieve data")
-      .json(error);
+    console.error(error);
+    next(error);
   }
 };
 
-export const savedKrs = async (req, res) => {
+export const savedKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
   try {
     const user = req.user;
@@ -168,12 +150,12 @@ export const savedKrs = async (req, res) => {
       .message("Successfully retrieve data")
       .json(savedStudentKrs);
   } catch (error) {
-    console.log("Error in savedKrs", error);
-    responseBuilder.code(500).message("Failed to retrieve data").json(error);
+    console.error(error);
+    next(error);
   }
 };
 
-export const getKrsHistory = async (req, res) => {
+export const getKrsHistory = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
 
   const user = req.user;
@@ -200,10 +182,7 @@ export const getKrsHistory = async (req, res) => {
       .message("Berhasil mengambil data")
       .json(riwayatKrs);
   } catch (error) {
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message("Gagal mengambil data")
-      .json(error.message);
+    console.error(error)
+    next(error)
   }
 };

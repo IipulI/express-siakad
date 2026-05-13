@@ -1,6 +1,7 @@
 import db from '../models/index.js'
 import {findActive} from "./periode-akademik.service.js";
 import {Op} from 'sequelize'
+import { ConflictError, NotFoundError, UnprocessableEntityError } from "../utils/custom-error.js";
 
 const {
     sequelize,
@@ -31,7 +32,7 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
     });
 
     if (!activePeriod) {
-        throw new Error('Tidak ada periode akademik aktif yang ditemukan');
+        throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
     }
 
     // --- Step 2: Get Student's Program Studi and Course History ---
@@ -55,7 +56,7 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
     });
 
     if (!mahasiswa) {
-        throw new Error(`Mahasiswa dengan ID ${mahasiswaId} tidak ditemukan`);
+        throw new NotFoundError(`Mahasiswa dengan ID ${mahasiswaId} tidak ditemukan`);
     }
 
     const programStudiId = mahasiswa.siakProgramStudiId;
@@ -222,7 +223,7 @@ export const infoKrs = async (mahasiswaId) => {
     })
 
     if (!activePeriod) {
-        throw new Error('Tidak ada periode akademik aktif yang ditemukan');
+        throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
     }
 
     const mahasiswa = await Mahasiswa.findOne({
@@ -296,82 +297,77 @@ export const infoKrs = async (mahasiswaId) => {
 }
 
 export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
-    try {
-        // Get Mahasiswa
-        const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, { attributes: ['id', 'semester'] });
-        if (!mahasiswa) throw new Error('Data mahasiswa tidak ada');
+    // Get Mahasiswa
+    const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, { attributes: ['id', 'semester'] });
+    if (!mahasiswa) throw new NotFoundError('Data mahasiswa tidak ada');
 
-        // Get periode aktif
-        const activePeriod = await findActive();
-        if (!activePeriod) throw new Error('Tidak ada periode akademik aktif yang ditemukan');
+    // Get periode aktif
+    const activePeriod = await findActive();
+    if (!activePeriod) throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
 
-        // Check eksistensi krs
-        const existingKrs = await KrsMahasiswa.findOne({
-            where: { siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: activePeriod.id },
-        });
-        if (existingKrs) throw new Error("Anda sudah memiliki KRS.");
+    // Check eksistensi krs
+    const existingKrs = await KrsMahasiswa.findOne({
+        where: { siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: activePeriod.id },
+    });
+    if (existingKrs) throw new ConflictError("Anda sudah memiliki KRS.");
 
-        // Get kelas kuliah berdasarkan yang dipilih
-        const selectedClassCourse = await KelasKuliah.findAll({
-            attributes : ['id'],
-            where: { id: kelasKuliahIds },
-            include: {
-                attributes: ['id', 'totalSks', 'prasyaratMataKuliah1', 'prasyaratMataKuliah2', 'prasyaratMataKuliah3'],
-                model: MataKuliah,
-                as: 'mataKuliah',
-                // include: {
-                //     attributes: ['id'],
-                //     model: MataKuliah, // Assuming a self-referencing model for prerequisites
-                //     as: 'prasyarat_mata_kuliah',
-                // }
-            },
-        });
-        if (selectedClassCourse.length !== kelasKuliahIds.length) {
-            throw new Error('Beberapa kelas tidak ditemukan');
-        }
-
-        // Get taken subjects in a consistent manner (similar to your previous logic)
-        const takenSubjectIds = await getTakenSubjectIds(mahasiswaId);
-
-        // Now, perform validation using the private function
-        await _validateKrsRules(mahasiswa, selectedClassCourse, takenSubjectIds);
-
-        const courseWithStatus = selectedClassCourse.map(kelas => {
-            const isRetake = takenSubjectIds.includes(kelas.mataKuliah.id);
-            return {
-                ...kelas.get({ plain: true }),
-                kategori: isRetake ? "Ulang" : "Baru"
-            };
-        });
-
-        // kalkulasi total sks yang diambil
-        const totalSKKeseluruhan = courseWithStatus.reduce((sum, course) => sum + (course.mataKuliah?.totalSks || 0), 0);
-
-        const data = await sequelize.transaction(async (trx) => {
-            const studentKrs = await KrsMahasiswa.create({
-                siakMahasiswaId: mahasiswaId,
-                siakPeriodeAkademikId: activePeriod.id,
-                status: "Draft",
-                sksDiambil: totalSKKeseluruhan,
-                semester: mahasiswa.semester,
-            }, { transaction: trx });
-
-            const bulkRincianKrsMahasiswa = courseWithStatus.map(course => ({
-                siakKrsMahasiswaId: studentKrs.id,
-                siakKelasKuliahId: course.id,
-                kategori: course.kategori,
-            }));
-
-            await RincianKrsMahasiswa.bulkCreate(bulkRincianKrsMahasiswa, { transaction: trx });
-
-            return studentKrs;
-        });
-
-        return data;
-    } catch (error) {
-        console.error('Error saving KRS:', error);
-        throw new Error(`Gagal menyimpan KRS: ${error.message}`);
+    // Get kelas kuliah berdasarkan yang dipilih
+    const selectedClassCourse = await KelasKuliah.findAll({
+        attributes : ['id'],
+        where: { id: kelasKuliahIds },
+        include: {
+            attributes: ['id', 'totalSks', 'prasyaratMataKuliah1', 'prasyaratMataKuliah2', 'prasyaratMataKuliah3'],
+            model: MataKuliah,
+            as: 'mataKuliah',
+            // include: {
+            //     attributes: ['id'],
+            //     model: MataKuliah, // Assuming a self-referencing model for prerequisites
+            //     as: 'prasyarat_mata_kuliah',
+            // }
+        },
+    });
+    if (selectedClassCourse.length !== kelasKuliahIds.length) {
+        throw new NotFoundError('Beberapa kelas tidak ditemukan');
     }
+
+    // Get taken subjects in a consistent manner (similar to your previous logic)
+    const takenSubjectIds = await getTakenSubjectIds(mahasiswaId);
+
+    // Now, perform validation using the private function
+    await _validateKrsRules(mahasiswa, selectedClassCourse, takenSubjectIds);
+
+    const courseWithStatus = selectedClassCourse.map(kelas => {
+        const isRetake = takenSubjectIds.includes(kelas.mataKuliah.id);
+        return {
+            ...kelas.get({ plain: true }),
+            kategori: isRetake ? "Ulang" : "Baru"
+        };
+    });
+
+    // kalkulasi total sks yang diambil
+    const totalSKKeseluruhan = courseWithStatus.reduce((sum, course) => sum + (course.mataKuliah?.totalSks || 0), 0);
+
+    const data = await sequelize.transaction(async (trx) => {
+        const studentKrs = await KrsMahasiswa.create({
+            siakMahasiswaId: mahasiswaId,
+            siakPeriodeAkademikId: activePeriod.id,
+            status: "Draft",
+            sksDiambil: totalSKKeseluruhan,
+            semester: mahasiswa.semester,
+        }, { transaction: trx });
+
+        const bulkRincianKrsMahasiswa = courseWithStatus.map(course => ({
+            siakKrsMahasiswaId: studentKrs.id,
+            siakKelasKuliahId: course.id,
+            kategori: course.kategori,
+        }));
+
+        await RincianKrsMahasiswa.bulkCreate(bulkRincianKrsMahasiswa, { transaction: trx });
+
+        return studentKrs;
+    });
+
+    return data;
 };
 
 export const submitKrs = async (siakMahasiswaId) => {
@@ -385,13 +381,13 @@ export const submitKrs = async (siakMahasiswaId) => {
     });
 
     if(!existingKrs) {
-        throw new Error('Krs tidak ditemukan.')
+        throw new NotFoundError('Krs tidak ditemukan.')
     }
     if (existingKrs.siakMahasiswaId !== siakMahasiswaId) {
-        throw new Error("Krs bukan milik anda")
+        throw new UnprocessableEntityError("Krs bukan milik anda")
     }
     if(existingKrs.status === "Diajukan" || existingKrs.status === 'Disetujui'){
-        throw new Error(`Status Krs sudah tidak bisa dirubah karena sudah : ${existingKrs.status}`)
+        throw new ConflictError(`Status Krs sudah tidak bisa dirubah karena sudah : ${existingKrs.status}`)
     }
 
     return existingKrs.update({
@@ -402,11 +398,11 @@ export const submitKrs = async (siakMahasiswaId) => {
 export const updateKrs = async (mahasiswaId, kelasKuliahId) => {
     // Get Mahasiswa
     const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, { attributes: ['id', 'semester'] });
-    if (!mahasiswa) throw new Error('Data mahasiswa tidak ada');
+    if (!mahasiswa) throw new NotFoundError('Data mahasiswa tidak ada');
 
     // Get periode aktif
     const activePeriod = await findActive();
-    if (!activePeriod) throw new Error('Tidak ada periode akademik aktif yang ditemukan');
+    if (!activePeriod) throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
 
     // Check eksistensi krs
     const krs = await KrsMahasiswa.findOne({
@@ -419,10 +415,10 @@ export const updateKrs = async (mahasiswaId, kelasKuliahId) => {
     });
 
     if (!krs) {
-        throw new Error('KRS tidak ditemukan')
+        throw new NotFoundError('KRS tidak ditemukan')
     }
     if (krs.status === 'Disetujui' || krs.status === 'Diajukan') {
-        throw new Error('Krs Sudah disetujui, tidak bisa dirubah lagi');
+        throw new UnprocessableEntityError('Krs Sudah disetujui, tidak bisa dirubah lagi');
     }
 
     try {
@@ -441,7 +437,7 @@ export const updateKrs = async (mahasiswaId, kelasKuliahId) => {
             }
         });
         if(newSelectedClasses.length !== kelasKuliahId.length) {
-            throw new Error('Beberapa kelas tidak ditemukan');
+            throw new NotFoundError('Beberapa kelas tidak ditemukan');
         }
 
         // Get all courses the student has taken previously
@@ -504,10 +500,10 @@ export const deleteKrs = async (krsId, kelasKuliahId) => {
             }
         })
         if(!krs) {
-            throw new Error('KRS tidak ditemukan');
+            throw new NotFoundError('KRS tidak ditemukan');
         }
         if (krs.status === 'Disetujui' || krs.status === 'Diajukan') {
-            throw new Error(`Krs sudah ${krs.status}, tidak bisa dirubah lagi`);
+            throw new UnprocessableEntityError(`Krs sudah ${krs.status}, tidak bisa dirubah lagi`);
         }
 
         await sequelize.transaction(async (trx) => {
@@ -530,7 +526,7 @@ export const savedKrs = async (mahasiswaId) => {
     });
 
     if (!activePeriod) {
-        throw new Error('Tidak ada periode akademik aktif yang ditemukan');
+        throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
     }
 
     // --- Step 2: Query the Parent (KrsMahasiswa) ---
@@ -617,7 +613,7 @@ export const historyKrs = async (mahasiswaId, periodeId) => {
             raw:true
         })
         if (!mahasiswa) {
-            throw new Error(`Mahasiswa tidak ditemukan`)
+            throw new NotFoundError(`Mahasiswa tidak ditemukan`)
         }
 
         const periodeAkademik = await PeriodeAkademik.findByPk(periodeId, {
@@ -626,7 +622,7 @@ export const historyKrs = async (mahasiswaId, periodeId) => {
             ]
         })
         if (!periodeAkademik) {
-            throw new Error(`Periode akademik tidak ditemukan`)
+            throw new NotFoundError(`Periode akademik tidak ditemukan`)
         }
 
         let batasSks = 0;
