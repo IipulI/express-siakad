@@ -30,8 +30,6 @@ export const getHasilStudi = async (req, res, next) => {
     } catch (error) {
         next(error)
     }
-<<<<<<< HEAD
-=======
 }
 
 export const getIpk = async (req, res, next) => {
@@ -58,5 +56,4 @@ export const getIpk = async (req, res, next) => {
     } catch (error) {
         next(error)
     }
->>>>>>> ea1c904 (Menambah fitur get ipk untuk modul orang tua)
 }
