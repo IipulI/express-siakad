@@ -30,4 +30,33 @@ export const getHasilStudi = async (req, res, next) => {
     } catch (error) {
         next(error)
     }
+<<<<<<< HEAD
+=======
+}
+
+export const getIpk = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+    const npm = req.query.npm ? req.query.npm : null;
+
+    const mahasiswa = await Mahasiswa.findOne({
+        where: {
+            npm: npm
+        }
+    })
+    if (!mahasiswa) {
+        throw new NotFoundError("Mahasiswa tidak ditemukan")
+    }
+
+    try {
+        const data = await hasilStudiService.getIpk(mahasiswa.id)
+
+        responseBuilder
+            .status('success')
+            .code(200)
+            .message("berhasil mengambil data ipk")
+            .json(data)
+    } catch (error) {
+        next(error)
+    }
+>>>>>>> ea1c904 (Menambah fitur get ipk untuk modul orang tua)
 }

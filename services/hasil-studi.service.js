@@ -79,3 +79,54 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
     rincianKrs: rincianKrsMahasiswa,
   };
 };
+
+export const getIpk = async (mahasiswaId) => {
+  const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
+    attributes: ['id', 'nama', 'periodeMasuk'],
+  })
+
+  if (!mahasiswa) {
+    throw new NotFoundError(`Mahasiswa tidak dapat ditemukan`)
+  }
+
+  const hasilStudi = await HasilStudi.findAll({
+    attributes: ['semester', 'ips', 'ipk', 'sksDiambil', 'sksLulus'],
+    where: {
+      siakMahasiswaId: mahasiswaId
+    },
+    include: {
+      model: PeriodeAkademik,
+      as: 'periodeAkademik',
+      attributes: ['id', 'kode', 'nama']
+    },
+    order: [
+      ['semester', 'ASC']
+    ]
+  })
+
+  let totalMutu = 0;
+  let totalSks = 0;
+
+  const riwayatCalculated = hasilStudi.map(item => {
+    const data = item.toJSON();
+    const ips = parseFloat(data.ips);
+    const sks = parseInt(data.sksDiambil);
+
+    totalMutu += (ips * sks);
+    totalSks += sks;
+
+    const calculatedIpk = totalSks > 0 ? (totalMutu / totalSks).toFixed(2) : "0.00";
+
+    return {
+      ...data,
+      ipk: calculatedIpk // override with calculated IPK
+    };
+  });
+
+  const finalIpk = riwayatCalculated.length > 0 ? riwayatCalculated[riwayatCalculated.length - 1].ipk : "0.00";
+
+  return {
+    ipk: finalIpk,
+    riwayat: riwayatCalculated
+  };
+};
