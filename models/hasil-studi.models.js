@@ -5,7 +5,14 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class HasilStudi extends Model {
         static associate(models) {
-            // define assoc
+            HasilStudi.belongsTo(models.PeriodeAkademik, {
+                as: 'periodeAkademik',
+                foreignKey: 'siakPeriodeAkademikId'
+            });
+            HasilStudi.belongsTo(models.Mahasiswa, {
+                as: 'mahasiswa',
+                foreignKey: 'siakMahasiswaId'
+            });
         }
     }
 
