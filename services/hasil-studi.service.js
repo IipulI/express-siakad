@@ -1,5 +1,6 @@
 import db from "../models/index.js";
 import { NotFoundError } from "../utils/custom-error.js";
+import { Op } from "sequelize";
 
 const {
   HasilStudi,
@@ -129,4 +130,65 @@ export const getIpk = async (mahasiswaId) => {
     ipk: finalIpk,
     riwayat: riwayatCalculated
   };
+};
+
+export const getKkn = async (mahasiswaId) => {
+  const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
+    attributes: ['id', 'nama', 'periodeMasuk'],
+  });
+
+  if (!mahasiswa) {
+    throw new NotFoundError(`Mahasiswa tidak dapat ditemukan`);
+  }
+
+  const kknMataKuliah = await RincianKrsMahasiswa.findAll({
+    attributes: [
+      "id",
+      "kehadiran",
+      "tugas",
+      "uts",
+      "uas",
+      "nilai",
+      "hurufMutu",
+      "angkaMutu",
+      "nilaiAkhir",
+    ],
+    include: [
+      {
+        attributes: ['id', 'siakPeriodeAkademikId', 'semester'],
+        where: {
+          siakMahasiswaId: mahasiswaId,
+        },
+        model: KrsMahasiswa,
+        as: "krsMahasiswa",
+        required: true,
+        include: [
+          {
+            model: PeriodeAkademik,
+            as: "periodeAkademik",
+            attributes: ['id', 'nama', 'kode']
+          }
+        ]
+      },
+      {
+        attributes: ['id', 'nama'],
+        model: KelasKuliah,
+        as: "kelasKuliah",
+        required: true,
+        include: {
+          attributes: ["nama", "kode", "totalSks"],
+          model: MataKuliah,
+          as: "mataKuliah",
+          required: true,
+          where: {
+            jenis: {
+              [Op.like]: '%KKN%'
+            }
+          }
+        },
+      },
+    ]
+  });
+
+  return kknMataKuliah;
 };
