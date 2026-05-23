@@ -649,3 +649,24 @@ Jika Anda mau, saya bisa:
 - mengekspor versi PDF/Word dari dokumen ini untuk dimasukkan ke bab skripsi.
 
 ---
+## Perbedaan Implementasi & Rekomendasi
+
+Berikut ringkasan perbedaan penting antara spesifikasi skripsi/dokumen dan implementasi proyek, beserta rekomendasi penulisan untuk Bab 4.3.6.
+
+- **siak_obe**: Implementasi akhir menggunakan kolom `target_cpl` dan `target_cpmk` (model: [models/obe.models.js](models/obe.models.js)). Migration [migrations/20260327095028-update-kolom-target-obe.cjs](migrations/20260327095028-update-kolom-target-obe.cjs) menghapus kolom `target_capaian` yang sempat ada; namun `doc/db/schema.sql` dapat menampilkan snapshot antara (periksa migration). Rekomendasi: sebutkan evolusi kolom dan cantumkan migration ID sebagai bukti.
+
+- **siak_pemetaan_cpl_cpmk**: Kolom `bobot_cpl` ditambahkan melalui migration [migrations/20260320151849-tambah-kolom-bobot-cpl.cjs](migrations/20260320151849-tambah-kolom-bobot-cpl.cjs) dan di-model-kan sebagai `FLOAT` ([models/pemetaan-cpl-cmk.models.js](models/pemetaan-cpl-cmk.models.js)), sementara `doc/db/schema.sql` mencantumkan `DOUBLE PRECISION`. Rekomendasi: catat perbedaan tipe (FLOAT vs DOUBLE) dan jelaskan implikasi presisi; jika presisi penting gunakan DECIMAL.
+
+- **siak_capaian_pembelajaran_lulusan (CPL)**: `target_cpl` diimplementasikan sebagai `FLOAT` pada model ([models/capaian-pembelajaran-lulusan.models.js](models/capaian-pembelajaran-lulusan.models.js)). Rekomendasi: sebutkan tipe implementasi.
+
+- **siak_komposisi_nilai_mata_kuliah**: Model menggunakan `DOUBLE` untuk `persentase` ([models/komposisi-nilai-mata-kuliah.models.js](models/komposisi-nilai-mata-kuliah.models.js)), sedangkan dokumen menyatakan `DECIMAL`. Rekomendasi: jika pembulatan/akurasi kritis, sarankan DECIMAL; catat keputusan teknis di bab metodologi.
+
+- **Tabel RPS dan Rencana Pembelajaran**: Implementasi menambahkan field bilingual dan media (mis. `deskripsi_mata_kuliah_eng`, `materi_pembelajaran_eng`, `media_perangkat_lunak`, `metode_pembelajaran_daring`). Rekomendasi: sebutkan sebagai ekstensi fungsional proyek pada bagian implementasi.
+
+- **Syarat Lulus pada siak_rencana_evaluasi**: Di model, `syarat_lulus` diimplementasikan sebagai string-enum dengan nilai default (lihat [models/rencana-evaluasi.models.js](models/rencana-evaluasi.models.js)). Rekomendasi: dokumentasikan nilai enum yang valid dan alasan memilih string-enum daripada boolean.
+
+Rekomendasi umum untuk Bab 4.3.6 (Perancangan Basis Data):
+
+- Sertakan semua tabel OBE yang tercantum pada dokumen ini.
+- Untuk setiap tabel yang mengalami perubahan historis (rename/penambahan/tipe), cantumkan referensi migration dan model (contoh: `migrations/20260327095028-update-kolom-target-obe.cjs`, `models/obe.models.js`).
+- Gunakan kombinasi `migrations` + `models` sebagai sumber kebenaran final; gunakan `doc/db/schema.sql` hanya sebagai snapshot dan beri catatan jika terdapat inkonsistensi.

@@ -59,16 +59,42 @@ export const getPesertaKelas = async (req, res) => {
     }
 };
 
+export const kunciNilaiKelas = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const { action = 'kunci' } = req.body;
+        if (!['kunci', 'buka'].includes(action)) {
+            return new ResponseBuilder(res).code(400).message("action harus 'kunci' atau 'buka'").json();
+        }
+        const result = await penilaianService.kunciNilaiKelas(kelasId, action);
+        const msg = action === 'kunci' ? 'Nilai seluruh mahasiswa berhasil dikunci' : 'Kunci nilai seluruh mahasiswa berhasil dibuka';
+        return new ResponseBuilder(res).code(200).message(msg).json(result);
+    } catch (error) { next(error); }
+};
+
+export const kunciNilaiMahasiswa = async (req, res, next) => {
+    try {
+        const { rincianKrsId } = req.params;
+        const { action = 'kunci' } = req.body;
+        if (!['kunci', 'buka'].includes(action)) {
+            return new ResponseBuilder(res).code(400).message("action harus 'kunci' atau 'buka'").json();
+        }
+        const result = await penilaianService.kunciNilaiSatuMahasiswa(rincianKrsId, action);
+        const msg = action === 'kunci' ? 'Nilai mahasiswa berhasil dikunci' : 'Kunci nilai mahasiswa berhasil dibuka';
+        return new ResponseBuilder(res).code(200).message(msg).json(result);
+    } catch (error) { next(error); }
+};
+
 export const simpanNilaiMahasiswa = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     const krsId = req.params.krsId;
-    const arrNilai = req.body.nilai; 
+    const arrNilai = req.body.nilai;
     try {
         await penilaianService.inputNilaiMahasiswa(krsId, arrNilai);
         const hasilAkhir = await penilaianService.hitungNilaiAkhir(krsId);
         return responseBuilder.code(200).message("Nilai berhasil disimpan").json(hasilAkhir);
     } catch (error) {
-        return responseBuilder.status('failure').code(500).json(error.message);
+        return responseBuilder.status('failure').code(error.statusCode || 500).json(error.message);
     }
 };
 

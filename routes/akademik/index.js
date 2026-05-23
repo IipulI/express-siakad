@@ -38,6 +38,8 @@ import CPLUmum from "./cpl-umum.router.js";
 import AturanEvaluasiRouter from "./aturan-evaluasi.router.js";
 import KrsRouter from "./krs.router.js";
 import MonitoringRouter from "./monitoring.router.js";
+import koordinatorMkRouter from './koordinator-mk_router.js';
+import dosenPengampuRouter from './dosen-pengampu_router.js';
 
 const router = Router();
 
@@ -105,5 +107,11 @@ router.use("/ekivalensi", Ekivalensi)
 router.use("/mata-kuliah-kurikulum", MkKurikulum)
 router.use("/ekivalensi-mata-kuliah", EkivalensiMataKuliah)
 router.use("/monitoring", MonitoringRouter)
+
+// Router baru untuk Koordinator MK:
+router.use('/koordinator-mk', koordinatorMkRouter);
+
+// Router baru untuk Dosen Pengampu:
+router.use('/dosen', dosenPengampuRouter);
 
 export default router;

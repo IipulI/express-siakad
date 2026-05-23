@@ -5,6 +5,23 @@ import * as obeService from '../../services/obe.service.js';
 import * as MonitoringService from '../../services/monitoring.service.js';
 
 import path from 'path';
+
+// ─── Env-based institutional constants (same pattern as export-nilai-kelas) ───
+const ENV_NAMA_UNIV    = () => process.env.NAMA_UNIVERSITAS   || ENV_NAMA_UNIV();
+const ENV_ALAMAT_UNIV  = () => process.env.ALAMAT_UNIVERSITAS || ENV_ALAMAT_UNIV();
+const ENV_KONTAK_UNIV  = () => process.env.KONTAK_UNIVERSITAS || ENV_KONTAK_UNIV();
+const ENV_APP_URL      = () => process.env.APP_URL            || 'siakad.uika-bogor.ac.id';
+const ENV_WAKIL_REKTOR = () => process.env.NAMA_WAKIL_REKTOR  || '-';
+const ENV_KOTA_TTD     = () => process.env.KOTA_TTD           || 'Bogor';
+
+// ─── Footer text builder (dipanggil tiap export, namaPencetak dari req.user) ───
+const buildFooter = (namaPencetak) => {
+    const printDate = new Date().toLocaleString('id-ID', {
+        timeZone: 'Asia/Jakarta', dateStyle: 'long', timeStyle: 'medium'
+    });
+    return `Dicetak oleh: ${namaPencetak}, pada ${printDate} WIB | ${ENV_APP_URL()}`;
+};
+
 // ============================================================================
 // 1. EXPORT EXCEL - MANAJEMEN PL
 // ============================================================================
@@ -520,9 +537,9 @@ export const exportPdfMonitoringCplProdi = async (req, res, next) => {
         // 1. KOP SURAT
         // =========================================================
         if (isPakaiKop) {
-            doc.font('Helvetica-Bold').fontSize(14).text('UNIVERSITAS IBN KHALDUN BOGOR', { align: 'center' });
-            doc.font('Helvetica').fontSize(9).text('Jl. KH. Sholeh Iskandar KM.2 Kedung Badak Bogor', { align: 'center' });
-            doc.fontSize(8).text('Website: uika-bogor.ac.id | Email: info@uika-bogor.ac.id | Telepon: (0251) 8336824', { align: 'center' });
+            doc.font('Helvetica-Bold').fontSize(14).text(ENV_NAMA_UNIV(), { align: 'center' });
+            doc.font('Helvetica').fontSize(9).text(ENV_ALAMAT_UNIV(), { align: 'center' });
+            doc.fontSize(8).text(ENV_KONTAK_UNIV(), { align: 'center' });
             doc.moveDown(1);
             doc.moveTo(30, doc.y).lineTo(565, doc.y).lineWidth(2).strokeColor('black').stroke();
             doc.moveDown(1.5);
@@ -783,9 +800,9 @@ export const exportPdfMonitoringCplProdi = async (req, res, next) => {
 //         // 1. KOP SURAT
 //         // =========================================================
 //         if (isPakaiKop) {
-//             doc.font('Helvetica-Bold').fontSize(14).text('UNIVERSITAS IBN KHALDUN BOGOR', { align: 'center' });
-//             doc.font('Helvetica').fontSize(9).text('Jl. KH. Sholeh Iskandar KM.2 Kedung Badak Bogor', { align: 'center' });
-//             doc.fontSize(8).text('Website: uika-bogor.ac.id | Email: info@uika-bogor.ac.id | Telepon: (0251) 8336824', { align: 'center' });
+//             doc.font('Helvetica-Bold').fontSize(14).text(ENV_NAMA_UNIV(), { align: 'center' });
+//             doc.font('Helvetica').fontSize(9).text(ENV_ALAMAT_UNIV(), { align: 'center' });
+//             doc.fontSize(8).text(ENV_KONTAK_UNIV(), { align: 'center' });
 //             doc.moveDown(1);
 //             doc.moveTo(30, doc.y).lineTo(565, doc.y).lineWidth(2).strokeColor('black').stroke();
 //             doc.moveDown(1.5);
@@ -1113,10 +1130,10 @@ export const exportPdfLaporanCplPerMahasiswa = async (req, res, next) => {
             try { doc.image(logoPath, boxX, 15, { width: logoSize }); } catch (e) { }
 
             doc.font('Helvetica-Bold').fontSize(14).fillColor('black')
-                .text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 18, { width: boxW, align: 'center' });
+                .text(ENV_NAMA_UNIV(), boxX, 18, { width: boxW, align: 'center' });
             doc.font('Helvetica').fontSize(8)
-                .text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-            doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+                .text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+            doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
 
             if (doc.y < 15 + logoSize + 4) doc.y = 15 + logoSize + 4;
 
@@ -1343,7 +1360,7 @@ export const exportPdfLaporanCplPerMahasiswa = async (req, res, next) => {
         doc.moveDown(0.5);
         doc.font('Helvetica').fontSize(7).fillColor('#555555')
             .text(
-                `Dicetak oleh: SATRIA SUDIRJA, pada ${printDate} WIB | siakad.uika-bogor.ac.id/siakad/rep_transkripobemhs`,
+                buildFooter(req.user?.nama || req.user?.name || 'Sistem'),
                 boxX, doc.y
             );
 
@@ -1376,10 +1393,10 @@ export const exportPdfLaporanCplPerMataKuliah = async (req, res, next) => {
             try { doc.image(logoPath, boxX, 15, { width: logoSize }); } catch (e) { }
 
             doc.font('Helvetica-Bold').fontSize(14).fillColor('black')
-                .text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 18, { width: boxW, align: 'center' });
+                .text(ENV_NAMA_UNIV(), boxX, 18, { width: boxW, align: 'center' });
             doc.font('Helvetica').fontSize(8)
-                .text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-            doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+                .text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+            doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
 
             if (doc.y < 15 + logoSize + 4) doc.y = 15 + logoSize + 4;
 
@@ -1571,7 +1588,7 @@ export const exportPdfLaporanCplPerMataKuliah = async (req, res, next) => {
             .lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
         doc.moveDown(0.5);
         doc.font('Helvetica').fontSize(7).fillColor('#555555')
-            .text(`Dicetak oleh: SATRIA SUDIRJA, pada ${printDate} WIB | siakad.uika-bogor.ac.id/siakad/rep_transkripobemhs`, boxX, doc.y);
+            .text(buildFooter(req.user?.nama || req.user?.name || 'Sistem'), boxX, doc.y);
 
         doc.end();
     } catch (error) {
@@ -1605,10 +1622,10 @@ export const exportPdfLaporanCplPerMataKuliah = async (req, res, next) => {
 //             try { doc.image(logoPath, boxX, 15, { width: logoSize }); } catch (e) { }
 
 //             doc.font('Helvetica-Bold').fontSize(14).fillColor('black')
-//                 .text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 18, { width: boxW, align: 'center' });
+//                 .text(ENV_NAMA_UNIV(), boxX, 18, { width: boxW, align: 'center' });
 //             doc.font('Helvetica').fontSize(8)
-//                 .text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-//             doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+//                 .text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+//             doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
 
 //             if (doc.y < 15 + logoSize + 4) doc.y = 15 + logoSize + 4;
 //             doc.moveDown(0.4);
@@ -1802,7 +1819,7 @@ export const exportPdfLaporanCplPerMataKuliah = async (req, res, next) => {
 //         doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y).lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
 //         doc.moveDown(0.5);
 //         doc.font('Helvetica').fontSize(7).fillColor('#555555')
-//             .text(`Dicetak oleh: SATRIA SUDIRJA, pada ${printDate} WIB | siakad.uika-bogor.ac.id/siakad/rep_transkripobemhs`, boxX, doc.y);
+//             .text(buildFooter(req.user?.nama || req.user?.name || 'Sistem'), boxX, doc.y);
 
 //         doc.end();
 //     } catch (error) {
@@ -1833,10 +1850,10 @@ export const exportPdfLaporanMkPerMahasiswa = async (req, res, next) => {
             try { doc.image(logoPath, boxX, 15, { width: logoSize }); } catch (e) { }
 
             doc.font('Helvetica-Bold').fontSize(14).fillColor('black')
-                .text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 18, { width: boxW, align: 'center' });
+                .text(ENV_NAMA_UNIV(), boxX, 18, { width: boxW, align: 'center' });
             doc.font('Helvetica').fontSize(8)
-                .text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-            doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+                .text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+            doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
 
             if (doc.y < 15 + logoSize + 4) doc.y = 15 + logoSize + 4;
             doc.moveDown(0.4);
@@ -2039,7 +2056,7 @@ export const exportPdfLaporanMkPerMahasiswa = async (req, res, next) => {
         doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y).lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
         doc.moveDown(0.5);
         doc.font('Helvetica').fontSize(7).fillColor('#555555')
-            .text(`Dicetak oleh: SATRIA SUDIRJA, pada ${printDate} WIB | siakad.uika-bogor.ac.id/siakad/rep_transkripobemhs`, boxX, doc.y);
+            .text(buildFooter(req.user?.nama || req.user?.name || 'Sistem'), boxX, doc.y);
 
         doc.end();
     } catch (error) {
@@ -2070,9 +2087,9 @@ export const exportPdfLaporanMkPerMahasiswa = async (req, res, next) => {
 //         const isPakaiKop = String(filters.kop).toLowerCase() === 'true';
 //         if (isPakaiKop) {
 //             try { doc.image(logoPath, boxX, 20, { width: 55 }); } catch (e) { }
-//             doc.font('Helvetica-Bold').fontSize(13).fillColor('black').text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 22, { width: boxW, align: 'center' });
-//             doc.font('Helvetica').fontSize(8).text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-//             doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+//             doc.font('Helvetica-Bold').fontSize(13).fillColor('black').text(ENV_NAMA_UNIV(), boxX, 22, { width: boxW, align: 'center' });
+//             doc.font('Helvetica').fontSize(8).text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+//             doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
 //             if (doc.y < 85) doc.y = 85;
 //             doc.save().lineWidth(1.5).strokeColor('#000000').moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y).stroke().restore();
 //             doc.moveDown(1);
@@ -2313,14 +2330,14 @@ export const exportPdfLaporanMkPerMahasiswa = async (req, res, next) => {
 //         doc.font('Helvetica').fontSize(9).text('Ketua Program Studi', boxX, ttdY, { align: 'left' });
 //         doc.text('S1 Teknik Informatika', boxX, doc.y, { align: 'left' });
 //         doc.moveDown(4);
-//         doc.font('Helvetica-Bold').text('HERSANTO FAJRI, S.Ds., M.M.D.', boxX, doc.y, { align: 'left' });
+//         doc.font('Helvetica-Bold').text(process.env.NAMA_KAPRODI_DEFAULT || '-', boxX, doc.y, { align: 'left' });
 
 //         const printDate = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'long', day: 'numeric' });
 //         doc.font('Helvetica').text(`Bogor, ${printDate}`, 0, ttdY, { align: 'right', width: boxX + boxW });
 //         doc.text('Wakil Rektor 1', 0, doc.y, { align: 'right', width: boxX + boxW });
 //         doc.text('Universitas Ibn Khaldun', 0, doc.y, { align: 'right', width: boxX + boxW });
 //         doc.moveDown(3);
-//         doc.font('Helvetica-Bold').text("Prof. Dr Hj. Maemunah Sa'diyah, S. Ag., M. A", 0, doc.y, { align: 'right', width: boxX + boxW });
+//         doc.font('Helvetica-Bold').text(ENV_WAKIL_REKTOR(), 0, doc.y, { align: 'right', width: boxX + boxW });
 
 //         doc.end();
 //     } catch (error) {
@@ -2348,9 +2365,9 @@ export const exportPdfTranskripObeMahasiswa = async (req, res, next) => {
         const isPakaiKop = String(filters.kop).toLowerCase() === 'true';
         if (isPakaiKop) {
             try { doc.image(logoPath, boxX, 20, { width: 55 }); } catch (e) { }
-            doc.font('Helvetica-Bold').fontSize(13).fillColor('black').text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 22, { width: boxW, align: 'center' });
-            doc.font('Helvetica').fontSize(8).text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-            doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+            doc.font('Helvetica-Bold').fontSize(13).fillColor('black').text(ENV_NAMA_UNIV(), boxX, 22, { width: boxW, align: 'center' });
+            doc.font('Helvetica').fontSize(8).text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+            doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
             if (doc.y < 85) doc.y = 85;
             doc.save().lineWidth(1.5).strokeColor('#000000').moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y).stroke().restore();
             doc.moveDown(1);
@@ -2581,14 +2598,14 @@ export const exportPdfTranskripObeMahasiswa = async (req, res, next) => {
         doc.font('Helvetica').fontSize(9).text('Ketua Program Studi', boxX, ttdY, { align: 'left' });
         doc.text('S1 Teknik Informatika', boxX, doc.y, { align: 'left' });
         doc.moveDown(4);
-        doc.font('Helvetica-Bold').text('HERSANTO FAJRI, S.Ds., M.M.D.', boxX, doc.y, { align: 'left' });
+        doc.font('Helvetica-Bold').text(process.env.NAMA_KAPRODI_DEFAULT || '-', boxX, doc.y, { align: 'left' });
 
         const printDate = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'long', day: 'numeric' });
-        doc.font('Helvetica').text(`Bogor, ${printDate}`, 0, ttdY, { align: 'right', width: boxX + boxW });
+        doc.font('Helvetica').text(`${ENV_KOTA_TTD()}, ${printDate}`, 0, ttdY, { align: 'right', width: boxX + boxW });
         doc.text('Wakil Rektor 1', 0, doc.y, { align: 'right', width: boxX + boxW });
-        doc.text('Universitas Ibn Khaldun', 0, doc.y, { align: 'right', width: boxX + boxW });
+        doc.text(ENV_NAMA_UNIV(), 0, doc.y, { align: 'right', width: boxX + boxW });
         doc.moveDown(3);
-        doc.font('Helvetica-Bold').text("Prof. Dr Hj. Maemunah Sa'diyah, S. Ag., M. A", 0, doc.y, { align: 'right', width: boxX + boxW });
+        doc.font('Helvetica-Bold').text(ENV_WAKIL_REKTOR(), 0, doc.y, { align: 'right', width: boxX + boxW });
 
         doc.end();
     } catch (error) {
@@ -2621,10 +2638,10 @@ export const exportPdfTranskripObeMahasiswa = async (req, res, next) => {
 //         if (isPakaiKop) {
 //             try { doc.image(logoPath, boxX, 20, { width: 55 }); } catch (e) { }
 //             doc.font('Helvetica-Bold').fontSize(13).fillColor('black')
-//                 .text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 22, { width: boxW, align: 'center' });
+//                 .text(ENV_NAMA_UNIV(), boxX, 22, { width: boxW, align: 'center' });
 //             doc.font('Helvetica').fontSize(8)
-//                 .text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-//             doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+//                 .text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+//             doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
 //             if (doc.y < 85) doc.y = 85;
 //             doc.save().lineWidth(1.5).strokeColor('#000000')
 //                 .moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y).stroke().restore();
@@ -2841,7 +2858,7 @@ export const exportPdfTranskripObeMahasiswa = async (req, res, next) => {
 //         doc.moveDown(0.5);
 //         doc.font('Helvetica').fontSize(7).fillColor('#555555')
 //             .text(
-//                 `Dicetak oleh: SATRIA SUDIRJA, pada ${printDate} WIB | siakad.uika-bogor.ac.id/siakad/rep_transkripobemhs`,
+//                 buildFooter(req.user?.nama || req.user?.name || 'Sistem'),
 //                 boxX, doc.y
 //             );
 
@@ -2873,10 +2890,10 @@ export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
         if (isPakaiKop) {
             try { doc.image(logoPath, boxX, 20, { width: 55 }); } catch (e) { }
             doc.font('Helvetica-Bold').fontSize(13).fillColor('black')
-                .text('UNIVERSITAS IBN KHALDUN BOGOR', boxX, 22, { width: boxW, align: 'center' });
+                .text(ENV_NAMA_UNIV(), boxX, 22, { width: boxW, align: 'center' });
             doc.font('Helvetica').fontSize(8)
-                .text('Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor', boxX, doc.y + 1, { width: boxW, align: 'center' });
-            doc.text('Website :uika-bogor.ac.id/ e-Mail :mail@uika-bogor.ac.id / Telepon :0251-8356884', boxX, doc.y + 1, { width: boxW, align: 'center' });
+                .text(ENV_ALAMAT_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
+            doc.text(ENV_KONTAK_UNIV(), boxX, doc.y + 1, { width: boxW, align: 'center' });
             if (doc.y < 85) doc.y = 85;
             doc.save().lineWidth(1.5).strokeColor('#000000')
                 .moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y).stroke().restore();
@@ -3104,7 +3121,7 @@ export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
         doc.moveDown(0.5);
         doc.font('Helvetica').fontSize(7).fillColor('#555555')
             .text(
-                `Dicetak oleh: SATRIA SUDIRJA, pada ${printDate} WIB | siakad.uika-bogor.ac.id/siakad/rep_transkripobemhs`,
+                buildFooter(req.user?.nama || req.user?.name || 'Sistem'),
                 boxX, doc.y
             );
 

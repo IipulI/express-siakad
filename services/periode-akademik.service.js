@@ -8,7 +8,7 @@ export const findAll = async (page, size) => {
         if (page !== null && size !== null) {
             const { limit, offset } = getPagination(page, size);
 
-            const {count, rows} = await PeriodeAkademik.findAndCountAll({
+            const { count, rows } = await PeriodeAkademik.findAndCountAll({
                 attributes: {
                     exclude: ['createdAt', 'updatedAt', 'deletedAt']
                 },
@@ -24,14 +24,14 @@ export const findAll = async (page, size) => {
             }
         }
         else {
-            const {count, rows}= await PeriodeAkademik.findAndCountAll({
+            const { count, rows } = await PeriodeAkademik.findAndCountAll({
                 attributes: {
                     exclude: ['createdAt', 'updatedAt', 'deletedAt']
                 },
             })
 
             return {
-                count : count,
+                count: count,
                 rows,
                 isPaginated: false,
             }
@@ -50,7 +50,7 @@ export const findActive = async () => {
         where: { status: "Aktif" }
     })
 
-    if(!activePeriod) {
+    if (!activePeriod) {
         throw new Error('Tidak ada periode aktif yang ditemukan');
     }
 
@@ -62,7 +62,7 @@ export const createPeriodeAkademik = async (periodeAkademikData) => {
 
     const tahunAjaranExist = await TahunAjaranModels.findByPk(periodeAkademikData.siakTahunAjaranId);
     if (!tahunAjaranExist) {
-        throw new Error (`Tahun Ajaran tidak ditemukan`)
+        throw new Error(`Tahun Ajaran tidak ditemukan`)
     }
 
     try {

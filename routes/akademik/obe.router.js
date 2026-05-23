@@ -182,6 +182,9 @@ router.post('/capaian-pembelajaran/:obeId', ObeController.createCapaianPembelaja
 // 3. PUT (Tembak ID CPL)
 router.put('/capaian-pembelajaran/:cplId', ObeController.updateCapaianPembelajaraanLulusan);
 
+// 3b. PATCH - Update target CPL saja (Kaprodi/Admin)
+router.patch('/capaian-pembelajaran/:cplId/target', ObeController.updateTargetCpl);
+
 // 4. DELETE (Tembak ID CPL)
 router.delete('/capaian-pembelajaran/:cplId', ObeController.deleteCapaianPembelajaranLulusan);
 router.post('/indikator-kinerja', validateStoreIK, ObeController.storeIndikatorKinerja);

@@ -1,0 +1,29 @@
+%% Diagram: Mengelola Rencana Pembelajaran (Sesi RPS) — Dosen ↔ Sistem
+flowchart TB
+  subgraph Dosen["Dosen"]
+    direction TB
+    startD((Mulai)) --> openMenu["Buka menu Rencana Pembelajaran (UI)"]
+    openMenu --> getRps["GET /mata-kuliah/:mataKuliahId/setup-evaluasi\nPenilaianController.getKomposisiRPS → penilaianService.getKomposisiEvaluasi"]
+    getRps --> showRps["Tampil data RPS (komposisi & CPMK)"]
+    showRps --> fillSession["Isi detail sesi (materi, metode) & cek CPMK"]
+    fillSession --> clickSave["Klik Simpan (POST /mata-kuliah/:mataKuliahId/setup-evaluasi)\nPenilaianController.setupKomposisiRPS"]
+  end
+
+  subgraph Sistem["Sistem (Backend)"]
+    direction TB
+    clickSave --> validate["Validator: total persentase komposisi == 100%"]
+    validate -->|Tidak| badReq["Return 400 Bad Request (pesan: total persentase harus 100%)"]
+    validate -->|Ya| beginTx["Mulai DB transaction"]
+    beginTx --> insertKomposisi["Insert KomposisiNilaiMataKuliah (per komponen)"]
+    insertKomposisi --> checkMapping["Ada mapping CPMK (mappingCpmk)?"]
+    checkMapping -->|Ya| bulkPivot["Bulk insert PemetaanKomposisiCpmk (pivot)"]
+    checkMapping -->|Tidak| skipPivot["Lewati pivot"]
+    bulkPivot --> commit["Commit transaction"]
+    skipPivot --> commit
+    commit --> resp201["Return 201 Created (sesi tersimpan)"]
+    resp201 --> uiReload["UI menampilkan sesi RPS baru"]
+  end
+
+  %% cross-links for clarity
+  badReq -.-> openMenu
+  uiReload -.-> showRps

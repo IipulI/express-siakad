@@ -22,7 +22,7 @@ import ResponseBuilder from "../../utils/response.js";
 //     }
 // }
 
-export const createProfilLulusan = async(req, res) => {
+export const createProfilLulusan = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res)
     const obeId = req.params.obeId
     const body = req.body
@@ -30,7 +30,7 @@ export const createProfilLulusan = async(req, res) => {
     try {
         const promise = await obeService.createProfilLulusan(obeId, body)
 
-        if(promise) {
+        if (promise) {
             responseBuilder
                 .code(200)
                 .message("Berhasil menambah data")
@@ -240,7 +240,7 @@ export const getCapaianMataKuliah = async (req, res) => {
             .json();
     }
 };
-export const createCapaianMataKuliah = async(req, res) => {
+export const createCapaianMataKuliah = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     const { obeId, mataKuliahId } = req.params; // Lebih rapi pakai destructuring
 
@@ -272,7 +272,7 @@ export const createCapaianMataKuliah = async(req, res) => {
 export const updateCapaianMataKuliah = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     // Pastikan nama param di router sesuai (cpmkId)
-    const { obeId, mataKuliahId, cpmkId } = req.params; 
+    const { obeId, mataKuliahId, cpmkId } = req.params;
 
     try {
         const result = await obeService.updateCapaianMataKuliah(obeId, mataKuliahId, cpmkId, req.body);
@@ -331,7 +331,7 @@ export const deleteCapaianMataKuliah = async (req, res) => {
 
 // export const createPemetaanPlCpl = async (req, res) => {
 //     const responseBuilder = new ResponseBuilder(res);
-    
+
 //     // Asumsi frontend mengirim ID CPL dan array mappingnya
 //     const cplId = req.body.cplId; 
 //     const dataPemetaan = req.body.dataPemetaan; 
@@ -348,7 +348,7 @@ export const deleteCapaianMataKuliah = async (req, res) => {
 //         }
 
 //         await obeService.createPemetaanPlCpl(cplId, dataPemetaan);
-        
+
 //         responseBuilder
 //             .code(201)
 //             .message("Berhasil memetakan Profil Lulusan ke CPL beserta bobotnya")
@@ -387,7 +387,7 @@ export const getMatriksPemetaan = async (req, res) => {
 
 // export const getManajemenCapaian = async (req, res) => {
 //     const responseBuilder = new ResponseBuilder(res);
-    
+
 //     // Tangkap query untuk filter dan paginasi
 //     const { 
 //         page = 1, 
@@ -410,7 +410,7 @@ export const getMatriksPemetaan = async (req, res) => {
 //             .code(200)
 //             .message("Berhasil mengambil data Manajemen Capaian")
 //             .json(data);
-            
+
 //     } catch (error) {
 //         return responseBuilder
 //             .status('failure')
@@ -435,15 +435,15 @@ export const getManajemenCapaian = async (req, res, next) => {
         };
 
         const result = await obeService.getListManajemenCapaian(filters);
-        
+
         // Pakai ResponseBuilder Abang
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil mengambil data Manajemen Capaian")
             .json(result);
-            
-    } catch (error) { 
-        next(error); 
+
+    } catch (error) {
+        next(error);
     }
 };
 
@@ -498,7 +498,7 @@ export const getProfilLulusan = async (req, res, next) => {
     try {
         const { obeId } = req.params;
         const result = await obeService.getManajemenPlByObeId(obeId);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil mengambil data PL")
@@ -589,7 +589,7 @@ export const getCapaianPembelajaranLulusan = async (req, res, next) => {
     try {
         const { obeId } = req.params;
         const result = await obeService.getManajemenCplByObeId(obeId);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil mengambil data CPL")
@@ -601,16 +601,16 @@ export const getCapaianPembelajaranLulusan = async (req, res, next) => {
 export const createCapaianPembelajaranLulusan = async (req, res, next) => {
     try {
         const { obeId } = req.params;
-        
+
         // Panggil service bulk yang baru
         const result = await obeService.createCplBulk(obeId, req.body);
-        
+
         return new ResponseBuilder(res)
             .code(201)
             .message(`Berhasil menambah ${result.length} CPL`)
             .json(result);
-    } catch (error) { 
-        next(error); 
+    } catch (error) {
+        next(error);
     }
 };
 
@@ -619,7 +619,7 @@ export const updateCapaianPembelajaraanLulusan = async (req, res, next) => {
     try {
         const { cplId } = req.params;
         const result = await obeService.updateCpl(cplId, req.body);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil update CPL")
@@ -632,7 +632,7 @@ export const deleteCapaianPembelajaranLulusan = async (req, res, next) => {
     try {
         const { cplId } = req.params;
         await obeService.deleteCpl(cplId);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil menghapus CPL")
@@ -678,7 +678,7 @@ export const getMatriksPemetaanPlCpl = async (req, res, next) => {
     try {
         const { obeId } = req.params;
         const result = await obeService.getMatriksPemetaanPlCpl(obeId);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil mengambil matriks pemetaan")
@@ -703,12 +703,16 @@ export const createPemetaanPlCpl = async (req, res, next) => {
         const { obeId } = req.params;
         const { pemetaan } = req.body; // Isinya array: [{plId, cplId, bobot}, ...]
 
+        // 1. Simpan pemetaan massal ke database
         await obeService.saveMatriksPemetaanPlCpl(obeId, pemetaan);
         
+        // 2. Ambil ulang data matriks yang sudah di-update agar dikembalikan sebagai response
+        const result = await obeService.getMatriksPemetaanPlCpl(obeId);
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil menyimpan pemetaan PL ke CPL")
-            .json();
+            .json(result);
     } catch (error) { next(error); }
 };
 // export const getMatriksPemetaanCplMk = async (req, res) => {
@@ -733,7 +737,7 @@ export const getMatriksPemetaanCplMk = async (req, res, next) => {
     try {
         const { obeId } = req.params;
         const result = await obeService.getMatriksPemetaanCplMk(obeId);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil mengambil matriks CPL-MK")
@@ -747,12 +751,16 @@ export const savePemetaanCplMk = async (req, res, next) => {
         const { obeId } = req.params;
         const { pemetaan } = req.body; // Isinya array: [{mkId, cplId}, ...]
 
+        // 1. Simpan pemetaan massal ke database
         await obeService.saveMatriksPemetaanCplMk(obeId, pemetaan);
         
+        // 2. Ambil ulang data matriks yang sudah di-update agar dikembalikan sebagai response
+        const result = await obeService.getMatriksPemetaanCplMk(obeId);
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Pemetaan CPL ke MK berhasil disimpan")
-            .json();
+            .json(result);
     } catch (error) { next(error); }
 };
 // =====================================================================
@@ -762,12 +770,24 @@ export const getCetakLaporanObe = async (req, res, next) => {
     try {
         const { obeId } = req.params;
         const result = await obeService.getCetakLaporanObe(obeId);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil mengambil data Laporan OBE")
             .json(result);
-    } catch (error) { 
-        next(error); 
+    } catch (error) {
+        next(error);
     }
+};
+
+export const updateTargetCpl = async (req, res, next) => {
+    try {
+        const { cplId } = req.params;
+        const { targetCpl } = req.body;
+        if (targetCpl === undefined || targetCpl === null || isNaN(parseFloat(targetCpl))) {
+            return new ResponseBuilder(res).code(400).message('targetCpl harus berupa angka').json();
+        }
+        const result = await obeService.updateTargetCpl(cplId, targetCpl);
+        return new ResponseBuilder(res).code(200).message('Target CPL berhasil diupdate').json(result);
+    } catch (error) { next(error); }
 };

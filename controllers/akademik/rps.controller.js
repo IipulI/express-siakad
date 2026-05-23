@@ -188,12 +188,19 @@ export const getRencanaEvaluasi = async (req, res) => {
 
 export const saveRencanaEvaluasiList = async (req, res, next) => {
     try {
-        await rpsService.saveRencanaEvaluasi(req.params.mataKuliahId, req.body);
+        const { mataKuliahId } = req.params;
+        const { siakPeriodeAkademikId } = req.body;
+        
+        // 1. Simpan rencana evaluasi
+        await rpsService.saveRencanaEvaluasi(mataKuliahId, req.body);
+        
+        // 2. Tarik ulang data yang baru saja disimpan untuk ditampilkan di response
+        const result = await rpsService.getRencanaEvaluasi(mataKuliahId, siakPeriodeAkademikId);
         
         return new ResponseBuilder(res)
             .code(200)
             .message("Komponen Evaluasi berhasil disimpan dan divalidasi!")
-            .json({});
+            .json(result);
     } catch (error) {
         next(error);
     }

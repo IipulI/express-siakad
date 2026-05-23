@@ -1762,3 +1762,12 @@ export const getCetakLaporanObe = async (obeId) => {
         throw new CustomError.InternalServerError("Gagal menyusun data laporan: " + error.message);
     }
 };
+
+export const updateTargetCpl = async (cplId, targetCpl) => {
+    const [updated] = await CapaianPembelajaranLulusan.update(
+        { targetCpl: parseFloat(targetCpl) },
+        { where: { id: cplId } }
+    );
+    if (!updated) throw new CustomError.NotFoundError('CPL tidak ditemukan');
+    return { cplId, targetCpl: parseFloat(targetCpl) };
+};

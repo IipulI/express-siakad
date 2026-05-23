@@ -3,11 +3,32 @@ import { Op } from 'sequelize';
 
 const {
     sequelize, KomposisiNilaiMataKuliah, PemetaanEvaluasiCpmk, PemetaanKomposisiCpmk,
-    NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa,
+    NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
+    MasterMetodeEvaluasi, MasterKomponenEvaluasi
 } = models;
 
-// 1. SETUP RPS: Dosen mensetup komponen evaluasi (Teori/Praktikum/Proyek) beserta relasi CPMK
+const DEFAULT_SKALA = [
+    { hurufMutu: 'A',  angkaMutu: 4.00, nilaiMin: 81.00, nilaiMax: 100.00 },
+    { hurufMutu: 'AB', angkaMutu: 3.50, nilaiMin: 76.00, nilaiMax:  80.00 },
+    { hurufMutu: 'B',  angkaMutu: 3.00, nilaiMin: 71.00, nilaiMax:  75.00 },
+    { hurufMutu: 'BC', angkaMutu: 2.50, nilaiMin: 66.00, nilaiMax:  70.00 },
+    { hurufMutu: 'C',  angkaMutu: 2.00, nilaiMin: 61.00, nilaiMax:  65.00 },
+    { hurufMutu: 'CD', angkaMutu: 1.50, nilaiMin: 41.00, nilaiMax:  60.00 },
+    { hurufMutu: 'D',  angkaMutu: 1.00, nilaiMin:  1.00, nilaiMax:  40.00 },
+    { hurufMutu: 'E',  angkaMutu: 0.00, nilaiMin:  0.00, nilaiMax:   0.00 },
+];
 
+const getGrade = (nilai, skala) => {
+    for (const s of skala) {
+        if (nilai >= s.nilaiMin && nilai <= s.nilaiMax) {
+            return { hurufMutu: s.hurufMutu, angkaMutu: s.angkaMutu };
+        }
+    }
+    // Nilai 0 atau tidak cocok range manapun
+    return { hurufMutu: 'E', angkaMutu: 0 };
+};
+
+// 1. SETUP RPS: Dosen mensetup komponen evaluasi (Teori/Praktikum/Proyek) beserta relasi CPMK
 export const createKomposisiEvaluasi = async (mataKuliahId, komposisiData) => {
     try {
         let createdRecords = [];
@@ -33,7 +54,7 @@ export const createKomposisiEvaluasi = async (mataKuliahId, komposisiData) => {
                 if (item.mappingCpmk && Array.isArray(item.mappingCpmk) && item.mappingCpmk.length > 0) {
                     const pemetaan = item.mappingCpmk.map(cpmkData => ({
                         siakKomposisiNilaiId: komposisi.id,
-                        siakCpmkId: cpmkData.siakCapaianMataKuliahId, // Kembali pakai ini seperti kode asli Abang
+                        siakCpmkId: cpmkData.siakCapaianMataKuliahId, // Kembali pakai ini
                         bobot: cpmkData.bobot // 🟢 FIX UTAMA: Tambahan bobot agar tidak kosong
                     }));
 
@@ -56,7 +77,7 @@ export const getKomposisiEvaluasi = async (mataKuliahId) => {
             where: { siakMataKuliahId: mataKuliahId },
             attributes: ['id', 'persentase', 'key'],
             include: [{
-                model: models.CapaianMataKuliah, // Pastikan modelnya dipanggil dari models
+                model: models.CapaianMataKuliah, 
                 as: 'cpmkList',
                 attributes: ['id', 'kode'],
                 through: { attributes: [] } // Wajib ada agar tabel pemetaan ikut terbaca
@@ -72,14 +93,39 @@ export const getKomposisiEvaluasi = async (mataKuliahId) => {
 
 // 2. INPUT NILAI DINAMIS: Menyimpan skor mahasiswa dalam bentuk Array
 export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
+    const rincian = await RincianKrsMahasiswa.findByPk(krsId, { attributes: ['id', 'status'] });
+    if (!rincian) {
+        const err = new Error('Data rincian KRS tidak ditemukan');
+        err.statusCode = 404;
+        throw err;
+    }
+    if (rincian.status === 'Dikunci') {
+        const err = new Error('Nilai sudah dikunci, tidak dapat diedit');
+        err.statusCode = 403;
+        throw err;
+    }
     try {
         await sequelize.transaction(async (trx) => {
-            // Hapus nilai lama agar bersih saat update
-            await NilaiEvaluasiMahasiswa.destroy({ where: { siakRincianKrsMahasiswaId: krsId }, transaction: trx });
+            // Hapus nilai lama dengan FORCE: TRUE agar terhapus permanen (hard-delete),
+            // sehingga tidak bentrok dengan data baru saat di-insert.
+            await NilaiEvaluasiMahasiswa.destroy({ 
+                where: { 
+                    [Op.or]: [
+                        { siakRincianKrsMahasiswaId: krsId },
+                        { siak_rincian_krs_mahasiswa_id: krsId }
+                    ]
+                }, 
+                force: true, // 🔴 INI KUNCI PERBAIKANNYA
+                transaction: trx 
+            });
 
+            // Mapping payload (menggunakan format camelCase & snake_case sekaligus
+            // untuk menghindari error nama kolom tidak ditemukan)
             const payload = arrNilai.map(item => ({
                 siakRincianKrsMahasiswaId: krsId,
+                siak_rincian_krs_mahasiswa_id: krsId,
                 siakKomposisiNilaiId: item.komposisiId,
+                siak_komposisi_nilai_id: item.komposisiId,
                 skor: item.skor
             }));
 
@@ -87,276 +133,29 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
         });
         return true;
     } catch (error) {
-        throw new Error("Gagal menyimpan nilai evaluasi: " + error.message);
+        // Baris ini akan mengeluarkan nama kolom/pesan error yang jauh lebih detail jika gagal lagi
+        const detailError = error.errors ? error.errors.map(e => e.message).join(', ') : error.message;
+        throw new Error("Gagal menyimpan nilai evaluasi: " + detailError);
     }
 }
 
-// 3. KALKULATOR HASIL AKHIR OBE
-// export const hitungNilaiAkhir = async (krsId) => {
-//     try {
-//         return await sequelize.transaction(async (trx) => {
-//             const listNilai = await NilaiEvaluasiMahasiswa.findAll({
-//                 where: { siakRincianKrsMahasiswaId: krsId },
-//                 include: [{ model: KomposisiNilaiMataKuliah, as: 'komposisiNilai' }],
-//                 transaction: trx
-//             });
-
-//             let totalSkor = 0;
-//             listNilai.forEach(item => {
-//                 if (item.komposisiNilai) {
-//                     const skor = parseFloat(item.skor);
-//                     const bobot = parseFloat(item.komposisiNilai.persentase) / 100;
-//                     totalSkor += (skor * bobot);
-//                 }
-//             });
-
-//             // Konversi rentang Huruf Mutu (Sesuai dengan tabel siak_skala_penilaian)
-//             let hurufMutu = 'E';
-//             let angkaMutu = 0.0;
-
-//             if (totalSkor >= 81.00) {
-//                 hurufMutu = 'A'; angkaMutu = 4.0;
-//             } else if (totalSkor >= 76.00) {
-//                 hurufMutu = 'AB'; angkaMutu = 3.5;
-//             } else if (totalSkor >= 71.00) {
-//                 hurufMutu = 'B'; angkaMutu = 3.0;
-//             } else if (totalSkor >= 66.00) {
-//                 hurufMutu = 'BC'; angkaMutu = 2.5;
-//             } else if (totalSkor >= 61.00) {
-//                 hurufMutu = 'C'; angkaMutu = 2.0;
-//             } else if (totalSkor >= 41.00) {
-//                 hurufMutu = 'CD'; angkaMutu = 1.5;
-//             } else if (totalSkor >= 1.00) {
-//                 hurufMutu = 'D'; angkaMutu = 1.0;
-//             } else {
-//                 hurufMutu = 'E'; angkaMutu = 0.0;
-//             }
-//             await RincianKrsMahasiswa.update(
-//                 { nilaiAkhir: totalSkor, hurufMutu: hurufMutu, angkaMutu: angkaMutu },
-//                 { where: { id: krsId }, transaction: trx }
-//             );
-
-//             // =========================================================
-//             // SIMPAN KE TABEL MATERIALIZED (NILAI CPMK) UNTUK DASHBOARD MONITORING
-//             // =========================================================
-//             const rincianKrs = await RincianKrsMahasiswa.findByPk(krsId, {
-//                 include: [{ model: KrsMahasiswa, as: 'krsMahasiswa' }],
-//                 transaction: trx
-//             });
-
-//             if (rincianKrs && rincianKrs.krsMahasiswa) {
-//                 const { siakKelasKuliahId } = rincianKrs;
-//                 const { siakMahasiswaId } = rincianKrs.krsMahasiswa;
-
-//                 // Dapatkan rapor dinamis menggunakan getRaporOBEMahasiswa()
-//                 // Tapi karena getRaporOBEMahasiswa tidak pakai trx, kita lakukan hitungan ulang khusus di sini
-//                 // Atau cukup bersihkan data lama dulu
-//                 const { NilaiCpmkMahasiswa, CapaianMataKuliah } = models;
-//                 if (NilaiCpmkMahasiswa) {
-//                     await NilaiCpmkMahasiswa.destroy({
-//                         where: { siakKelasKuliahId, siakMahasiswaId },
-//                         transaction: trx
-//                     });
-
-//                     // Tarik ulang listNilai yang lebih lengkap (dengan CPMK)
-//                     const listNilaiLengkap = await NilaiEvaluasiMahasiswa.findAll({
-//                         where: { siakRincianKrsMahasiswaId: krsId },
-//                         include: [{
-//                             model: KomposisiNilaiMataKuliah,
-//                             as: 'komposisiNilai',
-//                             include: [{
-//                                 model: CapaianMataKuliah,
-//                                 as: 'cpmkList'
-//                             }]
-//                         }],
-//                         transaction: trx
-//                     });
-
-//                     let raporCPMK = {};
-//                     listNilaiLengkap.forEach(nilai => {
-//                         if (nilai.komposisiNilai && nilai.komposisiNilai.cpmkList) {
-//                             const skorAsli = parseFloat(nilai.skor);
-//                             const bobotPersentase = parseFloat(nilai.komposisiNilai.persentase) / 100;
-//                             const skorTerbobot = skorAsli * bobotPersentase;
-
-//                             nilai.komposisiNilai.cpmkList.forEach(cpmk => {
-//                                 const idCpmk = cpmk.id;
-//                                 if (!raporCPMK[idCpmk]) {
-//                                     raporCPMK[idCpmk] = { totalSkorTerbobot: 0, totalBobotMaksimal: 0 };
-//                                 }
-//                                 raporCPMK[idCpmk].totalSkorTerbobot += skorTerbobot;
-//                                 raporCPMK[idCpmk].totalBobotMaksimal += (100 * bobotPersentase);
-//                             });
-//                         }
-//                     });
-
-//                     // Format ke payload bulkCreate
-//                     const payloadCpmk = Object.keys(raporCPMK).map(idCpmk => {
-//                         const item = raporCPMK[idCpmk];
-//                         const persentaseAkhir = item.totalBobotMaksimal > 0 ? (item.totalSkorTerbobot / item.totalBobotMaksimal) * 100 : 0;
-
-//                         return {
-//                             siakKelasKuliahId,
-//                             siakMahasiswaId,
-//                             siakCapaianMataKuliahId: idCpmk,
-//                             nilai: parseFloat(persentaseAkhir.toFixed(2))
-//                         };
-//                     });
-
-//                     if (payloadCpmk.length > 0) {
-//                         await NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
-//                     }
-//                 }
-//             }
-
-//             return { krsId, totalSkor, hurufMutu, angkaMutu };
-//         });
-//     } catch (error) {
-//         throw new Error("Gagal kalkulasi nilai: " + error.message);
-//     }
-// }
-// 3. KALKULATOR HASIL AKHIR OBE
-// 3. KALKULATOR HASIL AKHIR OBE
-// export const hitungNilaiAkhir = async (krsId) => {
-//     try {
-//         return await sequelize.transaction(async (trx) => {
-//             const listNilai = await NilaiEvaluasiMahasiswa.findAll({
-//                 where: { siakRincianKrsMahasiswaId: krsId },
-//                 include: [{ model: KomposisiNilaiMataKuliah, as: 'komposisiNilai' }],
-//                 transaction: trx
-//             });
-
-//             let totalSkor = 0;
-//             listNilai.forEach(item => {
-//                 if (item.komposisiNilai) {
-//                     const skor = parseFloat(item.skor);
-//                     const bobot = parseFloat(item.komposisiNilai.persentase) / 100;
-//                     totalSkor += (skor * bobot);
-//                 }
-//             });
-
-//             // Bulatkan maksimal 2 angka desimal
-//             totalSkor = Math.round(totalSkor * 100) / 100;
-
-//             // Konversi Huruf Mutu
-//             let hurufMutu = 'E'; let angkaMutu = 0.0;
-//             if (totalSkor >= 81.00) { hurufMutu = 'A'; angkaMutu = 4.0; }
-//             else if (totalSkor >= 76.00) { hurufMutu = 'AB'; angkaMutu = 3.5; }
-//             else if (totalSkor >= 71.00) { hurufMutu = 'B'; angkaMutu = 3.0; }
-//             else if (totalSkor >= 66.00) { hurufMutu = 'BC'; angkaMutu = 2.5; }
-//             else if (totalSkor >= 61.00) { hurufMutu = 'C'; angkaMutu = 2.0; }
-//             else if (totalSkor >= 41.00) { hurufMutu = 'CD'; angkaMutu = 1.5; }
-//             else if (totalSkor >= 1.00) { hurufMutu = 'D'; angkaMutu = 1.0; }
-
-//             // 🟢 AMAN DARI SNAKE_CASE: Tembak 2 format sekaligus
-//             try {
-//                 await RincianKrsMahasiswa.update(
-//                     {
-//                         nilaiAkhir: totalSkor, hurufMutu: hurufMutu, angkaMutu: angkaMutu,
-//                         nilai_akhir: totalSkor, huruf_mutu: hurufMutu, angka_mutu: angkaMutu
-//                     },
-//                     { where: { id: krsId }, transaction: trx }
-//                 );
-//             } catch (e) { } // Abaikan jika ada kolom yang tidak cocok
-
-//             // =========================================================
-//             // SIMPAN KE TABEL MATERIALIZED (NILAI CPMK)
-//             // =========================================================
-//             const rincianKrs = await RincianKrsMahasiswa.findByPk(krsId, {
-//                 include: [{ model: KrsMahasiswa, as: 'krsMahasiswa' }],
-//                 transaction: trx
-//             });
-
-//             if (rincianKrs && rincianKrs.krsMahasiswa) {
-//                 // 🟢 AMAN DARI UNDEFINED: Ambil properti dari camelCase ATAU snake_case
-//                 const kelasId = rincianKrs.siakKelasKuliahId || rincianKrs.siak_kelas_kuliah_id;
-//                 const mhsId = rincianKrs.krsMahasiswa.siakMahasiswaId || rincianKrs.krsMahasiswa.siak_mahasiswa_id;
-
-//                 const { NilaiCpmkMahasiswa, CapaianMataKuliah } = models;
-//                 if (NilaiCpmkMahasiswa && kelasId && mhsId) {
-
-//                     // Bersihkan nilai lama pakai Raw Query untuk hindari konflik nama tabel
-//                     await sequelize.query(
-//                         `DELETE FROM siak_nilai_cpmk_mahasiswa WHERE siak_kelas_kuliah_id = :kelasId AND siak_mahasiswa_id = :mhsId`,
-//                         { replacements: { kelasId, mhsId }, transaction: trx }
-//                     ).catch(() => { });
-
-//                     const listNilaiLengkap = await NilaiEvaluasiMahasiswa.findAll({
-//                         where: { siakRincianKrsMahasiswaId: krsId },
-//                         include: [{
-//                             model: KomposisiNilaiMataKuliah,
-//                             as: 'komposisiNilai',
-//                             include: [{
-//                                 model: CapaianMataKuliah,
-//                                 as: 'cpmkList'
-//                             }]
-//                         }],
-//                         transaction: trx
-//                     });
-
-//                     let raporCPMK = {};
-//                     listNilaiLengkap.forEach(nilai => {
-//                         if (nilai.komposisiNilai && nilai.komposisiNilai.cpmkList) {
-//                             const skorAsli = parseFloat(nilai.skor);
-//                             const bobotPersentase = parseFloat(nilai.komposisiNilai.persentase) / 100;
-//                             const skorTerbobot = skorAsli * bobotPersentase;
-
-//                             nilai.komposisiNilai.cpmkList.forEach(cpmk => {
-//                                 const idCpmk = cpmk.id;
-//                                 if (!raporCPMK[idCpmk]) {
-//                                     raporCPMK[idCpmk] = { totalSkorTerbobot: 0, totalBobotMaksimal: 0 };
-//                                 }
-//                                 raporCPMK[idCpmk].totalSkorTerbobot += skorTerbobot;
-//                                 raporCPMK[idCpmk].totalBobotMaksimal += (100 * bobotPersentase);
-//                             });
-//                         }
-//                     });
-
-//                     // Format ke payload bulkCreate
-//                     const payloadCpmk = Object.keys(raporCPMK).map(idCpmk => {
-//                         const item = raporCPMK[idCpmk];
-//                         let persentaseAkhir = item.totalBobotMaksimal > 0 ? (item.totalSkorTerbobot / item.totalBobotMaksimal) * 100 : 0;
-//                         persentaseAkhir = Math.round(persentaseAkhir * 100) / 100;
-
-//                         // 🟢 FIX FATAL: Lempar kedua nama variabel agar terhindar dari Validation Not Null
-//                         return {
-//                             siakKelasKuliahId: kelasId,
-//                             siak_kelas_kuliah_id: kelasId,
-//                             siakMahasiswaId: mhsId,
-//                             siak_mahasiswa_id: mhsId,
-//                             siakCapaianMataKuliahId: idCpmk,
-//                             siak_capaian_mata_kuliah_id: idCpmk,
-//                             nilai: persentaseAkhir
-//                         };
-//                     });
-
-//                     if (payloadCpmk.length > 0) {
-//                         await NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
-//                     }
-//                 }
-//             }
-
-//             return { krsId, totalSkor, hurufMutu, angkaMutu };
-//         });
-//     } catch (error) {
-//         throw new Error("Gagal kalkulasi nilai: " + error.message);
-//     }
-// }
-
 // 3. KALKULATOR HASIL AKHIR OBE (VERSI DINAMIS SKALA NILAI)
-// 3. KALKULATOR HASIL AKHIR OBE (VERSI DINAMIS SKALA NILAI)
-
 export const hitungNilaiAkhir = async (krsId) => {
     try {
-        const { sequelize } = models; // Pastikan models ter-import
+        const { sequelize } = models;
         return await sequelize.transaction(async (trx) => {
-            // 1. Hitung Total Skor Mahasiswa
+            // 1. Ambil nilai evaluasi mahasiswa (tanpa include CPMK dulu — pakai raw SQL)
             const listNilai = await models.NilaiEvaluasiMahasiswa.findAll({
                 where: { siakRincianKrsMahasiswaId: krsId },
-                include: [{ model: models.KomposisiNilaiMataKuliah, as: 'komposisiNilai' }],
+                include: [{
+                    model: models.KomposisiNilaiMataKuliah,
+                    as: 'komposisiNilai',
+                    attributes: ['id', 'persentase', 'key']
+                }],
                 transaction: trx
             });
 
+            // 2. Hitung total skor nilai akhir
             let totalSkor = 0;
             listNilai.forEach(item => {
                 if (item.komposisiNilai) {
@@ -365,11 +164,10 @@ export const hitungNilaiAkhir = async (krsId) => {
                     totalSkor += (skor * bobot);
                 }
             });
-
-            totalSkor = Math.round(totalSkor * 100) / 100; // Bulatkan 2 desimal
+            totalSkor = Math.round(totalSkor * 100) / 100;
 
             // ====================================================================
-            // 2. LACAK PRODI & KURIKULUM LALU TARIK SKALA NILAI DINAMIS
+            // 3. LACAK PRODI & KURIKULUM LALU TARIK SKALA NILAI DINAMIS
             // ====================================================================
             let hurufMutu = 'E';
             let angkaMutu = 0.0;
@@ -386,7 +184,6 @@ export const hitungNilaiAkhir = async (krsId) => {
             if (traceResult && traceResult.length > 0) {
                 const { prodi_id, kurikulum_id } = traceResult[0];
 
-                // 🟢 FIX FATAL: Perbaikan nama tabel dan kolom sesuai dengan model SkalaPenilaian
                 const querySkala = `
                     SELECT huruf_mutu AS grade, angka_mutu AS bobot, nilai_min
                     FROM siak_skala_penilaian
@@ -396,9 +193,7 @@ export const hitungNilaiAkhir = async (krsId) => {
                     ORDER BY nilai_min DESC
                 `;
                 const skalaList = await sequelize.query(querySkala, { replacements: { prodi_id, kurikulum_id }, type: sequelize.QueryTypes.SELECT, transaction: trx });
-                console.log("🔥 CEK SKALA DARI DB:", skalaList.length > 0 ? "SUKSES KETARIK!" : "KOSONG/GAGAL");
-                console.log("🔥 DATA SKALA:", skalaList);
-                // Loop untuk mencocokkan nilai
+
                 if (skalaList.length > 0) {
                     for (const skala of skalaList) {
                         if (totalSkor >= parseFloat(skala.nilai_min)) {
@@ -408,7 +203,6 @@ export const hitungNilaiAkhir = async (krsId) => {
                         }
                     }
                 } else {
-                    // Fallback jika ternyata tabel skala nilai kosong untuk prodi tersebut
                     if (totalSkor >= 81.00) { hurufMutu = 'A'; angkaMutu = 4.0; }
                     else if (totalSkor >= 76.00) { hurufMutu = 'AB'; angkaMutu = 3.5; }
                     else if (totalSkor >= 71.00) { hurufMutu = 'B'; angkaMutu = 3.0; }
@@ -420,61 +214,106 @@ export const hitungNilaiAkhir = async (krsId) => {
             }
 
             // ====================================================================
-            // 3. UPDATE KRS MAHASISWA
+            // 4. UPDATE NILAI AKHIR KRS
             // ====================================================================
             try {
                 await models.RincianKrsMahasiswa.update(
-                    { nilaiAkhir: totalSkor, hurufMutu: hurufMutu, angkaMutu: angkaMutu, nilai_akhir: totalSkor, huruf_mutu: hurufMutu, angka_mutu: angkaMutu },
+                    { nilaiAkhir: totalSkor, hurufMutu, angkaMutu, nilai_akhir: totalSkor, huruf_mutu: hurufMutu, angka_mutu: angkaMutu },
                     { where: { id: krsId }, transaction: trx }
                 );
             } catch (e) { }
 
             // ====================================================================
-            // 4. SIMPAN KE TABEL MATERIALIZED (NILAI CPMK)
+            // 5. SIMPAN KE TABEL MATERIALIZED (NILAI CPMK) MENGGUNAKAN RAW SQL
             // ====================================================================
-            const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId, { include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa' }], transaction: trx });
+            const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId, {
+                include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa' }],
+                transaction: trx
+            });
 
             if (rincianKrs && rincianKrs.krsMahasiswa) {
-                const kelasId = rincianKrs.siakKelasKuliahId || rincianKrs.siak_kelas_kuliah_id;
-                const mhsId = rincianKrs.krsMahasiswa.siakMahasiswaId || rincianKrs.krsMahasiswa.siak_mahasiswa_id;
+                const kelasId = rincianKrs.siakKelasKuliahId;
+                const mhsId   = rincianKrs.krsMahasiswa.siakMahasiswaId;
 
-                if (models.NilaiCpmkMahasiswa && kelasId && mhsId) {
+                if (kelasId && mhsId) {
+                    // Hapus nilai CPMK lama untuk mahasiswa ini di kelas ini
                     await sequelize.query(
-                        `DELETE FROM siak_nilai_cpmk_mahasiswa WHERE siak_kelas_kuliah_id = :kelasId AND siak_mahasiswa_id = :mhsId`,
+                        `DELETE FROM siak_nilai_cpmk_mahasiswa
+                          WHERE siak_kelas_kuliah_id = :kelasId
+                            AND siak_mahasiswa_id   = :mhsId`,
                         { replacements: { kelasId, mhsId }, transaction: trx }
-                    ).catch(() => { });
+                    );
 
-                    let raporCPMK = {};
-                    listNilai.forEach(nilai => {
-                        if (nilai.komposisiNilai && nilai.komposisiNilai.cpmkList) {
-                            const skorAsli = parseFloat(nilai.skor);
-                            const bobotPersentase = parseFloat(nilai.komposisiNilai.persentase) / 100;
-                            const skorTerbobot = skorAsli * bobotPersentase;
+                    // 🔴 FIX FINAL: Pastikan ID ditangkap dengan aman baik saat camelCase maupun snake_case
+                    const komposisiIds = listNilai
+                        .map(n => n.siak_komposisi_nilai_id || n.siakKomposisiNilaiId)
+                        .filter(Boolean);
 
-                            nilai.komposisiNilai.cpmkList.forEach(cpmk => {
-                                const idCpmk = cpmk.id;
-                                if (!raporCPMK[idCpmk]) raporCPMK[idCpmk] = { totalSkorTerbobot: 0, totalBobotMaksimal: 0 };
-                                raporCPMK[idCpmk].totalSkorTerbobot += skorTerbobot;
-                                raporCPMK[idCpmk].totalBobotMaksimal += (100 * bobotPersentase);
+                    if (komposisiIds.length > 0) {
+                        const pemetaanRows = await sequelize.query(
+                            `SELECT pkc.siak_komposisi_nilai_id AS komposisi_id,
+                                    pkc.siak_cpmk_id            AS cpmk_id
+                             FROM siak_pemetaan_komposisi_cpmk pkc
+                             WHERE pkc.siak_komposisi_nilai_id IN (:komposisiIds)
+                               AND pkc.deleted_at IS NULL`,
+                            {
+                                replacements: { komposisiIds },
+                                type: sequelize.QueryTypes.SELECT,
+                                transaction: trx
+                            }
+                        );
+
+                        console.log(`\n====== DEBUG NILAI CPMK (krsId=${krsId}) ======`);
+                        console.log('Komposisi IDs:', komposisiIds);
+                        console.log('Pemetaan Komposisi->CPMK ditemukan:', pemetaanRows.length);
+
+                        // Build map komposisiId -> [cpmkId]
+                        const pemetaanMap = {};
+                        pemetaanRows.forEach(row => {
+                            if (!pemetaanMap[row.komposisi_id]) pemetaanMap[row.komposisi_id] = [];
+                            pemetaanMap[row.komposisi_id].push(row.cpmk_id);
+                        });
+
+                        const raporCPMK = {}; // { cpmkId: { skorTerbobot, totalBobot } }
+
+                        listNilai.forEach(nilai => {
+                            if (!nilai.komposisiNilai) return;
+                            
+                            // 🔴 FIX FINAL: Sinkronisasi pemanggilan ID Komponen
+                            const komposisiId  = nilai.siak_komposisi_nilai_id || nilai.siakKomposisiNilaiId;
+                            const skor         = parseFloat(nilai.skor || 0);
+                            const bobotPersen  = parseFloat(nilai.komposisiNilai.persentase || 0);
+                            const cpmkIds      = pemetaanMap[komposisiId] || [];
+
+                            cpmkIds.forEach(cpmkId => {
+                                if (!raporCPMK[cpmkId]) raporCPMK[cpmkId] = { skorTerbobot: 0, totalBobot: 0 };
+                                raporCPMK[cpmkId].skorTerbobot += skor * (bobotPersen / 100);
+                                raporCPMK[cpmkId].totalBobot   += bobotPersen;
                             });
+                        });
+
+                        console.log('Rapor CPMK (sebelum normalisasi):', raporCPMK);
+                        console.log('================================================\n');
+
+                        const payloadCpmk = Object.entries(raporCPMK).map(([cpmkId, item]) => {
+                            // Normalisasi: bagi dengan total bobot agar skala tetap 0-100
+                            const nilaiCpmk = item.totalBobot > 0
+                                ? Math.round((item.skorTerbobot / (item.totalBobot / 100)) * 100) / 100
+                                : 0;
+                            return {
+                                siakKelasKuliahId:       kelasId,
+                                siakMahasiswaId:         mhsId,
+                                siakCapaianMataKuliahId: cpmkId,
+                                nilai:                   nilaiCpmk
+                            };
+                        });
+
+                        if (payloadCpmk.length > 0) {
+                            await models.NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
+                            console.log(`✅ Berhasil simpan ${payloadCpmk.length} nilai CPMK ke DB.`);
+                        } else {
+                            console.warn('⚠️  Tidak ada CPMK yang dipetakan ke komponen evaluasi. Cek setup-evaluasi!');
                         }
-                    });
-
-                    const payloadCpmk = Object.keys(raporCPMK).map(idCpmk => {
-                        const item = raporCPMK[idCpmk];
-                        let persentaseAkhir = item.totalBobotMaksimal > 0 ? (item.totalSkorTerbobot / item.totalBobotMaksimal) * 100 : 0;
-                        persentaseAkhir = Math.round(persentaseAkhir * 100) / 100;
-
-                        return {
-                            siakKelasKuliahId: kelasId, siak_kelas_kuliah_id: kelasId,
-                            siakMahasiswaId: mhsId, siak_mahasiswa_id: mhsId,
-                            siakCapaianMataKuliahId: idCpmk, siak_capaian_mata_kuliah_id: idCpmk,
-                            nilai: persentaseAkhir
-                        };
-                    });
-
-                    if (payloadCpmk.length > 0) {
-                        await models.NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
                     }
                 }
             }
@@ -485,12 +324,8 @@ export const hitungNilaiAkhir = async (krsId) => {
         throw new Error("Gagal kalkulasi nilai: " + error.message);
     }
 }
-// 4. GENERATOR RAPOR OBE MAHASISWA
-// Di dalam file services/penilaian.service.js
 
-// =====================================================================
-// GENERATOR RAPOR OBE MAHASISWA
-// =====================================================================
+// 4. GENERATOR RAPOR OBE MAHASISWA
 export const getRaporOBEMahasiswa = async (rincianKrsId) => {
     try {
         const ModelNilai = models.NilaiEvaluasiMahasiswa || models.siak_nilai_evaluasi_mahasiswa;
@@ -559,13 +394,7 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
         throw new Error("Gagal menggenerate rapor OBE: " + error.message);
     }
 }
-// Pastikan model master sudah di-import di bagian atas file
-const {
-    MasterMetodeEvaluasi,
-    MasterKomponenEvaluasi
-} = models;
 
-// ... (kode service yang lain)
 
 export const getDropdownMasterEvaluasi = async () => {
     try {
@@ -590,9 +419,8 @@ export const getDropdownMasterEvaluasi = async () => {
         throw new Error("Gagal mengambil data master evaluasi: " + error.message);
     }
 }
+
 export const getTemplateEvaluasiList = async (page = 1, limit = 10, search = '') => {
-    // 1. Ambil model secara dinamis dari objek models
-    // Jika di console.log tadi namanya 'siak_mata_kuliah', ganti baris ini
     const MKModel = models.MataKuliah || models.siak_mata_kuliah;
     const KomposisiModel = models.KomposisiNilaiMataKuliah || models.siak_komposisi_nilai_mata_kuliah;
 
@@ -629,58 +457,220 @@ export const getTemplateEvaluasiList = async (page = 1, limit = 10, search = '')
         console.error("DEBUG ERROR:", error);
         throw new Error("Gagal mengambil daftar template evaluasi: " + error.message);
     }
-
-
 }
-// =====================================================================
-// GET PESERTA KELAS (Untuk Dosen Input Nilai)
-// =====================================================================
-// =====================================================================
-// GET PESERTA KELAS (Untuk Dosen Input Nilai)
-// =====================================================================
+
 export const getPesertaKelasList = async (kelasId) => {
     try {
-        const peserta = await RincianKrsMahasiswa.findAll({
+        // 1. Ambil kelas -> MK -> prodiId & kurikulumId
+        const kelas = await KelasKuliah.findByPk(kelasId, {
+            include: [{
+                model: MataKuliah,
+                as: 'mataKuliah',
+                attributes: ['id', 'siakProgramStudiId', 'siakTahunKurikulumId']
+            }]
+        });
+        if (!kelas) throw new Error('Kelas tidak ditemukan');
+ 
+        const mkId        = kelas.siakMataKuliahId;
+        const prodiId     = kelas.mataKuliah?.siakProgramStudiId;
+        const kurikulumId = kelas.mataKuliah?.siakTahunKurikulumId;
+ 
+        // 2. Ambil komposisi nilai MK
+        const komposisiList = await KomposisiNilaiMataKuliah.findAll({
+            where: { siakMataKuliahId: mkId },
+            attributes: ['id', 'persentase', 'key'],
+            order: [['createdAt', 'ASC']]
+        });
+ 
+        // Map by ID, tampilkan key sebagai uppercase label
+        const komposisiMap = {};
+        komposisiList.forEach(k => {
+            komposisiMap[k.id] = {
+                id:         k.id,
+                label:      (k.key || '-').toUpperCase(),
+                persentase: parseFloat(k.persentase || 0)
+            };
+        });
+ 
+        // 3. Ambil skala nilai dari DB, fallback ke DEFAULT jika kosong
+        let skalaAktif = DEFAULT_SKALA;
+        if (prodiId && kurikulumId) {
+            const rawSkala = await SkalaPenilaian.findAll({
+                where: {
+                    siak_program_studi_id:   prodiId,
+                    siak_tahun_kurikulum_id: kurikulumId,
+                    deleted_at:              null
+                },
+                attributes: ['huruf_mutu', 'angka_mutu', 'nilai_min', 'nilai_max'],
+                order: [['nilai_min', 'DESC']]
+            });
+ 
+            if (rawSkala.length > 0) {
+                skalaAktif = rawSkala.map(s => ({
+                    hurufMutu: s.huruf_mutu,
+                    angkaMutu: parseFloat(s.angka_mutu || 0),
+                    nilaiMin:  parseFloat(s.nilai_min  || 0),
+                    nilaiMax:  parseFloat(s.nilai_max  || 0),
+                }));
+            }
+        }
+ 
+        // 4. Ambil semua rincian KRS di kelas
+        const allRincian = await RincianKrsMahasiswa.findAll({
             where: { siak_kelas_kuliah_id: kelasId },
-            attributes: ['id', 'nilai_akhir', 'huruf_mutu', 'angka_mutu'],
+            attributes: ['id', 'nilai_akhir', 'huruf_mutu', 'angka_mutu', 'status'],
             include: [
                 {
                     model: KrsMahasiswa,
-                    as: 'krsMahasiswa', // Sudah benar dari langkah sebelumnya
-                    attributes: ['id', 'semester'],
-                    include: [
-                        {
-                            model: Mahasiswa,
-                            as: 'mahasiswa',
-                            attributes: ['id', 'nama', 'npm', 'angkatan']
-                        }
-                    ]
+                    as: 'krsMahasiswa',
+                    attributes: ['id'],
+                    include: [{
+                        model: Mahasiswa,
+                        as: 'mahasiswa',
+                        attributes: ['id', 'nama', 'npm', 'angkatan']
+                    }]
                 },
                 {
                     model: NilaiEvaluasiMahasiswa,
-                    as: 'daftarNilaiEvaluasi', // <--- UBAH ALIAS KEDUA DI SINI
+                    as: 'daftarNilaiEvaluasi',
                     attributes: ['id', 'siak_komposisi_nilai_id', 'skor'],
                     required: false
                 }
             ]
         });
-
-        const formattedData = peserta.map(item => ({
-            rincianKrsId: item.id,
-            mahasiswaId: item.krsMahasiswa?.mahasiswa?.id,
-            npm: item.krsMahasiswa?.mahasiswa?.npm,
-            nama: item.krsMahasiswa?.mahasiswa?.nama,
-            angkatan: item.krsMahasiswa?.mahasiswa?.angkatan,
-            nilaiAkhir: item.nilai_akhir || 0,
-            hurufMutu: item.huruf_mutu || '-',
-            angkaMutu: item.angka_mutu || 0,
-            detailNilai: item.daftarNilaiEvaluasi || [] // <--- UBAH JUGA DI SINI
+ 
+        // 5. Deduplicate per mahasiswaId
+        const komposisiIds = new Set(Object.keys(komposisiMap));
+        const mahasiswaMap = {};
+        allRincian.forEach(item => {
+            const mhsId = item.krsMahasiswa?.mahasiswa?.id;
+            if (!mhsId) return;
+ 
+            // Cek apakah detailNilai item ini cocok dengan komposisi kelas ini
+            const nilaiYangCocok = (item.daftarNilaiEvaluasi || []).filter(
+                n => komposisiIds.has(n.siak_komposisi_nilai_id)
+            );
+            const punyaNilaiCocok = nilaiYangCocok.length > 0;
+ 
+            const existing = mahasiswaMap[mhsId];
+            const existingCocok = existing
+                ? (existing.daftarNilaiEvaluasi || []).filter(
+                    n => komposisiIds.has(n.siak_komposisi_nilai_id)
+                  ).length > 0
+                : false;
+ 
+            if (!existing || (punyaNilaiCocok && !existingCocok)) {
+                mahasiswaMap[mhsId] = item;
+            }
+        });
+ 
+        const pesertaUnik = Object.values(mahasiswaMap).sort((a, b) =>
+            (a.krsMahasiswa?.mahasiswa?.npm || '')
+            .localeCompare(b.krsMahasiswa?.mahasiswa?.npm || '')
+        );
+ 
+        // 6. Build tabel
+        let no = 1;
+        const tabel = pesertaUnik.map(item => {
+            const mhs       = item.krsMahasiswa?.mahasiswa;
+            const nilaiList = item.daftarNilaiEvaluasi || [];
+ 
+            // Nilai per komponen + hitung nilai akhir
+            const nilaiPerKomponen = {};
+            let nilaiAkhirHitung = 0;
+            let adaNilai = false;
+ 
+            nilaiList.forEach(n => {
+                const komp = komposisiMap[n.siak_komposisi_nilai_id];
+                if (komp) {
+                    const skor = parseFloat(n.skor || 0);
+                    nilaiPerKomponen[komp.label] = skor;
+                    nilaiAkhirHitung += skor * (komp.persentase / 100);
+                    adaNilai = true;
+                }
+            });
+ 
+            // Komponen belum diinput -> null (tampil kosong)
+            komposisiList.forEach(k => {
+                const label = (k.key || '-').toUpperCase();
+                if (!(label in nilaiPerKomponen)) nilaiPerKomponen[label] = null;
+            });
+ 
+            nilaiAkhirHitung = Math.round(nilaiAkhirHitung * 100) / 100;
+ 
+            // Nilai akhir final
+            const nilaiAkhirDB    = parseFloat(item.nilai_akhir || 0);
+            const nilaiAkhirFinal = nilaiAkhirDB > 0
+                ? nilaiAkhirDB
+                : (adaNilai ? nilaiAkhirHitung : 0);
+ 
+            // Grade dari skala nilai (DB atau default)
+            let grade;
+            if (item.huruf_mutu && item.huruf_mutu !== '-') {
+                grade = {
+                    hurufMutu: item.huruf_mutu,
+                    angkaMutu: parseFloat(item.angka_mutu || 0)
+                };
+            } else if (adaNilai && nilaiAkhirFinal > 0) {
+                grade = getGrade(nilaiAkhirFinal, skalaAktif);
+            } else {
+                grade = { hurufMutu: '-', angkaMutu: 0 };
+            }
+ 
+            return {
+                no:              no++,
+                rincianKrsId:    item.id,
+                mahasiswaId:     mhs?.id,
+                nim:             mhs?.npm      || '-',
+                nama:            mhs?.nama     || '-',
+                angkatan:        mhs?.angkatan || '-',
+                hadir:           null,
+                nilaiPerKomponen,
+                nilaiAkhir:      nilaiAkhirFinal,
+                grade:           grade.hurufMutu,
+                angkaMutu:       grade.angkaMutu,
+                lulus:           item.status === 'Lulus',
+                keterangan:      item.status === 'Dikunci'
+                                     ? 'Nilai KRS sudah dikunci' : ''
+            };
+        });
+ 
+        // Header kolom untuk frontend (dinamis sesuai komposisi)
+        const headerKolom = komposisiList.map(k => ({
+            id:         k.id,
+            label:      (k.key || '-').toUpperCase(),
+            bobot:      parseFloat(k.persentase || 0),
+            labelKolom: `${(k.key || '-').toUpperCase()} (${parseFloat(k.persentase || 0).toFixed(2)}%)`
         }));
+ 
+        return {
+            skalaDipakai: skalaAktif === DEFAULT_SKALA ? 'default' : 'database',
+            headerKolom,
+            tabel
+        };
 
-        formattedData.sort((a, b) => (a.npm || '').localeCompare(b.npm || ''));
-
-        return formattedData;
     } catch (error) {
         throw new Error("Gagal mengambil daftar peserta kelas: " + error.message);
     }
-}
+};
+
+// ─────────────────────────────────────────────
+// KUNCI / BUKA KUNCI NILAI
+// ─────────────────────────────────────────────
+
+export const kunciNilaiKelas = async (kelasId, action = 'kunci') => {
+    const newStatus = action === 'kunci' ? 'Dikunci' : null;
+    const [jumlahDiupdate] = await RincianKrsMahasiswa.update(
+        { status: newStatus },
+        { where: { siak_kelas_kuliah_id: kelasId } }
+    );
+    return { kelasId, jumlahDiupdate, status: newStatus ?? 'Aktif' };
+};
+
+export const kunciNilaiSatuMahasiswa = async (rincianKrsId, action = 'kunci') => {
+    const newStatus = action === 'kunci' ? 'Dikunci' : null;
+    const rincian = await RincianKrsMahasiswa.findByPk(rincianKrsId);
+    if (!rincian) throw new Error('Data rincian KRS tidak ditemukan');
+    await rincian.update({ status: newStatus });
+    return { rincianKrsId, status: newStatus ?? 'Aktif' };
+};

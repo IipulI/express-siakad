@@ -1,0 +1,875 @@
+{
+  "info": {
+    "name": "SIAKAD OBE — Koordinator MK & Dosen Pengampu",
+    "description": "Collection lengkap untuk role Koordinator Mata Kuliah dan Dosen Pengampu.\n\nBase URL: http://localhost:3000\n- Koordinator MK  : /api/akademik/koordinator-mk\n- Dosen Pengampu  : /api/akademik/dosen\n\nGanti nilai variable di tab Variables sebelum mulai testing.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",       "value": "http://localhost:3000",                     "type": "string" },
+    { "key": "mk_id",          "value": "isi-uuid-mata-kuliah-di-sini",              "type": "string" },
+    { "key": "kelas_id",       "value": "isi-uuid-kelas-kuliah-di-sini",             "type": "string" },
+    { "key": "krs_id",         "value": "isi-uuid-rincian-krs-mahasiswa-di-sini",    "type": "string" },
+    { "key": "rincian_krs_id", "value": "isi-uuid-rincian-krs-mahasiswa-di-sini",    "type": "string" },
+    { "key": "rps_id",         "value": "isi-uuid-rps-di-sini",                      "type": "string" },
+    { "key": "sesi_id",        "value": "isi-uuid-sesi-rencana-pembelajaran-di-sini","type": "string" },
+    { "key": "evaluasi_id",    "value": "isi-uuid-rencana-evaluasi-di-sini",         "type": "string" },
+    { "key": "periode_id",     "value": "isi-uuid-periode-akademik-di-sini",         "type": "string" },
+    { "key": "cpl_id_1",       "value": "isi-uuid-cpl-pertama-di-sini",              "type": "string" },
+    { "key": "cpl_id_2",       "value": "isi-uuid-cpl-kedua-di-sini",               "type": "string" },
+    { "key": "cpmk_id_1",      "value": "isi-uuid-cpmk-pertama-di-sini",             "type": "string" },
+    { "key": "cpmk_id_2",      "value": "isi-uuid-cpmk-kedua-di-sini",              "type": "string" },
+    { "key": "komposisi_id_1", "value": "isi-uuid-komposisi-nilai-pertama-di-sini",  "type": "string" },
+    { "key": "komposisi_id_2", "value": "isi-uuid-komposisi-nilai-kedua-di-sini",    "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "🟦 KOORDINATOR MK",
+      "description": "Semua endpoint untuk role Koordinator Mata Kuliah.\nBase: {{base_url}}/api/akademik/koordinator-mk",
+      "item": [
+
+        {
+          "name": "📚 Mata Kuliah",
+          "item": [
+            {
+              "name": "GET — Daftar Mata Kuliah OBE",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah"]
+                }
+              }
+            },
+            {
+              "name": "GET — Detail Mata Kuliah",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}"]
+                }
+              }
+            },
+            {
+              "name": "GET — Form Pemetaan CPL",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/pemetaan-cpl",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","pemetaan-cpl"]
+                }
+              }
+            },
+            {
+              "name": "POST — Simpan Pemetaan CPL",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"cplIds\": [\n    \"{{cpl_id_1}}\",\n    \"{{cpl_id_2}}\"\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/pemetaan-cpl",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","pemetaan-cpl"]
+                }
+              }
+            },
+            {
+              "name": "GET — Form Pemetaan CPMK",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/pemetaan-cpmk",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","pemetaan-cpmk"]
+                }
+              }
+            },
+            {
+              "name": "POST — Simpan Pemetaan CPMK",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"cpmkList\": [\n    {\n      \"kode\": \"CPMK021\",\n      \"deskripsi\": \"Mahasiswa mampu menjelaskan konsep dasar pemrograman\",\n      \"bobot\": 50,\n      \"target\": 65,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cpl_id_1}}\", \"bobotCpl\": 60 },\n        { \"idCpl\": \"{{cpl_id_2}}\", \"bobotCpl\": 40 }\n      ],\n      \"subCpmk\": [\n        { \"kode\": \"CPMK021a\", \"deskripsi\": \"Mahasiswa dapat menyebutkan tipe data\" }\n      ]\n    },\n    {\n      \"kode\": \"CPMK022\",\n      \"deskripsi\": \"Mahasiswa mampu mengimplementasikan algoritma sederhana\",\n      \"bobot\": 50,\n      \"target\": 65,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cpl_id_1}}\", \"bobotCpl\": 100 }\n      ],\n      \"subCpmk\": []\n    }\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/pemetaan-cpmk",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","pemetaan-cpmk"]
+                }
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "📄 RPS — Detail",
+          "item": [
+            {
+              "name": "GET — Detail RPS (+ filter periode)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/detail-rps?periodeId={{periode_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","detail-rps"],
+                  "query": [{ "key": "periodeId", "value": "{{periode_id}}", "description": "Optional. Kosongkan untuk tampil semua" }]
+                }
+              }
+            },
+            {
+              "name": "POST — Simpan Detail RPS (multipart/form-data)",
+              "request": {
+                "method": "POST",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "siakPeriodeAkademikId",   "value": "{{periode_id}}",                                         "type": "text" },
+                    { "key": "tanggalPenyusunan",        "value": "2025-08-01",                                             "type": "text" },
+                    { "key": "deskripsiMataKuliah",      "value": "Mata kuliah ini membahas konsep dasar pemrograman OOP.", "type": "text" },
+                    { "key": "deskripsiMataKuliahEng",   "value": "This course covers the fundamentals of OOP.",           "type": "text" },
+                    { "key": "tujuanMataKuliah",         "value": "Mahasiswa mampu membangun aplikasi berbasis OOP.",       "type": "text" },
+                    { "key": "materiPembelajaran",       "value": "OOP, Design Pattern, Clean Code",                       "type": "text" },
+                    { "key": "pustakaUtama",             "value": "Clean Code - Robert C. Martin",                        "type": "text" },
+                    { "key": "pustakaPendukung",         "value": "Head First Design Patterns",                           "type": "text" },
+                    { "key": "mediaPerangkatLunak",      "value": "VSCode, Node.js",                                       "type": "text" },
+                    { "key": "mediaPerangkatKeras",      "value": "Laptop",                                                "type": "text" },
+                    { "key": "dokumenRps",               "value": "",  "type": "file",   "description": "Optional: upload file PDF/DOCX RPS" }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/detail-rps",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","detail-rps"]
+                }
+              }
+            },
+            {
+              "name": "DELETE — Hapus Detail RPS",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/detail-rps/{{rps_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","detail-rps","{{rps_id}}"]
+                }
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "📅 RPS — Rencana Pembelajaran",
+          "item": [
+            {
+              "name": "GET — Daftar Sesi Rencana Pembelajaran",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/rencana-pembelajaran?periodeId={{periode_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","rencana-pembelajaran"],
+                  "query": [{ "key": "periodeId", "value": "{{periode_id}}", "description": "Optional. Default: periode aktif" }]
+                }
+              }
+            },
+            {
+              "name": "POST — Tambah Sesi Rencana Pembelajaran",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"siakPeriodeAkademikId\": \"{{periode_id}}\",\n  \"sesi\": 1,\n  \"jenisPertemuan\": \"Tatap Muka\",\n  \"materiPembelajaran\": \"Pengenalan OOP dan Prinsip SOLID\",\n  \"materiPembelajaranEng\": \"Introduction to OOP and SOLID Principles\",\n  \"indikatorPenilaian\": \"Mahasiswa dapat mendefinisikan 5 prinsip SOLID\",\n  \"kriteriaPenilaian\": \"Minimal 75% jawaban benar\",\n  \"metodePembelajaranLuring\": \"Ceramah, Diskusi Kelompok\",\n  \"metodePembelajaranDaring\": \"-\",\n  \"bobotPenilaian\": 10,\n  \"cpmkIds\": [\"{{cpmk_id_1}}\"]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/rencana-pembelajaran",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","rencana-pembelajaran"]
+                }
+              }
+            },
+            {
+              "name": "PUT — Update Sesi Rencana Pembelajaran",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"siakPeriodeAkademikId\": \"{{periode_id}}\",\n  \"sesi\": 1,\n  \"jenisPertemuan\": \"Tatap Muka\",\n  \"materiPembelajaran\": \"Pengenalan OOP, Prinsip SOLID, dan Design Pattern\",\n  \"materiPembelajaranEng\": \"Introduction to OOP, SOLID Principles, and Design Pattern\",\n  \"indikatorPenilaian\": \"Mahasiswa dapat menerapkan minimal 2 design pattern\",\n  \"kriteriaPenilaian\": \"Minimal 75% jawaban benar\",\n  \"metodePembelajaranLuring\": \"Ceramah, Studi Kasus\",\n  \"metodePembelajaranDaring\": \"-\",\n  \"bobotPenilaian\": 10,\n  \"cpmkIds\": [\"{{cpmk_id_1}}\", \"{{cpmk_id_2}}\"]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/rencana-pembelajaran/{{sesi_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","rencana-pembelajaran","{{sesi_id}}"]
+                }
+              }
+            },
+            {
+              "name": "DELETE — Hapus Sesi Rencana Pembelajaran",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/rencana-pembelajaran/{{sesi_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","rencana-pembelajaran","{{sesi_id}}"]
+                }
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "📊 RPS — Rencana Evaluasi",
+          "item": [
+            {
+              "name": "GET — Daftar Rencana Evaluasi",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/rencana-evaluasi?periodeId={{periode_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","rencana-evaluasi"],
+                  "query": [{ "key": "periodeId", "value": "{{periode_id}}", "description": "Optional. Default: periode aktif" }]
+                }
+              }
+            },
+            {
+              "name": "POST — Simpan Rencana Evaluasi (Wipe & Replace)",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"siakPeriodeAkademikId\": \"{{periode_id}}\",\n  \"evaluasiList\": [\n    {\n      \"metodeEvaluasi\": \"Ujian Tengah Semester\",\n      \"jenisEvaluasi\": \"UTS\",\n      \"bobotEvaluasi\": 40,\n      \"deskripsi\": \"Ujian tertulis materi pertemuan 1-7\",\n      \"deskripsiInggris\": \"Written exam for week 1-7\",\n      \"syaratLulus\": \"MENJADI_SYARAT_LULUS\",\n      \"cpmkData\": [\n        { \"cpmkId\": \"{{cpmk_id_1}}\", \"bobotCpmk\": 20 },\n        { \"cpmkId\": \"{{cpmk_id_2}}\", \"bobotCpmk\": 20 }\n      ]\n    },\n    {\n      \"metodeEvaluasi\": \"Ujian Akhir Semester\",\n      \"jenisEvaluasi\": \"UAS\",\n      \"bobotEvaluasi\": 60,\n      \"deskripsi\": \"Ujian tertulis komprehensif\",\n      \"deskripsiInggris\": \"Comprehensive written exam\",\n      \"syaratLulus\": \"MENJADI_SYARAT_LULUS\",\n      \"cpmkData\": [\n        { \"cpmkId\": \"{{cpmk_id_1}}\", \"bobotCpmk\": 30 },\n        { \"cpmkId\": \"{{cpmk_id_2}}\", \"bobotCpmk\": 30 }\n      ]\n    }\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/rencana-evaluasi",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","rencana-evaluasi"]
+                }
+              }
+            },
+            {
+              "name": "DELETE — Hapus Baris Rencana Evaluasi",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/rencana-evaluasi/{{evaluasi_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","rencana-evaluasi","{{evaluasi_id}}"]
+                }
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "⚙️ Komposisi Nilai Kelas",
+          "description": "Mapping komponen evaluasi (UTS/UAS/Tugas) → CPMK + bobot.\nWajib disetup sebelum dosen bisa input nilai.",
+          "item": [
+            {
+              "name": "GET — Komposisi Nilai",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/komposisi-nilai",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","komposisi-nilai"]
+                }
+              }
+            },
+            {
+              "name": "POST — Setup Komposisi Nilai (Wipe & Replace)",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"tipe\": \"Tugas\",\n    \"persentase\": 20,\n    \"key\": \"tugas\",\n    \"mappingCpmk\": [\n      { \"siakCapaianMataKuliahId\": \"{{cpmk_id_1}}\", \"bobot\": 20 }\n    ]\n  },\n  {\n    \"tipe\": \"UTS\",\n    \"persentase\": 30,\n    \"key\": \"uts\",\n    \"mappingCpmk\": [\n      { \"siakCapaianMataKuliahId\": \"{{cpmk_id_1}}\", \"bobot\": 15 },\n      { \"siakCapaianMataKuliahId\": \"{{cpmk_id_2}}\", \"bobot\": 15 }\n    ]\n  },\n  {\n    \"tipe\": \"UAS\",\n    \"persentase\": 50,\n    \"key\": \"uas\",\n    \"mappingCpmk\": [\n      { \"siakCapaianMataKuliahId\": \"{{cpmk_id_1}}\", \"bobot\": 25 },\n      { \"siakCapaianMataKuliahId\": \"{{cpmk_id_2}}\", \"bobot\": 25 }\n    ]\n  }\n]",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/mata-kuliah/{{mk_id}}/komposisi-nilai",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","mata-kuliah","{{mk_id}}","komposisi-nilai"]
+                }
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "🏫 Kelas Kuliah",
+          "item": [
+            {
+              "name": "GET — Detail Kelas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}"]
+                }
+              }
+            },
+            {
+              "name": "GET — Daftar Peserta Kelas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/peserta-kelas",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","peserta-kelas"]
+                }
+              }
+            },
+            {
+              "name": "GET — Nilai Perkuliahan (semua dosen di MK ini)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/nilai",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","nilai"]
+                }
+              }
+            },
+            {
+              "name": "PATCH — Kunci Nilai Semua Mahasiswa di Kelas",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"kunci\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/nilai/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","nilai","kunci"]
+                }
+              }
+            },
+            {
+              "name": "PATCH — Buka Kunci Nilai Semua Mahasiswa di Kelas",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"buka\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/nilai/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","nilai","kunci"]
+                }
+              }
+            },
+            {
+              "name": "PATCH — Kunci Nilai Satu Mahasiswa",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"kunci\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/nilai/{{rincian_krs_id}}/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","nilai","{{rincian_krs_id}}","kunci"]
+                }
+              }
+            },
+            {
+              "name": "PATCH — Buka Kunci Nilai Satu Mahasiswa",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"buka\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/nilai/{{rincian_krs_id}}/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","nilai","{{rincian_krs_id}}","kunci"]
+                }
+              }
+            },
+            {
+              "name": "GET — Export Nilai Kelas → Excel",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/nilai/export",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","nilai","export"]
+                }
+              }
+            },
+            {
+              "name": "GET — Export Nilai Kelas → PDF",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/nilai/export?format=pdf",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","nilai","export"],
+                  "query": [{ "key": "format", "value": "pdf" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Export Capaian Kelas → Excel",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/capaian/export",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","capaian","export"]
+                }
+              }
+            },
+            {
+              "name": "GET — Export Capaian Kelas → PDF",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/capaian/export?format=pdf",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","capaian","export"],
+                  "query": [{ "key": "format", "value": "pdf" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Capaian Pembelajaran (tab gabungan)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/capaian?tab=cpmk",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","capaian"],
+                  "query": [{ "key": "tab", "value": "cpmk", "description": "cpmk | cpl" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Capaian CPMK per Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/capaian/cpmk",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","capaian","cpmk"]
+                }
+              }
+            },
+            {
+              "name": "GET — Capaian CPL per Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/capaian/cpl",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","capaian","cpl"]
+                }
+              }
+            },
+            {
+              "name": "GET — RPS dari Kelas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{kelas_id}}/rps",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{kelas_id}}","rps"]
+                }
+              }
+            },
+            {
+              "name": "GET — Rapor OBE Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/koordinator-mk/kelas/{{krs_id}}/rapor-obe",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","koordinator-mk","kelas","{{krs_id}}","rapor-obe"],
+                  "description": "Gunakan rincian_krs_id (bukan kelas_id) di sini — endpoint ini menerima ID rincian KRS mahasiswa"
+                }
+              }
+            }
+          ]
+        }
+
+      ]
+    },
+
+    {
+      "name": "🟩 DOSEN PENGAMPU",
+      "description": "Semua endpoint untuk role Dosen Pengampu.\nBase: {{base_url}}/api/akademik/dosen\n\nDosen HANYA dapat mengakses kelas yang dia ampu (dijaga middleware kepemilikan kelas).",
+      "item": [
+
+        {
+          "name": "📚 Mata Kuliah (Read Only)",
+          "description": "Dosen hanya baca. Semua edit dilakukan Koordinator MK.",
+          "item": [
+            {
+              "name": "GET — Daftar Mata Kuliah OBE",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah"]
+                }
+              }
+            },
+            {
+              "name": "GET — Detail Mata Kuliah",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah/{{mk_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah","{{mk_id}}"]
+                }
+              }
+            },
+            {
+              "name": "GET — Pemetaan CPL",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah/{{mk_id}}/pemetaan-cpl",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah","{{mk_id}}","pemetaan-cpl"]
+                }
+              }
+            },
+            {
+              "name": "GET — Form Pemetaan CPMK",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah/{{mk_id}}/pemetaan-cpmk",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah","{{mk_id}}","pemetaan-cpmk"]
+                }
+              }
+            },
+            {
+              "name": "GET — Detail RPS",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah/{{mk_id}}/detail-rps?periodeId={{periode_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah","{{mk_id}}","detail-rps"],
+                  "query": [{ "key": "periodeId", "value": "{{periode_id}}", "description": "Optional" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Rencana Pembelajaran",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah/{{mk_id}}/rencana-pembelajaran?periodeId={{periode_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah","{{mk_id}}","rencana-pembelajaran"],
+                  "query": [{ "key": "periodeId", "value": "{{periode_id}}", "description": "Optional. Default: periode aktif" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Rencana Evaluasi",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah/{{mk_id}}/rencana-evaluasi?periodeId={{periode_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah","{{mk_id}}","rencana-evaluasi"],
+                  "query": [{ "key": "periodeId", "value": "{{periode_id}}", "description": "Optional. Default: periode aktif" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Komposisi Nilai",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/mata-kuliah/{{mk_id}}/komposisi-nilai",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","mata-kuliah","{{mk_id}}","komposisi-nilai"]
+                }
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "🏫 Kelas Kuliah",
+          "description": "Dosen HANYA bisa akses kelas yang dia ampu sendiri.",
+          "item": [
+            {
+              "name": "GET — Semua Kelas Milik Dosen",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas"]
+                }
+              }
+            },
+            {
+              "name": "GET — Detail Kelas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}"]
+                }
+              }
+            },
+            {
+              "name": "GET — Daftar Peserta Kelas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/peserta-kelas",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","peserta-kelas"]
+                }
+              }
+            },
+            {
+              "name": "GET — Nilai Perkuliahan + Komposisi Evaluasi",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai"]
+                }
+              }
+            },
+            {
+              "name": "POST — Input Nilai Mahasiswa",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nilai\": [\n    { \"komposisiId\": \"{{komposisi_id_1}}\", \"skor\": 85 },\n    { \"komposisiId\": \"{{komposisi_id_2}}\", \"skor\": 90 }\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai/{{krs_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai","{{krs_id}}"],
+                  "description": "krs_id = siak_rincian_krs_mahasiswa.id (ID rincian KRS mahasiswa yang ingin diinput nilainya). Pastikan nilai BELUM dikunci."
+                }
+              }
+            },
+            {
+              "name": "PATCH — Kunci Nilai Semua Mahasiswa di Kelas",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"kunci\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai","kunci"]
+                }
+              }
+            },
+            {
+              "name": "PATCH — Buka Kunci Nilai Semua Mahasiswa di Kelas",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"buka\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai","kunci"]
+                }
+              }
+            },
+            {
+              "name": "PATCH — Kunci Nilai Satu Mahasiswa",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"kunci\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai/{{rincian_krs_id}}/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai","{{rincian_krs_id}}","kunci"]
+                }
+              }
+            },
+            {
+              "name": "PATCH — Buka Kunci Nilai Satu Mahasiswa",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"buka\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai/{{rincian_krs_id}}/kunci",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai","{{rincian_krs_id}}","kunci"]
+                }
+              }
+            },
+            {
+              "name": "GET — Capaian Pembelajaran (tab gabungan)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/capaian?tab=cpmk",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","capaian"],
+                  "query": [{ "key": "tab", "value": "cpmk", "description": "cpmk | cpl" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Capaian CPMK per Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/capaian/cpmk",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","capaian","cpmk"]
+                }
+              }
+            },
+            {
+              "name": "GET — Capaian CPL per Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/capaian/cpl",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","capaian","cpl"]
+                }
+              }
+            },
+            {
+              "name": "GET — RPS dari Kelas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/rps",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","rps"]
+                }
+              }
+            },
+            {
+              "name": "GET — Rapor OBE Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{krs_id}}/rapor-obe",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{krs_id}}","rapor-obe"],
+                  "description": "Gunakan rincian_krs_id di sini, bukan kelas_id"
+                }
+              }
+            },
+            {
+              "name": "GET — Export Nilai Kelas → Excel",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai/export",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai","export"]
+                }
+              }
+            },
+            {
+              "name": "GET — Export Nilai Kelas → PDF",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/nilai/export?format=pdf",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","nilai","export"],
+                  "query": [{ "key": "format", "value": "pdf" }]
+                }
+              }
+            },
+            {
+              "name": "GET — Export Capaian Kelas → Excel",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/capaian/export",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","capaian","export"]
+                }
+              }
+            },
+            {
+              "name": "GET — Export Capaian Kelas → PDF",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/akademik/dosen/kelas/{{kelas_id}}/capaian/export?format=pdf",
+                  "host": ["{{base_url}}"],
+                  "path": ["api","akademik","dosen","kelas","{{kelas_id}}","capaian","export"],
+                  "query": [{ "key": "format", "value": "pdf" }]
+                }
+              }
+            }
+          ]
+        }
+
+      ]
+    }
+
+  ]
+}

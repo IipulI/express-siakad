@@ -249,7 +249,22 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
 
     // 💾 2. EKSEKUSI DATABASE
     return await sequelize.transaction(async (t) => {
-        // A. Hapus semua CPMK lama (termasuk Sub dan Pivot-nya karena fitur Cascade)
+        // A. Ambil ID CPMK lama dulu, lalu hapus pivot-nya, lalu soft-delete CPMK-nya
+        const oldCpmkList = await CapaianMataKuliah.findAll({
+            where: { siakMataKuliahId: mataKuliahId },
+            attributes: ['id'],
+            transaction: t
+        });
+        const oldCpmkIds = oldCpmkList.map(c => c.id);
+
+        if (oldCpmkIds.length > 0) {
+            await PemetaanCplCpmk.destroy({
+                where: { siakCapaianMataKuliahId: oldCpmkIds },
+                force: true,
+                transaction: t
+            });
+        }
+
         await CapaianMataKuliah.destroy({ where: { siakMataKuliahId: mataKuliahId }, transaction: t });
 
         // B. Looping untuk simpan Induk (Parent)

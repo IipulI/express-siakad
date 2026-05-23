@@ -34,7 +34,17 @@ export const getFormPemetaanCpmk = async (req, res, next) => {
 
 export const savePemetaanCpmk = async (req, res, next) => {
     try {
-        await CpmkService.savePemetaanCpmk(req.params.id, req.body);
-        return new ResponseBuilder(res).code(200).message("Matriks Pemetaan CPMK berhasil disimpan!").json({});
+        const mataKuliahId = req.params.id;
+        
+        // 1. Simpan matriks pemetaan
+        await CpmkService.savePemetaanCpmk(mataKuliahId, req.body);
+        
+        // 2. Tarik ulang data form terbaru
+        const result = await CpmkService.getFormPemetaanCpmk(mataKuliahId);
+        
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Matriks Pemetaan CPMK berhasil disimpan!")
+            .json(result);
     } catch (error) { next(error); }
 };
