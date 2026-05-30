@@ -2,6 +2,8 @@ import * as penilaianService from "../../services/penilaian.service.js";
 import * as obeService from "../../services/obe.service.js";
 import ResponseBuilder from "../../utils/response.js";
 
+const { getDataLaporanPerkuliahan, getDataDaftarNilai } = penilaianService;
+
 // =====================================================================
 // 1. MODUL PENILAIAN & TEMPLATE (SKRIPSI SATRIA)
 // =====================================================================
@@ -18,7 +20,7 @@ export const getDropdownMasterEvaluasi = async (req, res) => {
 
 export const getDaftarTemplate = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
-    const { page, limit, search } = req.query; 
+    const { page, limit, search } = req.query;
     try {
         const result = await penilaianService.getTemplateEvaluasiList(page, limit, search);
         return responseBuilder.code(200).message("Berhasil mengambil data template").json(result);
@@ -30,7 +32,7 @@ export const getDaftarTemplate = async (req, res) => {
 export const setupKomposisiRPS = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     const mkId = req.params.mataKuliahId;
-    const komposisiData = req.body; 
+    const komposisiData = req.body;
 
     try {
         const totalBobot = komposisiData.reduce((sum, item) => sum + parseFloat(item.persentase || 0), 0);
@@ -46,11 +48,10 @@ export const setupKomposisiRPS = async (req, res) => {
         return responseBuilder.status('failure').code(500).json(error.message);
     }
 };
-// Tambahkan ini di atas simpanNilaiMahasiswa
+
 export const getPesertaKelas = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     const kelasId = req.params.kelasId;
-    
     try {
         const data = await penilaianService.getPesertaKelasList(kelasId);
         return responseBuilder.code(200).message("Berhasil mengambil daftar peserta kelas").json(data);
@@ -241,14 +242,11 @@ export const deleteCapaianMataKuliah = async (req, res) => {
     } catch (error) {
         responseBuilder.status('failure').code(500).json(error.message);
     }
-    
-
-    
 };
+
 export const getKomposisiRPS = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     const mkId = req.params.mataKuliahId;
-
     try {
         const data = await penilaianService.getKomposisiEvaluasi(mkId);
         return responseBuilder.code(200).message("Berhasil mengambil data evaluasi RPS").json(data);
@@ -260,11 +258,8 @@ export const getKomposisiRPS = async (req, res) => {
 export const injectKrsTester = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     const { id_mhs, id_periode, id_kelas } = req.body;
-    
     try {
         const models = (await import('../../models/index.js')).default;
-
-        // 1. Buat KRS
         const krs = await models.KrsMahasiswa.create({
             siakMahasiswaId: id_mhs,
             siakPeriodeAkademikId: id_periode,
@@ -272,19 +267,39 @@ export const injectKrsTester = async (req, res) => {
             sksDiambil: 3,
             semester: 1
         });
-
-        // 2. Buat Rincian KRS
         await models.RincianKrsMahasiswa.create({
             siakKrsMahasiswaId: krs.id,
             siakKelasKuliahId: id_kelas,
             status: "Disetujui"
         });
-
-        return responseBuilder.code(200).message("Mahasiswa berhasil dimasukkan ke KRS Kelas!").json({
-            id_krs: krs.id
-        });
+        return responseBuilder.code(200).message("Mahasiswa berhasil dimasukkan ke KRS Kelas!").json({ id_krs: krs.id });
     } catch (error) {
         return responseBuilder.status('failure').code(500).json(error.message);
     }
 };
 
+// =====================================================================
+// 3. LAPORAN NILAI
+// =====================================================================
+
+/**
+ * GET /api/akademik/dosen/kelas/:kelasId/laporan/perkuliahan
+ * → JSON: detail nilai per komponen evaluasi + rata-rata kelas
+ */
+export const getLaporanPerkuliahan = async (req, res, next) => {
+    try {
+        const data = await penilaianService.getDataLaporanPerkuliahan(req.params.kelasId);
+        return new ResponseBuilder(res).code(200).message("Berhasil mengambil data laporan nilai perkuliahan").json(data);
+    } catch (error) { next(error); }
+};
+
+/**
+ * GET /api/akademik/dosen/kelas/:kelasId/laporan/daftar-nilai
+ * → JSON: daftar nilai akhir + huruf mutu per mahasiswa
+ */
+export const getLaporanDaftarNilai = async (req, res, next) => {
+    try {
+        const data = await penilaianService.getDataDaftarNilai(req.params.kelasId);
+        return new ResponseBuilder(res).code(200).message("Berhasil mengambil daftar nilai mahasiswa").json(data);
+    } catch (error) { next(error); }
+};

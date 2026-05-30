@@ -4,18 +4,19 @@ import { Op } from 'sequelize';
 const {
     sequelize, KomposisiNilaiMataKuliah, PemetaanEvaluasiCpmk, PemetaanKomposisiCpmk,
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
-    MasterMetodeEvaluasi, MasterKomponenEvaluasi
+    MasterMetodeEvaluasi, MasterKomponenEvaluasi,
+    ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang
 } = models;
 
 const DEFAULT_SKALA = [
-    { hurufMutu: 'A',  angkaMutu: 4.00, nilaiMin: 81.00, nilaiMax: 100.00 },
-    { hurufMutu: 'AB', angkaMutu: 3.50, nilaiMin: 76.00, nilaiMax:  80.00 },
-    { hurufMutu: 'B',  angkaMutu: 3.00, nilaiMin: 71.00, nilaiMax:  75.00 },
-    { hurufMutu: 'BC', angkaMutu: 2.50, nilaiMin: 66.00, nilaiMax:  70.00 },
-    { hurufMutu: 'C',  angkaMutu: 2.00, nilaiMin: 61.00, nilaiMax:  65.00 },
-    { hurufMutu: 'CD', angkaMutu: 1.50, nilaiMin: 41.00, nilaiMax:  60.00 },
-    { hurufMutu: 'D',  angkaMutu: 1.00, nilaiMin:  1.00, nilaiMax:  40.00 },
-    { hurufMutu: 'E',  angkaMutu: 0.00, nilaiMin:  0.00, nilaiMax:   0.00 },
+    { hurufMutu: 'A', angkaMutu: 4.00, nilaiMin: 81.00, nilaiMax: 100.00 },
+    { hurufMutu: 'AB', angkaMutu: 3.50, nilaiMin: 76.00, nilaiMax: 80.00 },
+    { hurufMutu: 'B', angkaMutu: 3.00, nilaiMin: 71.00, nilaiMax: 75.00 },
+    { hurufMutu: 'BC', angkaMutu: 2.50, nilaiMin: 66.00, nilaiMax: 70.00 },
+    { hurufMutu: 'C', angkaMutu: 2.00, nilaiMin: 61.00, nilaiMax: 65.00 },
+    { hurufMutu: 'CD', angkaMutu: 1.50, nilaiMin: 41.00, nilaiMax: 60.00 },
+    { hurufMutu: 'D', angkaMutu: 1.00, nilaiMin: 1.00, nilaiMax: 40.00 },
+    { hurufMutu: 'E', angkaMutu: 0.00, nilaiMin: 0.00, nilaiMax: 0.00 },
 ];
 
 const getGrade = (nilai, skala) => {
@@ -77,7 +78,7 @@ export const getKomposisiEvaluasi = async (mataKuliahId) => {
             where: { siakMataKuliahId: mataKuliahId },
             attributes: ['id', 'persentase', 'key'],
             include: [{
-                model: models.CapaianMataKuliah, 
+                model: models.CapaianMataKuliah,
                 as: 'cpmkList',
                 attributes: ['id', 'kode'],
                 through: { attributes: [] } // Wajib ada agar tabel pemetaan ikut terbaca
@@ -108,15 +109,15 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
         await sequelize.transaction(async (trx) => {
             // Hapus nilai lama dengan FORCE: TRUE agar terhapus permanen (hard-delete),
             // sehingga tidak bentrok dengan data baru saat di-insert.
-            await NilaiEvaluasiMahasiswa.destroy({ 
-                where: { 
+            await NilaiEvaluasiMahasiswa.destroy({
+                where: {
                     [Op.or]: [
                         { siakRincianKrsMahasiswaId: krsId },
                         { siak_rincian_krs_mahasiswa_id: krsId }
                     ]
-                }, 
+                },
                 force: true, // 🔴 INI KUNCI PERBAIKANNYA
-                transaction: trx 
+                transaction: trx
             });
 
             // Mapping payload (menggunakan format camelCase & snake_case sekaligus
@@ -233,7 +234,7 @@ export const hitungNilaiAkhir = async (krsId) => {
 
             if (rincianKrs && rincianKrs.krsMahasiswa) {
                 const kelasId = rincianKrs.siakKelasKuliahId;
-                const mhsId   = rincianKrs.krsMahasiswa.siakMahasiswaId;
+                const mhsId = rincianKrs.krsMahasiswa.siakMahasiswaId;
 
                 if (kelasId && mhsId) {
                     // Hapus nilai CPMK lama untuk mahasiswa ini di kelas ini
@@ -278,17 +279,17 @@ export const hitungNilaiAkhir = async (krsId) => {
 
                         listNilai.forEach(nilai => {
                             if (!nilai.komposisiNilai) return;
-                            
+
                             // 🔴 FIX FINAL: Sinkronisasi pemanggilan ID Komponen
-                            const komposisiId  = nilai.siak_komposisi_nilai_id || nilai.siakKomposisiNilaiId;
-                            const skor         = parseFloat(nilai.skor || 0);
-                            const bobotPersen  = parseFloat(nilai.komposisiNilai.persentase || 0);
-                            const cpmkIds      = pemetaanMap[komposisiId] || [];
+                            const komposisiId = nilai.siak_komposisi_nilai_id || nilai.siakKomposisiNilaiId;
+                            const skor = parseFloat(nilai.skor || 0);
+                            const bobotPersen = parseFloat(nilai.komposisiNilai.persentase || 0);
+                            const cpmkIds = pemetaanMap[komposisiId] || [];
 
                             cpmkIds.forEach(cpmkId => {
                                 if (!raporCPMK[cpmkId]) raporCPMK[cpmkId] = { skorTerbobot: 0, totalBobot: 0 };
                                 raporCPMK[cpmkId].skorTerbobot += skor * (bobotPersen / 100);
-                                raporCPMK[cpmkId].totalBobot   += bobotPersen;
+                                raporCPMK[cpmkId].totalBobot += bobotPersen;
                             });
                         });
 
@@ -301,10 +302,10 @@ export const hitungNilaiAkhir = async (krsId) => {
                                 ? Math.round((item.skorTerbobot / (item.totalBobot / 100)) * 100) / 100
                                 : 0;
                             return {
-                                siakKelasKuliahId:       kelasId,
-                                siakMahasiswaId:         mhsId,
+                                siakKelasKuliahId: kelasId,
+                                siakMahasiswaId: mhsId,
                                 siakCapaianMataKuliahId: cpmkId,
-                                nilai:                   nilaiCpmk
+                                nilai: nilaiCpmk
                             };
                         });
 
@@ -470,51 +471,51 @@ export const getPesertaKelasList = async (kelasId) => {
             }]
         });
         if (!kelas) throw new Error('Kelas tidak ditemukan');
- 
-        const mkId        = kelas.siakMataKuliahId;
-        const prodiId     = kelas.mataKuliah?.siakProgramStudiId;
+
+        const mkId = kelas.siakMataKuliahId;
+        const prodiId = kelas.mataKuliah?.siakProgramStudiId;
         const kurikulumId = kelas.mataKuliah?.siakTahunKurikulumId;
- 
+
         // 2. Ambil komposisi nilai MK
         const komposisiList = await KomposisiNilaiMataKuliah.findAll({
             where: { siakMataKuliahId: mkId },
             attributes: ['id', 'persentase', 'key'],
             order: [['createdAt', 'ASC']]
         });
- 
+
         // Map by ID, tampilkan key sebagai uppercase label
         const komposisiMap = {};
         komposisiList.forEach(k => {
             komposisiMap[k.id] = {
-                id:         k.id,
-                label:      (k.key || '-').toUpperCase(),
+                id: k.id,
+                label: (k.key || '-').toUpperCase(),
                 persentase: parseFloat(k.persentase || 0)
             };
         });
- 
+
         // 3. Ambil skala nilai dari DB, fallback ke DEFAULT jika kosong
         let skalaAktif = DEFAULT_SKALA;
         if (prodiId && kurikulumId) {
             const rawSkala = await SkalaPenilaian.findAll({
                 where: {
-                    siak_program_studi_id:   prodiId,
+                    siak_program_studi_id: prodiId,
                     siak_tahun_kurikulum_id: kurikulumId,
-                    deleted_at:              null
+                    deleted_at: null
                 },
                 attributes: ['huruf_mutu', 'angka_mutu', 'nilai_min', 'nilai_max'],
                 order: [['nilai_min', 'DESC']]
             });
- 
+
             if (rawSkala.length > 0) {
                 skalaAktif = rawSkala.map(s => ({
                     hurufMutu: s.huruf_mutu,
                     angkaMutu: parseFloat(s.angka_mutu || 0),
-                    nilaiMin:  parseFloat(s.nilai_min  || 0),
-                    nilaiMax:  parseFloat(s.nilai_max  || 0),
+                    nilaiMin: parseFloat(s.nilai_min || 0),
+                    nilaiMax: parseFloat(s.nilai_max || 0),
                 }));
             }
         }
- 
+
         // 4. Ambil semua rincian KRS di kelas
         const allRincian = await RincianKrsMahasiswa.findAll({
             where: { siak_kelas_kuliah_id: kelasId },
@@ -538,48 +539,48 @@ export const getPesertaKelasList = async (kelasId) => {
                 }
             ]
         });
- 
+
         // 5. Deduplicate per mahasiswaId
         const komposisiIds = new Set(Object.keys(komposisiMap));
         const mahasiswaMap = {};
         allRincian.forEach(item => {
             const mhsId = item.krsMahasiswa?.mahasiswa?.id;
             if (!mhsId) return;
- 
+
             // Cek apakah detailNilai item ini cocok dengan komposisi kelas ini
             const nilaiYangCocok = (item.daftarNilaiEvaluasi || []).filter(
                 n => komposisiIds.has(n.siak_komposisi_nilai_id)
             );
             const punyaNilaiCocok = nilaiYangCocok.length > 0;
- 
+
             const existing = mahasiswaMap[mhsId];
             const existingCocok = existing
                 ? (existing.daftarNilaiEvaluasi || []).filter(
                     n => komposisiIds.has(n.siak_komposisi_nilai_id)
-                  ).length > 0
+                ).length > 0
                 : false;
- 
+
             if (!existing || (punyaNilaiCocok && !existingCocok)) {
                 mahasiswaMap[mhsId] = item;
             }
         });
- 
+
         const pesertaUnik = Object.values(mahasiswaMap).sort((a, b) =>
             (a.krsMahasiswa?.mahasiswa?.npm || '')
-            .localeCompare(b.krsMahasiswa?.mahasiswa?.npm || '')
+                .localeCompare(b.krsMahasiswa?.mahasiswa?.npm || '')
         );
- 
+
         // 6. Build tabel
         let no = 1;
         const tabel = pesertaUnik.map(item => {
-            const mhs       = item.krsMahasiswa?.mahasiswa;
+            const mhs = item.krsMahasiswa?.mahasiswa;
             const nilaiList = item.daftarNilaiEvaluasi || [];
- 
+
             // Nilai per komponen + hitung nilai akhir
             const nilaiPerKomponen = {};
             let nilaiAkhirHitung = 0;
             let adaNilai = false;
- 
+
             nilaiList.forEach(n => {
                 const komp = komposisiMap[n.siak_komposisi_nilai_id];
                 if (komp) {
@@ -589,21 +590,21 @@ export const getPesertaKelasList = async (kelasId) => {
                     adaNilai = true;
                 }
             });
- 
+
             // Komponen belum diinput -> null (tampil kosong)
             komposisiList.forEach(k => {
                 const label = (k.key || '-').toUpperCase();
                 if (!(label in nilaiPerKomponen)) nilaiPerKomponen[label] = null;
             });
- 
+
             nilaiAkhirHitung = Math.round(nilaiAkhirHitung * 100) / 100;
- 
+
             // Nilai akhir final
-            const nilaiAkhirDB    = parseFloat(item.nilai_akhir || 0);
+            const nilaiAkhirDB = parseFloat(item.nilai_akhir || 0);
             const nilaiAkhirFinal = nilaiAkhirDB > 0
                 ? nilaiAkhirDB
                 : (adaNilai ? nilaiAkhirHitung : 0);
- 
+
             // Grade dari skala nilai (DB atau default)
             let grade;
             if (item.huruf_mutu && item.huruf_mutu !== '-') {
@@ -616,33 +617,33 @@ export const getPesertaKelasList = async (kelasId) => {
             } else {
                 grade = { hurufMutu: '-', angkaMutu: 0 };
             }
- 
+
             return {
-                no:              no++,
-                rincianKrsId:    item.id,
-                mahasiswaId:     mhs?.id,
-                nim:             mhs?.npm      || '-',
-                nama:            mhs?.nama     || '-',
-                angkatan:        mhs?.angkatan || '-',
-                hadir:           null,
+                no: no++,
+                rincianKrsId: item.id,
+                mahasiswaId: mhs?.id,
+                nim: mhs?.npm || '-',
+                nama: mhs?.nama || '-',
+                angkatan: mhs?.angkatan || '-',
+                hadir: null,
                 nilaiPerKomponen,
-                nilaiAkhir:      nilaiAkhirFinal,
-                grade:           grade.hurufMutu,
-                angkaMutu:       grade.angkaMutu,
-                lulus:           item.status === 'Lulus',
-                keterangan:      item.status === 'Dikunci'
-                                     ? 'Nilai KRS sudah dikunci' : ''
+                nilaiAkhir: nilaiAkhirFinal,
+                grade: grade.hurufMutu,
+                angkaMutu: grade.angkaMutu,
+                lulus: item.status === 'Lulus',
+                keterangan: item.status === 'Dikunci'
+                    ? 'Nilai KRS sudah dikunci' : ''
             };
         });
- 
+
         // Header kolom untuk frontend (dinamis sesuai komposisi)
         const headerKolom = komposisiList.map(k => ({
-            id:         k.id,
-            label:      (k.key || '-').toUpperCase(),
-            bobot:      parseFloat(k.persentase || 0),
+            id: k.id,
+            label: (k.key || '-').toUpperCase(),
+            bobot: parseFloat(k.persentase || 0),
             labelKolom: `${(k.key || '-').toUpperCase()} (${parseFloat(k.persentase || 0).toFixed(2)}%)`
         }));
- 
+
         return {
             skalaDipakai: skalaAktif === DEFAULT_SKALA ? 'default' : 'database',
             headerKolom,
@@ -674,3 +675,176 @@ export const kunciNilaiSatuMahasiswa = async (rincianKrsId, action = 'kunci') =>
     await rincian.update({ status: newStatus });
     return { rincianKrsId, status: newStatus ?? 'Aktif' };
 };
+const getMetadataKelas = async (kelasId) => {
+
+    const kelas = await KelasKuliah.findByPk(kelasId, {
+        include: [
+            {
+                model: MataKuliah,
+                as: "mataKuliah",
+                attributes: ["id", "kode", "nama", "totalSks"],
+                include: [
+                    {
+                        model: ProgramStudi,
+                        as: "programStudi",
+                        attributes: ["id", "nama"],
+                        include: [
+                            {
+                                model: Jenjang,
+                                as: "jenjang",
+                                attributes: ["jenjang"],
+                            }
+                        ]
+                    },
+                ],
+            },
+            {
+                model: PeriodeAkademik,
+                as: "periodeAkademik",
+                attributes: ["id", "nama"],
+            },
+            {
+                model: JadwalKuliah,
+                as: "jadwalKuliah",
+                required: false,
+                include: [
+                    {
+                        model: Dosen,
+                        as: "dosen",
+                        attributes: ["id", "nama", "nidn"],
+                    },
+                ],
+            },
+        ],
+    });
+
+    if (!kelas) throw new Error("Kelas tidak ditemukan");
+    return kelas;
+};
+
+// ─────────────────────────────────────────────────────────────
+// HELPER: Hitung rata-rata per komponen & nilai akhir
+// ─────────────────────────────────────────────────────────────
+const hitungRataRata = (tabel, headerKolom) => {
+    if (!tabel.length) return null;
+
+    const total = {};
+    let totalNilaiAkhir = 0;
+    headerKolom.forEach((h) => { total[h.label] = 0; });
+
+    tabel.forEach((row) => {
+        totalNilaiAkhir += row.nilaiAkhir || 0;
+        headerKolom.forEach((h) => {
+            total[h.label] += row.nilaiPerKomponen?.[h.label] ?? 0;
+        });
+    });
+
+    const count = tabel.length;
+    const rataPerKomponen = {};
+    headerKolom.forEach((h) => {
+        rataPerKomponen[h.label] = parseFloat((total[h.label] / count).toFixed(2));
+    });
+
+    return {
+        rataPerKomponen,
+        rataNilaiAkhir: parseFloat((totalNilaiAkhir / count).toFixed(2)),
+    };
+};
+
+// ─────────────────────────────────────────────────────────────
+// LAPORAN 1: Detail nilai per komponen evaluasi
+// ─────────────────────────────────────────────────────────────
+export const getDataLaporanPerkuliahan = async (kelasId) => {
+    const [metadata, pesertaData] = await Promise.all([
+        getMetadataKelas(kelasId),
+        getPesertaKelasList(kelasId),
+    ]);
+
+    const { headerKolom, tabel } = pesertaData;
+    const rataRata = hitungRataRata(tabel, headerKolom);
+    const dosenList = (metadata.jadwalKuliah || []).map((dk) => dk.dosen).filter(Boolean);
+
+    return {
+        kelas: {
+            id: metadata.id,
+            nama: metadata.namaKelas || metadata.nama || "-",
+        },
+        mataKuliah: {
+            kode: metadata.mataKuliah?.kode || "-",
+            nama: metadata.mataKuliah?.nama || "-",
+            sks: metadata.mataKuliah?.totalSks || 0,
+        },
+        programStudi: {
+            nama: metadata.mataKuliah?.programStudi?.nama || "-",
+            jenjang: metadata.mataKuliah?.programStudi?.jenjang?.jenjang || "S1",
+        },
+        periode: {
+            nama: metadata.periodeAkademik?.nama || "-",
+            tahun: metadata.periodeAkademik?.tahun || null,
+            semester: metadata.periodeAkademik?.semester || null,
+        },
+        dosen: dosenList,
+        komponenEvaluasi: headerKolom,
+        mahasiswa: tabel.map((row) => ({
+            no: row.no,
+            rincianKrsId: row.rincianKrsId,
+            nim: row.nim,
+            nama: row.nama,
+            nilaiPerKomponen: row.nilaiPerKomponen,
+            nilaiAkhir: row.nilaiAkhir,
+            grade: row.grade,
+            angkaMutu: row.angkaMutu,
+            lulus: row.lulus,
+            keterangan: row.keterangan || null,
+        })),
+        rataRataKelas: rataRata,
+        totalMahasiswa: tabel.length,
+    };
+};
+
+// ─────────────────────────────────────────────────────────────
+// LAPORAN 2: Daftar nilai mahasiswa (ringkas)
+// ─────────────────────────────────────────────────────────────
+export const getDataDaftarNilai = async (kelasId) => {
+    const [metadata, pesertaData] = await Promise.all([
+        getMetadataKelas(kelasId),
+        getPesertaKelasList(kelasId),
+    ]);
+
+    const { tabel } = pesertaData;
+    const dosenList = (metadata.jadwalKuliah || []).map((dk) => dk.dosen).filter(Boolean);
+
+    return {
+        kelas: {
+            id: metadata.id,
+            nama: metadata.namaKelas || metadata.nama || "-",
+        },
+        mataKuliah: {
+            kode: metadata.mataKuliah?.kode || "-",
+            nama: metadata.mataKuliah?.nama || "-",
+            sks: metadata.mataKuliah?.totalSks || 0,
+        },
+        programStudi: {
+            nama: metadata.mataKuliah?.programStudi?.nama || "-",
+            jenjang: metadata.mataKuliah?.programStudi?.jenjang?.jenjang || "S1",
+        },
+        periode: {
+            nama: metadata.periodeAkademik?.nama || "-",
+            tahun: metadata.periodeAkademik?.tahun || null,
+            semester: metadata.periodeAkademik?.semester || null,
+        },
+        dosen: dosenList,
+        mahasiswa: tabel.map((row) => ({
+            no: row.no,
+            rincianKrsId: row.rincianKrsId,
+            nim: row.nim,
+            nama: row.nama,
+            nilaiAkhir: row.nilaiAkhir,
+            nilaiAngka: row.angkaMutu,
+            nilaiHuruf: row.grade,
+            keterangan: row.lulus ? "Lulus" : "-",
+        })),
+        totalMahasiswa: tabel.length,
+    };
+};
+    

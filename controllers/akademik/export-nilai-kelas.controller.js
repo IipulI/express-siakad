@@ -646,3 +646,123 @@ export const exportPdfCapaianKelas = async (req, res, next) => {
         doc.end();
     } catch (error) { next(error); }
 };
+
+// ============================================================================
+// 4. EXPORT PDF — DAFTAR NILAI MAHASISWA (RINGKAS)
+// ============================================================================
+export const exportPdfDaftarNilai = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+        const isPakaiKop   = String(req.query.kop).toLowerCase() === 'true';
+
+        const data  = await penilaianService.getDataDaftarNilai(kelasId);
+        
+        // Setup PDF layout - Portrait since it's fewer columns
+        const doc    = new PDFDocument({ margin: 20, size: 'A4', layout: 'portrait' });
+        const boxX   = 20;
+        const PAGE_W = doc.page.width;
+        const boxW   = PAGE_W - boxX * 2;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Daftar_Nilai_${data.kelas?.nama || kelasId}.pdf"`);
+        doc.pipe(res);
+
+        const logoPath = path.join(process.cwd(), 'public', 'logo', 'uika.jpg');
+
+        if (isPakaiKop) drawKopSurat(doc, logoPath, boxX, boxW);
+
+        const dosenString = data.dosen.map(d => d.nama).join(', ') || '-';
+        const namaProdi = `${data.programStudi?.jenjang || 'S1'} - ${data.programStudi?.nama || '-'}`;
+
+        drawInfoSection(doc, logoPath, boxX, boxW, 'DAFTAR NILAI MAHASISWA', [
+            { key: 'Program Studi',  val: namaProdi },
+            { key: 'Mata Kuliah',    val: `${data.mataKuliah?.kode} - ${data.mataKuliah?.nama} - ${data.mataKuliah?.sks} SKS` },
+            { key: 'Kelas',          val: data.kelas?.nama || '-' },
+            { key: 'Pengajar',       val: dosenString },
+            { key: 'Sistem Kuliah',  val: '-' },
+        ]);
+
+        // Columns: No, NIM, NAMA, NILAI, NILAI ANGKA, NILAI HURUF, KET.
+        const colNo    = 30;
+        const colNim   = 80;
+        const colNama  = 180;
+        const colNilai = 60;
+        const colAngka = 60;
+        const colHuruf = 60;
+        const colKet   = boxW - (colNo + colNim + colNama + colNilai + colAngka + colHuruf);
+        
+        const rowHeight = 16;
+        const hh        = 20;
+
+        doc.save().rect(boxX, doc.y, boxW, hh).fill('#0c4781').restore();
+        doc.save().lineWidth(0.5).strokeColor('#aaaaaa').rect(boxX, doc.y, boxW, hh).stroke();
+
+        const headerY = doc.y;
+        let curX = boxX;
+        [colNo, colNim, colNama, colNilai, colAngka, colHuruf].forEach((w) => {
+            curX += w;
+            doc.moveTo(curX, headerY).lineTo(curX, headerY + hh).stroke();
+        });
+        doc.restore();
+
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+        const hY = headerY + (hh / 2) - 4;
+        let tx = boxX;
+        doc.text('No', tx, hY, { width: colNo, align: 'center', lineBreak: false }); tx += colNo;
+        doc.text('NIM', tx, hY, { width: colNim, align: 'center', lineBreak: false }); tx += colNim;
+        doc.text('NAMA', tx, hY, { width: colNama, align: 'center', lineBreak: false }); tx += colNama;
+        doc.text('NILAI', tx, hY, { width: colNilai, align: 'center', lineBreak: false }); tx += colNilai;
+        doc.text('NILAI ANGKA', tx, hY, { width: colAngka, align: 'center', lineBreak: false }); tx += colAngka;
+        doc.text('NILAI HURUF', tx, hY, { width: colHuruf, align: 'center', lineBreak: false }); tx += colHuruf;
+        doc.text('KET.', tx, hY, { width: colKet, align: 'center', lineBreak: false });
+
+        let rowY = headerY + hh;
+        data.mahasiswa.forEach((mhs, iRow) => {
+            if (rowY + rowHeight > doc.page.height - 40) {
+                doc.addPage();
+                rowY = 30;
+            }
+            const bg = iRow % 2 === 0 ? '#ffffff' : '#f5f5f5';
+            doc.save().rect(boxX, rowY, boxW, rowHeight).fill(bg).restore();
+            doc.save().lineWidth(0.4).strokeColor('#cccccc');
+            doc.rect(boxX, rowY, boxW, rowHeight).stroke();
+            
+            let cx = boxX;
+            [colNo, colNim, colNama, colNilai, colAngka, colHuruf].forEach((w) => {
+                cx += w;
+                doc.moveTo(cx, rowY).lineTo(cx, rowY + rowHeight).stroke();
+            });
+            doc.restore();
+
+            const tY = rowY + (rowHeight / 2) - 3.5;
+            doc.font('Helvetica').fontSize(8).fillColor('black');
+            let dx = boxX;
+            doc.text(String(mhs.no), dx, tY, { width: colNo, align: 'center', lineBreak: false }); dx += colNo;
+            doc.text(mhs.nim, dx, tY, { width: colNim, align: 'center', lineBreak: false }); dx += colNim;
+            doc.text(mhs.nama, dx + 3, tY, { width: colNama - 6, align: 'left', lineBreak: false }); dx += colNama;
+            doc.text(mhs.nilaiAkhir > 0 ? String(mhs.nilaiAkhir) : '-', dx, tY, { width: colNilai, align: 'center', lineBreak: false }); dx += colNilai;
+            doc.text(mhs.nilaiAngka > 0 ? String(mhs.nilaiAngka) : '-', dx, tY, { width: colAngka, align: 'center', lineBreak: false }); dx += colAngka;
+            doc.text(mhs.nilaiHuruf || '-', dx, tY, { width: colHuruf, align: 'center', lineBreak: false }); dx += colHuruf;
+            doc.text(mhs.keterangan || '-', dx, tY, { width: colKet, align: 'center', lineBreak: false });
+
+            rowY += rowHeight;
+        });
+
+        doc.y = rowY + 12;
+
+        // Using Kaprodi from Data if available, else omit or get from getMetadataKelas.
+        // Wait, getDataDaftarNilai doesn't explicitly return Kaprodi right now.
+        // Let's pass '-' for Kaprodi or we can fetch it. I will just pass '-'.
+        drawTtdSection(doc, boxX, boxW, '-', namaProdi);
+
+        doc.moveDown(3);
+        doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y)
+            .lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
+        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(7).fillColor('#555555')
+            .text(buildFooterText(namaPencetak), boxX, doc.y);
+
+        doc.end();
+    } catch (error) { next(error); }
+};

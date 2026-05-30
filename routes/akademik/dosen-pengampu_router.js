@@ -97,11 +97,20 @@ router.get('/kelas/:kelasId/rps', cekKepemilikanKelas, CapaianController.getRpsF
 // Rapor OBE per mahasiswa
 router.get('/kelas/:krsId/rapor-obe', cekKepemilikanKelas, PenilaianController.getRaporOBE);
 router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
-    if (req.query.format === 'pdf') return exportExcelCapaianKelas.exportPdfNilaiKelas(req, res, next);
+    if (req.query.format === 'pdf') {
+        if (req.query.jenis === 'daftar-nilai') {
+            return exportExcelCapaianKelas.exportPdfDaftarNilai(req, res, next);
+        }
+        return exportExcelCapaianKelas.exportPdfNilaiKelas(req, res, next);
+    }
     return exportExcelCapaianKelas.exportExcelNilaiKelas(req, res, next);
 });
 router.get('/kelas/:kelasId/capaian/export', async (req, res, next) => {
-if (req.query.format === 'pdf') return exportExcelCapaianKelas.exportPdfCapaianKelas(req, res, next);
+    if (req.query.format === 'pdf') return exportExcelCapaianKelas.exportPdfCapaianKelas(req, res, next);
     return exportExcelCapaianKelas.exportExcelCapaianKelas(req, res, next);
 });
+
+router.get("/kelas/:kelasId/laporan/perkuliahan", PenilaianController.getLaporanPerkuliahan);
+router.get("/kelas/:kelasId/laporan/daftar-nilai", PenilaianController.getLaporanDaftarNilai);
+
 export default router;
