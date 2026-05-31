@@ -7,38 +7,39 @@ const {
 } = models;
 
 export const findAll = async (page, size) => {
-    try {
-        if (page !== null && size !== null) {
-            const { limit, offset } = getPagination(page, size);
+    const isPaginated = page !== null && size !== null;
 
-            const { count, rows } = await BidangIlmu.findAndCountAll({
-                attributes: ["id", "kode", "nama"],
-                limit,
-                offset,
-                order: [["id", "DESC"]],
-                raw: true,
-            });
-
-            return {
-                count,
-                rows,
-                isPaginated: true,
-            };
-        } else {
-            const { count, rows } = await BidangIlmu.findAndCountAll({
-                attributes: ["id", "kode", "nama"],
-                // raw: true,
-            });
-
-            return {
-                count: count,
-                rows,
-                isPaginated: false,
-            };
-        }
-    } catch (error) {
-        throw new Error(error.message);
+    const queryBuilder = {
+        attributes: ['id', 'kode', 'nama'],
+        order: [['id', 'DESC']],
     }
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await BidangIlmu.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true
+        }
+    } else {
+        const data = await BidangIlmu.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data.rows,
+            isPaginated: false
+        }
+    }
+}
+
+export const findOneById = async (id) => {
+    const cekDataBidangIlmu = await BidangIlmu.findOne(id);
 }
 
 export const createBidangIlmu = async (data) => {

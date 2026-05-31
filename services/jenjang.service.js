@@ -1,95 +1,92 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
+import { Op } from "sequelize";
 
 const { Jenjang } = models;
 
 export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
-
-      const { count, rows } = await Jenjang.findAndCountAll({
-        attributes: ["id", "nama", "jenjang"],
-        limit,
-        offset,
-        order: [["id", "DESC"]],
-        raw: true,
-      });
-
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
-
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
-    } else {
-      const { count, rows } = await Jenjang.findAndCountAll({
-        attributes: ["id", "nama", "jenjang"],
-        // raw: true,
-      });
-
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
+    const isPaginated = page !== null && size !== null
+    let queryBuilder = {
+        attributes: ['id', 'nama', 'jenjang'],
+        order: [['id', 'DESC']]
     }
-  } catch (error) {
-    throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
-  }
-};
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await Jenjang.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    } else {
+        const data = await Jenjang.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
+    }
+}
+
+export const findOneById = async (id) => {
+    const dataJenjangExist = await Jenjang.findByPk(id)
+
+    if (!dataJenjangExist) {
+        throw new NotFoundError(`Jenjang tidak dapat ditemukan`)
+    }
+
+    return dataJenjangExist
+}
 
 export const createJenjang = async (jenjangData) => {
-  const { nama, jenjang } = jenjangData;
+    const existingJenjang = await Jenjang.findOne({
+        where: {
+            jenjang: jenjangData.jenjang
+        }
+    })
 
-  const existingJenjang = await Jenjang.findOne({ where: { jenjang } });
-
-  if (existingJenjang) {
-    throw new Error(`Jenjang dengan nama "${jenjang}" sudah ada`);
-  }
-
-  try {
-    await Jenjang.create({ nama, jenjang });
-  } catch (err) {
-    if (err.name === "SequelizeUniqueConstraintError") {
-      throw new Error(
-        `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
-      );
-    }
-    throw new Error(`Terjadi kesalahan saat membuat Jenjang: ${err.message}`);
-  }
-};
-
-export const updateJenjang = async (id, updateData) => {
-  try {
-    const jenjang = await Jenjang.findByPk(id);
-
-    if (!jenjang) {
-      return null;
+    if (existingJenjang) {
+        throw new ConflictError(`Jenjang : ${jenjangData.jenjang} sudah ada.`);
     }
 
-    const [updatedRowsCount] = await Jenjang.update(updateData, {
-      where: { id: id },
-    });
+    return await Jenjang.create(jenjangData);
+}
 
-    return updatedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Terjadi kesalahan saat memperbarui Jenjang: ${error.message}`);
-  }
-};
+export const updateJenjang = async (id, jenjangData) => {
+    const existDataJenjang = await Jenjang.findByPk(id)
+
+    if (!existDataJenjang) {
+        throw new NotFoundError(`Jenjang tidak dapat ditemukan`)
+    }
+
+    const existJenjangNameKode = await Jenjang.findOne({
+        where: {
+            [Op.or] : [
+                { jenjang: jenjangData.jenjang },
+                { nama: jenjangData.nama }
+            ]
+        }
+    })
+    if (existJenjangNameKode && existJenjangNameKode.id !== id) {
+        throw new ConflictError(`Jenjang : ${jenjangData.jenjang} sudah ada.`);
+    }
+
+    return existDataJenjang.update(jenjangData)
+}
 
 export const deleteJenjang = async (id) => {
-  try {
-    const deletedRowsCount = await Jenjang.destroy({
-      where: { id: id },
-    });
+    const existDataJenjang = await Jenjang.findByPk(id)
 
-    return deletedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Terjadi kesalahan saat menghapus Jenjang: ${error.message}`);
-  }
-};
+    if (!existDataJenjang) {
+        throw new NotFoundError(`Jenjang tidak dapat ditemukan`)
+    }
+
+    await existDataJenjang.destroy()
+}

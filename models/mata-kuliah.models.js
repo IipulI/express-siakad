@@ -46,16 +46,16 @@ export default (sequelize) => {
                 foreignKey: "prasyarat_mata_kuliah_3",
                 as: "prasyarat3"
             })
-            
-            
-            
+
+
+
            MataKuliah.hasMany(models.KomposisiNilaiMataKuliah, { // Sesuaikan nama model ini
     foreignKey: 'siak_mata_kuliah_id',
     as: 'komposisiNilai'
   });
   // Pengembang RPS jadi Many-to-Many pakai tabel pivot
 // 1. Relasi Koordinator (1-to-1)
-    this.belongsTo(models.Dosen, { 
+    this.belongsTo(models.Dosen, {
         foreignKey: 'koordinator_mk_id',
         as: 'koordinatorMk'
     });
@@ -64,7 +64,7 @@ export default (sequelize) => {
         through: models.PengembanganRps,
         foreignKey: 'siakMataKuliahId', // <-- UBAH JADI camelCase
         otherKey: 'siakDosenId',        // <-- UBAH JADI camelCase
-        as: 'pengembangRps' 
+        as: 'pengembangRps'
     });
     // 3. Relasi Pengajar Mata Kuliah (Many-to-Many)
     this.belongsToMany(models.Dosen, {
@@ -74,7 +74,7 @@ export default (sequelize) => {
         as: 'pengajarMataKuliah'
     });
     // Relasi Pemetaan CPL
-    
+
 
 
     // Relasi Pemetaan CPL
@@ -82,15 +82,15 @@ export default (sequelize) => {
         through: models.PemetaanCplMk,
         foreignKey: 'siakMataKuliahId', // <-- UBAH KE CAMEL CASE
         otherKey: 'siakCplId',          // <-- UBAH KE CAMEL CASE
-        as: 'cplDipetakan' 
+        as: 'cplDipetakan'
     });
     this.hasMany(models.CapaianMataKuliah, {
         foreignKey: 'siak_mata_kuliah_id',
         as: 'cpmk' // Alias ini yang kita panggil di Service
     });
-    this.hasMany(models.RencanaPembelajaran, { 
-    foreignKey: "siak_mata_kuliah_id", 
-    as: "rencanaPembelajaran" 
+    this.hasMany(models.RencanaPembelajaran, {
+    foreignKey: "siak_mata_kuliah_id",
+    as: "rencanaPembelajaran"
 });
     this.belongsTo(models.KelompokMataKuliah, {
     foreignKey: 'siak_kelompok_mata_kuliah_id',
@@ -254,44 +254,45 @@ export default (sequelize) => {
                 allowNull: true,
                 defaultValue: false
             },
-            // Di dalam blok init MataKuliah.init({ ... })
-sksTatapMuka: { type: DataTypes.INTEGER, field: 'sks_tatap_muka' },
-sksPraktikum: { type: DataTypes.INTEGER, field: 'sks_praktikum' },
-sksPraktikLapangan: { type: DataTypes.INTEGER, field: 'sks_praktik_lapangan' },
-sksSimulasi: { type: DataTypes.INTEGER, field: 'sks_simulasi' },
-koordinatorMkId: { type: DataTypes.UUID, field: 'koordinator_mk_id' },
-pengembangRpsId: { type: DataTypes.UUID, field: 'pengembang_rps_id' },
-// ... (kolom-kolom mata kuliah yang sudah ada sebelumnya) ...
 
-        // 2 KOLOM BARU UNTUK PENGATURAN CPMK 👇
-        levelPemetaan: {
-            type: DataTypes.STRING,
-            field: 'level_pemetaan' // Ini yang memberi tahu Sequelize nama asli di DB-nya
+
+            koordinatorMkId: {
+                type: DataTypes.UUID,
+                field: 'koordinator_mk_id'
+            },
+            pengembangRpsId: {
+                type: DataTypes.UUID,
+                field: 'pengembang_rps_id'
+            },
+
+            // 2 KOLOM BARU UNTUK PENGATURAN CPMK 👇
+            levelPemetaan: {
+                type: DataTypes.STRING,
+                field: 'level_pemetaan' // Ini yang memberi tahu Sequelize nama asli di DB-nya
+            },
+            metodePembobotan: {
+                type: DataTypes.STRING,
+                field: 'metode_pembobotan'
+            },
+            topik: {
+                type: DataTypes.TEXT,
+                field: 'topik'
+            },
+            kompetensiDasar: {
+                type: DataTypes.TEXT,
+                field: 'kompetensi_dasar'
+            },
+            sksMinimal: {
+                type: DataTypes.INTEGER,
+                field: 'sks_minimal',
+                defaultValue: 0
+            },
+            isPaket: {
+                type: DataTypes.BOOLEAN,
+                field: 'is_paket',
+                defaultValue: false
+            }
         },
-        metodePembobotan: {
-            type: DataTypes.STRING,
-            field: 'metode_pembobotan'
-        },
-        topik: {
-    type: DataTypes.TEXT,
-    field: 'topik'
-},
-kompetensiDasar: {
-    type: DataTypes.TEXT,
-    field: 'kompetensi_dasar'
-},
-sksMinimal: {
-    type: DataTypes.INTEGER,
-    field: 'sks_minimal',
-    defaultValue: 0
-},
-isPaket: {
-    type: DataTypes.BOOLEAN,
-    field: 'is_paket',
-    defaultValue: false
-}
-        },
-        
         {
             sequelize,
             underscored: true,

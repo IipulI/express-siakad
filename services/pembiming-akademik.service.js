@@ -1,5 +1,7 @@
 import db from '../models/index.js'
 import { Op, Sequelize } from 'sequelize'
+import { getPagination } from "../utils/pagination.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 
 const {
     Dosen,
@@ -8,11 +10,15 @@ const {
     PembimbingAkademik,
     PeriodeAkademik,
     HasilStudi,
-
+    StatusMahasiswa,
     sequelize
 } = db
 
-export const getAllMahasiswaFiltered = async (filters, userDosen) => {
+export const getAllMahasiswaFiltered = async (filters, userDosen, page, size) => {
+    // 1. Setup pagination variables
+    const isPaginated = page !== null && size !== null;
+    const { limit, offset } = getPagination(page, size);
+
     // Start a managed transaction to ensure data consistency across all queries.
     const finalData = await sequelize.transaction(async (t) => {
         const {
@@ -33,17 +39,17 @@ export const getAllMahasiswaFiltered = async (filters, userDosen) => {
         }
 
         if (!periode) {
-            // In a service, we throw errors to be caught by the controller.
-            throw new Error('Periode akademik tidak ditemukan.');
+            throw new NotFoundError("Periode akademik tidak ditemukan");
         }
 
-        // --- Step 1: Build filtering clauses and get the correct Mahasiswa IDs ---
+        // --- Step 1: Build filtering clauses and get the correct Mahasiswa IDs with Pagination ---
         const whereClause = { periodeMasuk: { [Op.lte]: periode.kode } };
         const includeFilters = [];
 
         if (keyword) whereClause.nama = { [Op.iLike]: `%${keyword}%` };
         if (semester) whereClause.semester = semester;
         if (siakProgramStudiId) whereClause.siakProgramStudiId = siakProgramStudiId;
+
 
         if (userDosen) {
             includeFilters.push({
@@ -69,24 +75,42 @@ export const getAllMahasiswaFiltered = async (filters, userDosen) => {
             whereClause[Op.and] = Sequelize.literal(`NOT EXISTS (SELECT 1 FROM "pembimbing_akademik" AS "pa" WHERE "pa"."siak_mahasiswa_id" = "Mahasiswa"."id")`);
         }
 
-        const filteredMahasiswaIdsResult = await Mahasiswa.findAll({
-
-
+        // Menggunakan findAndCountAll pada tahap pencarian ID
+        const { count, rows: filteredMahasiswaIdsResult } = await Mahasiswa.findAndCountAll({
             attributes: ['id'],
             where: whereClause,
             include: includeFilters,
+            distinct: true, // Krusial: Mencegah duplikasi count akibat join (include)
+            col: 'id',      // Menghitung berdasarkan ID Mahasiswa
+            limit: isPaginated ? limit : undefined,
+            offset: isPaginated ? offset : undefined,
+            order: [['nama', 'ASC']], // Dipindah ke sini agar paginasi konsisten antar halaman
             raw: true,
             transaction: t
         });
+
         const mahasiswaIds = filteredMahasiswaIdsResult.map(m => m.id);
 
         if (mahasiswaIds.length === 0) {
-            return []; // Return an empty array if no students match the filters.
+            // Return format disesuaikan dengan contoh Anda
+            return { count, rows: [], isPaginated };
         }
 
         // --- Step 2: Fetch the full data for the filtered IDs in parallel ---
         const [mahasiswaList, allHasilStudi, allKrs, allPembimbing] = await Promise.all([
-            Mahasiswa.findAll({ where: { id: { [Op.in]: mahasiswaIds } }, order: [['nama', 'ASC']], transaction: t }),
+            // Order di sini tetap dipertahankan untuk memastikan urutan akhir
+            Mahasiswa.findAll({
+                where: { id: { [Op.in]: mahasiswaIds } },
+                include: [
+                    {
+                        attributes: ['id', 'nama'],
+                        model:StatusMahasiswa,
+                        as: 'statusMahasiswa'
+                    }
+                ],
+                order: [['nama', 'ASC']],
+                transaction: t
+            }),
             HasilStudi.findAll({ where: { siakMahasiswaId: { [Op.in]: mahasiswaIds } }, order: [['semester', 'DESC']], transaction: t }),
             KrsMahasiswa.findAll({ where: { siakMahasiswaId: { [Op.in]: mahasiswaIds }, siakPeriodeAkademikId: periode.id }, transaction: t }),
             PembimbingAkademik.findAll({
@@ -121,19 +145,21 @@ export const getAllMahasiswaFiltered = async (filters, userDosen) => {
         }
 
         const assembledData = mahasiswaList.map(mahasiswa => {
-            // 1. Convert the Sequelize instance to a plain object FIRST.
             const mahasiswaJson = mahasiswa.toJSON();
 
-            // 2. Attach all your manually-fetched data to the new plain object.
             mahasiswaJson.hasilStudiTerbaru = hasilStudiMap.get(mahasiswa.id) || null;
             mahasiswaJson.krsTerbaru = krsMap.get(mahasiswa.id) || null;
             mahasiswaJson.pembimbingDosen = pembimbingMap.get(mahasiswa.id) || null;
 
-            // 3. Return the plain object.
             return mahasiswaJson;
         });
 
-        return assembledData;
+        // Return data beserta metadata paginasi
+        return {
+            count,
+            rows: assembledData,
+            isPaginated
+        };
     });
 
     return finalData;
@@ -223,19 +249,33 @@ export const assignDosen = async (dosenId, mahasiswaIds, periodeAkademikId) => {
     }
 }
 
-export const updateKrsMahasiswa = async (krsIds, status) => {
+export const updateKrsMahasiswa = async (krsIds, mahasiswaIds, periodeAkademikId, status) => {
     try {
         await sequelize.transaction(async (trx) => {
-            const foundKrs = await KrsMahasiswa.findAll({
-                where: {
-                    id: krsIds,
-                    status: {
-                        [Op.ne] : "Diajukan"
+
+
+            let foundKrs
+            if (krsIds !== null) {
+                foundKrs = await KrsMahasiswa.findAll({
+                    where: {
+                        id: { [Op.in]: krsIds },
+                        status: {
+                            [Op.eq] : "Diajukan"
+                        }
+                    },
+                    attributes: ['id'],
+                    transaction: trx,
+                });
+            }
+            else if (mahasiswaIds !== null) {
+                foundKrs = await KrsMahasiswa.findAll({
+                    where : {
+                        siakMahasiswaId: { [Op.in] : mahasiswaIds },
+                        siakPeriodeAkademikId: periodeAkademikId,
+                        status: { [Op.eq] : "Diajukan" }
                     }
-                },
-                attributes: ['id'],
-                transaction: trx,
-            });
+                })
+            }
 
             const foundIds = foundKrs.map(krs => krs.id);
             const notFoundIds = krsIds.filter(id => !foundIds.includes(id));

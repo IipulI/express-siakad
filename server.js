@@ -1,7 +1,8 @@
 import http from 'http';
 import app from './app.js';
-import { sequelize } from './config/database.js';
+import db from './models/index.js';
 
+const { sequelize } = db;
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 

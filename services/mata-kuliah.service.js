@@ -1,209 +1,3 @@
-// import { getPagination } from "../utils/pagination.js";
-// import models from "../models/index.js"
-// import { Op } from 'sequelize';
-
-// const { sequelize, MataKuliah } = models;
-
-// export const findAll = async (page, size) => {
-//     try {
-//         if (page !== null && size !== null) {
-//             const { limit, offset } = getPagination(page, size);
-
-//             const { count, rows } = await MataKuliah.findAndCountAll({
-//                 limit,
-//                 offset,
-//                 order: [['createdAt', 'DESC']],
-//             })
-
-//             return { count, rows, isPaginated: true }
-//         }
-//         else {
-//             const { count, rows } = await MataKuliah.findAndCountAll({})
-//             return { count, rows, isPaginated: false }
-//         }
-//     }
-//     catch (error) {
-//         throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
-//     }
-// }
-
-// export const findOne = async (id) => {
-//     try {
-//         const existMataKuliah = await MataKuliah.findByPk(id)
-//         if (!existMataKuliah) {
-//             throw new Error(`MataKuliah doesn\'t exist`);
-//         }
-
-//         return existMataKuliah;
-//     }
-//     catch (error) {
-//         throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
-//     }
-// }
-
-// export const createMataKuliah = async (mataKuliahData) => {
-//     try {
-//         const newMataKuliah = sequelize.transaction(async (t) => {
-
-//             if (mataKuliahData.prasyaratMataKuliah1Id != null) {
-//                 const prasyaratMataKuliah1 = await MataKuliah.findByPk(mataKuliahData.prasyaratMataKuliah1Id, {
-//                     transaction: t,
-//                     lock: t.LOCK
-//                 });
-//                 if (!prasyaratMataKuliah1) {
-//                     throw new Error(`Prasyarat Mata Kuliah 1 tidak ditemukan`)
-//                 }
-//             }
-//             if (mataKuliahData.prasyaratMataKuliah2Id != null) {
-//                 const prasyaratMataKuliah2 = await MataKuliah.findByPk(mataKuliahData.prasyaratMataKuliah2Id, {
-//                     transaction: t,
-//                     lock: t.LOCK
-//                 });
-//                 if (!prasyaratMataKuliah2) {
-//                     throw new Error(`Prasyarat Mata Kuliah 2 tidak ditemukan`)
-//                 }
-//             }
-//             if (mataKuliahData.prasyaratMataKuliah3Id != null) {
-//                 const prasyaratMataKuliah3 = await MataKuliah.findByPk(mataKuliahData.prasyaratMataKuliah3Id, {
-//                     transaction: t,
-//                     lock: t.LOCK
-//                 });
-//                 if (!prasyaratMataKuliah3) {
-//                     throw new Error(`Prasyarat Mata Kuliah 3 tidak ditemukan`)
-//                 }
-//             }
-
-
-//             const createdMataKuliah = await MataKuliah.create(
-//                 {
-//                     siakProgramStudiId: mataKuliahData.siakProgramStudiId,
-//                     siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
-
-//                     siakBidangIlmuId : mataKuliahData.siakBidangIlmuId,
-//                     siakJenisMataKuliahId : mataKuliahData.siakJenisMataKuliahId,
-//                     siakKelompokMataKuliahId : mataKuliahData.siakKelompokMataKuliahId,
-
-//                     siakKelompokMataKuliahId: mataKuliahData.kelompokMataKuliahId,
-//                     siakRumpunMataKuliahId: mataKuliahData.rumpunMataKuliahId,
-
-//                     siakBidangIlmuId : mataKuliahData.siakBidangIlmuId,
-//                     siakJenisMataKuliahId : mataKuliahData.siakJenisMataKuliahId,
-//                     siakKelompokMataKuliahId : mataKuliahData.siakKelompokMataKuliahId,
-
-//                     nama: mataKuliahData.nama,
-//                     namaEn: mataKuliahData.namaEn,
-//                     kode: mataKuliahData.kode,
-//                     jenis: mataKuliahData.jenis,
-//                     adaPraktikum: mataKuliahData.adaPraktikum,
-
-//                     sksTatapMuka: mataKuliahData.sksTatapMuka,
-//                     sksPraktikum: mataKuliahData.sksPraktikum,
-//                     sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
-//                     sksSimulasi: mataKuliahData.sksSimulasi,
-//                     totalSks: (mataKuliahData.sksTatapMuka || 0) +
-//                               (mataKuliahData.sksPraktikum || 0) +
-//                               (mataKuliahData.sksPraktikLapangan || 0) +
-//                               (mataKuliahData.sksSimulasi || 0),
-
-//                     merupakanMku: mataKuliahData.merupakanMku,
-//                     adaSap: mataKuliahData.adaSap,
-//                     adaSilabus: mataKuliahData.adaSilabus,
-//                     adaBahanAjar: mataKuliahData.adaBahanAjar,
-//                     adaDiktat: mataKuliahData.adaDiktat,
-
-//                     koordinatorMkId: mataKuliahData.koordinatorMkId,
-
-//                     prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1Id,
-//                     prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2Id,
-//                     prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3Id
-//                 },
-//                 { transaction: t }
-//             );
-
-//             // Simpan Array Pengembang RPS ke tabel pivot
-//             if (mataKuliahData.pengembangRpsIds && mataKuliahData.pengembangRpsIds.length > 0) {
-//                 await createdMataKuliah.setPengembangRps(mataKuliahData.pengembangRpsIds, { transaction: t });
-//             }
-
-//             return createdMataKuliah;
-//         });
-
-//         // Mengembalikan format detail lengkap setelah berhasil create
-//         return await getDetailMataKuliahObe(newMataKuliah.id);
-
-//     } catch (error) {
-//         console.error("🔴 ERROR DI SERVICE CREATE:", error);
-//         throw new Error(error.message);
-//     }
-// }
-
-// export const updateMataKuliah = async (id, mataKuliahData) => {
-//     try {
-//         const existMataKuliah = await MataKuliah.findByPk(id);
-//         if (!existMataKuliah) throw new Error(`Mata Kuliah tidak ditemukan`);
-
-//         await MataKuliah.update({
-//             siakProgramStudiId: mataKuliahData.siakProgramStudiId,
-//             siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
-//             siakKelompokMataKuliahId: mataKuliahData.kelompokMataKuliahId,
-//             siakRumpunMataKuliahId: mataKuliahData.rumpunMataKuliahId,
-//             nama: mataKuliahData.nama,
-//             namaEn: mataKuliahData.namaEn,
-//             kode: mataKuliahData.kode,
-//             jenis: mataKuliahData.jenis,
-//             adaPraktikum: mataKuliahData.adaPraktikum,
-
-//             sksTatapMuka: mataKuliahData.sksTatapMuka,
-//             sksPraktikum: mataKuliahData.sksPraktikum,
-//             sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
-//             sksSimulasi: mataKuliahData.sksSimulasi,
-//             totalSks: (mataKuliahData.sksTatapMuka || 0) +
-//                       (mataKuliahData.sksPraktikum || 0) +
-//                       (mataKuliahData.sksPraktikLapangan || 0) +
-//                       (mataKuliahData.sksSimulasi || 0),
-
-//             merupakanMku: mataKuliahData.merupakanMku,
-//             adaSap: mataKuliahData.adaSap,
-//             adaSilabus: mataKuliahData.adaSilabus,
-//             adaBahanAjar: mataKuliahData.adaBahanAjar,
-//             adaDiktat: mataKuliahData.adaDiktat,
-
-//             koordinator_mk_id: mataKuliahData.koordinatorMkId,
-
-//             prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1Id,
-//             prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2Id,
-//             prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3Id
-//         }, { where: { id: id } });
-
-//         // UPDATE DATA PENGEMBANG RPS DI TABEL PIVOT
-//         if (mataKuliahData.pengembangRpsIds) {
-//             await existMataKuliah.setPengembangRps(mataKuliahData.pengembangRpsIds);
-//         }
-
-//         // Mengembalikan format detail lengkap setelah berhasil update
-//         return await getDetailMataKuliahObe(id);
-//     } catch (error) {
-//         throw new Error(`Kesalahan saat memperbarui data: ${error.message}`);
-//     }
-// }
-
-// export const deleteMataKuliah = async (id) => {
-//     try {
-//         const deletedRowsCount = await MataKuliah.destroy({
-//             where: { id: id }
-//         })
-
-//         return deletedRowsCount > 0;
-//     }
-//     catch (error) {
-//         throw new Error(`Kesalahan saat menghapus Mata Kuliah: ${error.message}`);
-//     }
-// }
-
-
-
-
-
 import { getPagination } from "../utils/pagination.js";
 import models from "../models/index.js";
 import { Op } from 'sequelize';
@@ -217,11 +11,11 @@ const { sequelize, MataKuliah } = models;
 // =========================================================
 export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKurikulumId) => {
     // 👇 1. PASTIKAN SEMUA MODEL DI-DESTRUCTURE DULU DI SINI
-    const { 
-        MataKuliah, 
-        ProgramStudi, 
-        TahunKurikulum, 
-        CapaianMataKuliah 
+    const {
+        MataKuliah,
+        ProgramStudi,
+        TahunKurikulum,
+        CapaianMataKuliah
     } = models;
 
     // 2. Hitung limit & offset untuk pagination
@@ -231,7 +25,7 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
     const whereClause = {};
     if (prodiId) whereClause.siakProgramStudiId = prodiId;
     if (tahunKurikulumId) whereClause.siakTahunKurikulumId = tahunKurikulumId;
-    
+
     if (search) {
         whereClause[Op.or] = [
             { nama: { [Op.iLike]: `%${search}%` } },
@@ -255,11 +49,11 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
     // 5. Mapping Data & Cek Status Pengisian
     const formattedRows = await Promise.all(data.rows.map(async (mk) => {
         // Cek CPL (Pakai count dari relasi)
-        const countCpl = await mk.countCplDipetakan(); 
-        
+        const countCpl = await mk.countCplDipetakan();
+
         // Cek CPMK (Asumsi model CapaianMataKuliah ada di models)
-        const countCpmk = await CapaianMataKuliah.count({ 
-            where: { siakMataKuliahId: mk.id } 
+        const countCpmk = await CapaianMataKuliah.count({
+            where: { siakMataKuliahId: mk.id }
         });
 
         return {
@@ -289,12 +83,12 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
 // =========================================================
 export const getDetailMataKuliahObe = async (id) => {
     // 👇 KUNCI: Tarik semua model dari 'models' supaya gak "is not defined"
-    const { 
-        MataKuliah, 
-        ProgramStudi, 
-        TahunKurikulum, 
-        Dosen, 
-        KelompokMataKuliah 
+    const {
+        MataKuliah,
+        ProgramStudi,
+        TahunKurikulum,
+        Dosen,
+        KelompokMataKuliah
     } = models;
 
     // 1. Cari data berdasarkan Primary Key (ID)
@@ -307,7 +101,7 @@ export const getDetailMataKuliahObe = async (id) => {
             { model: KelompokMataKuliah, as: 'kelompokMk', attributes: ['nama'] }
         ]
     });
-    
+
     // 2. CEK: Kalau ID ngasal/data ga ketemu, langsung tembak 404
     if (!mk) {
         throw new CustomError.NotFoundError(`Mata Kuliah dengan ID ${id} tidak ditemukan.`);
@@ -344,150 +138,115 @@ export const getDetailMataKuliahObe = async (id) => {
 // =========================================================
 // 3. FIND ALL (Bawaan)
 // =========================================================
-export const findAll = async (page, size) => {
-    try {
-        if (page !== null && size !== null) {
-            const { limit, offset } = getPagination(page, size);
+export const findAll = async (page, size, search, order) => {
+    const isPaginated = page !== null && size !== null;
 
-            const { count, rows } = await MataKuliah.findAndCountAll({
-                limit,
-                offset,
-                order: [['createdAt', 'DESC']],
-            })
-
-            return { count, rows, isPaginated: true }
-        }
-        else {
-            const { count, rows } = await MataKuliah.findAndCountAll({})
-            return { count, rows, isPaginated: false }
-        }
+    const queryBuilder = {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        order: [['id', 'DESC']],
     }
-    catch (error) {
-        throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await MataKuliah.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true
+        }
+    } else {
+        const  data = await MataKuliah.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false
+        }
     }
 }
 
-// =========================================================
-// 4. FIND ONE (Bawaan)
-// =========================================================
 export const findOne = async (id) => {
-    try {
-        const existMataKuliah = await MataKuliah.findByPk(id)
-        if (!existMataKuliah) {
-            throw new Error(`MataKuliah doesn\'t exist`);
-        }
+    const cekDataMataKuliah = await MataKuliah.findByPk(id)
 
-        return existMataKuliah;
+    if (!cekDataMataKuliah) {
+        throw new NotFoundError("Mata Kuliah tidak dapat ditemukan")
     }
-    catch (error) {
-        throw new Error(`Terjadi kesalahan saat mengambil data: ${error.message}`);
-    }
+
+    return cekDataMataKuliah
 }
 
 // =========================================================
 // 5. CREATE MATA KULIAH
 // =========================================================
 export const createMataKuliah = async (mataKuliahData) => {
-    try {
-        // PERBAIKAN: Menambahkan `await` sebelum sequelize.transaction
-        const newMataKuliah = await sequelize.transaction(async (t) => {
-
-            if (mataKuliahData.prasyaratMataKuliah1Id != null) {
-                const prasyaratMataKuliah1 = await MataKuliah.findByPk(mataKuliahData.prasyaratMataKuliah1Id, {
-                    transaction: t,
-                    lock: t.LOCK
-                });
-                if (!prasyaratMataKuliah1) {
-                    throw new Error(`Prasyarat Mata Kuliah 1 tidak ditemukan`)
-                }
-            }
-            if (mataKuliahData.prasyaratMataKuliah2Id != null) {
-                const prasyaratMataKuliah2 = await MataKuliah.findByPk(mataKuliahData.prasyaratMataKuliah2Id, {
-                    transaction: t,
-                    lock: t.LOCK
-                });
-                if (!prasyaratMataKuliah2) {
-                    throw new Error(`Prasyarat Mata Kuliah 2 tidak ditemukan`)
-                }
-            }
-            if (mataKuliahData.prasyaratMataKuliah3Id != null) {
-                const prasyaratMataKuliah3 = await MataKuliah.findByPk(mataKuliahData.prasyaratMataKuliah3Id, {
-                    transaction: t,
-                    lock: t.LOCK
-                });
-                if (!prasyaratMataKuliah3) {
-                    throw new Error(`Prasyarat Mata Kuliah 3 tidak ditemukan`)
-                }
-            }
-
-            const createdMataKuliah = await MataKuliah.create(
-                {
-                    siakProgramStudiId: mataKuliahData.siakProgramStudiId,
-                    siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
-
-                    // Menggunakan OR (||) agar tidak ada variabel redundan saat assign kelompok MK
-                    siakKelompokMataKuliahId: mataKuliahData.kelompokMataKuliahId || mataKuliahData.siakKelompokMataKuliahId,
-                    siakRumpunMataKuliahId: mataKuliahData.rumpunMataKuliahId,
-                    siakBidangIlmuId : mataKuliahData.siakBidangIlmuId,
-                    siakJenisMataKuliahId : mataKuliahData.siakJenisMataKuliahId,
-
-                    nama: mataKuliahData.nama,
-                    namaEn: mataKuliahData.namaEn,
-                    kode: mataKuliahData.kode,
-                    jenis: mataKuliahData.jenis,
-                    adaPraktikum: mataKuliahData.adaPraktikum,
-
-                    sksTatapMuka: mataKuliahData.sksTatapMuka,
-                    sksPraktikum: mataKuliahData.sksPraktikum,
-                    sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
-                    sksSimulasi: mataKuliahData.sksSimulasi,
-                    totalSks: (mataKuliahData.sksTatapMuka || 0) +
-                              (mataKuliahData.sksPraktikum || 0) +
-                              (mataKuliahData.sksPraktikLapangan || 0) +
-                              (mataKuliahData.sksSimulasi || 0),
-
-                    merupakanMku: mataKuliahData.merupakanMku,
-                    adaSap: mataKuliahData.adaSap,
-                    adaSilabus: mataKuliahData.adaSilabus,
-                    adaBahanAjar: mataKuliahData.adaBahanAjar,
-                    adaDiktat: mataKuliahData.adaDiktat,
-
-                    koordinatorMkId: mataKuliahData.koordinatorMkId,
-
-                    prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1Id,
-                    prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2Id,
-                    prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3Id
-                },
-                { transaction: t }
-            );
-
-            // Simpan Array Pengembang RPS ke tabel pivot
-            if (mataKuliahData.pengembangRpsIds && mataKuliahData.pengembangRpsIds.length > 0) {
-                await createdMataKuliah.setPengembangRps(mataKuliahData.pengembangRpsIds, { transaction: t });
-            }
-
-            return createdMataKuliah;
-        });
-
-        // Mengembalikan format detail lengkap setelah berhasil create
-        return await getDetailMataKuliahObe(newMataKuliah.id);
-
-    } catch (error) {
-        console.error("🔴 ERROR DI SERVICE CREATE:", error);
-        throw new Error(error.message);
+    const programStudiExist = await ProgramStudi.findByPk(mataKuliahData.siakProgramStudiId)
+    if (!programStudiExist) {
+        throw new Error(`Program studi tidak ditemukan`);
     }
-}
 
+    const tahunKurikulum = await TahunKurikulum.findByPk(mataKuliahData.siakTahunKurikulumId)
+    if (!tahunKurikulum) {
+        throw new Error(`Tahun kurikulum tidak ditemukan`);
+    }
+
+    const newMataKuliah = await sequelize.transaction(async (t) => {
+        await validatePrasyarat(mataKuliahData, t);
+
+        const createdMataKuliah = await MataKuliah.create(
+            {
+                siakProgramStudiId: mataKuliahData.siakProgramStudiId,
+                siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
+
+                siakBidangIlmuId : mataKuliahData.siakBidangIlmuId,
+                siakJenisMataKuliahId : mataKuliahData.siakJenisMataKuliahId,
+                siakKelompokMataKuliahId : mataKuliahData.siakKelompokMataKuliahId,
+
+                nama: mataKuliahData.nama,
+                kode: mataKuliahData.kode,
+                jenis: mataKuliahData.jenis,
+                adaPraktikum: mataKuliahData.adaPraktikum,
+                sksTatapMuka: mataKuliahData.sksTatapMuka,
+                sksPraktikum: mataKuliahData.sksPraktikum,
+                sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
+                totalSks: mataKuliahData.sksTatapMuka + mataKuliahData.sksPraktikum + mataKuliahData.sksPraktikLapangan,
+
+                prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1Id,
+                prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2Id,
+                prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3Id
+            },
+            {
+                transaction: t,
+            }
+        )
+
+        // Simpan Array Pengembang RPS ke tabel pivot
+        if (mataKuliahData.pengembangRpsIds && mataKuliahData.pengembangRpsIds.length > 0) {
+            await createdMataKuliah.setPengembangRps(mataKuliahData.pengembangRpsIds, { transaction: t });
+        }
+
+        // return if success
+        return createdMataKuliah
+    })
+
+    return await getDetailMataKuliahObe(newMataKuliah.id);
+}
 
 //OBE
 export const createMataKuliahObe = async (payload) => {
     // Gunakan transaksi agar data konsisten
     const result = await sequelize.transaction(async (t) => {
-        
+
         // 1. Cek duplikasi kode (Conflict 409)
-        const existing = await MataKuliah.findOne({ 
+        const existing = await MataKuliah.findOne({
             where: { kode: payload.kode, siakTahunKurikulumId: payload.siakTahunKurikulumId },
-            transaction: t 
+            transaction: t
         });
         if (existing) throw new CustomError.ConflictError(`Kode MK ${payload.kode} sudah ada di kurikulum ini!`);
 
@@ -529,118 +288,82 @@ export const createMataKuliahObe = async (payload) => {
     return await getDetailMataKuliahObe(result.id);
 };
 
-export const updateMataKuliahObe = async (id, payload) => {
-    const { MataKuliah, sequelize } = models;
-
-    // 1. Cek apakah data ada
-    const mk = await MataKuliah.findByPk(id);
-    if (!mk) throw new CustomError.NotFoundError(`Mata Kuliah tidak ditemukan.`);
-
-    // 2. Jalankan Transaksi
-    await sequelize.transaction(async (t) => {
-        // Cek conflict kode jika kode diubah
-        if (payload.kode && payload.kode !== mk.kode) {
-            const existing = await MataKuliah.findOne({ 
-                where: { kode: payload.kode, siakTahunKurikulumId: mk.siakTahunKurikulumId },
-                transaction: t 
-            });
-            if (existing) throw new CustomError.ConflictError(`Kode MK ${payload.kode} sudah digunakan!`);
-        }
-
-        // Update data utama
-        await mk.update({
-            ...payload,
-            totalSks: (payload.sksTatapMuka ?? mk.sksTatapMuka) + 
-                      (payload.sksPraktikum ?? mk.sksPraktikum) + 
-                      (payload.sksPraktikLapangan ?? mk.sksPraktikLapangan) + 
-                      (payload.sksSimulasi ?? mk.sksSimulasi)
-        }, { transaction: t });
-
-        // Update Tabel Pivot Pengembang RPS (Sync)
-        if (payload.pengembangRpsIds) {
-            await mk.setPengembangRps(payload.pengembangRpsIds, { transaction: t });
-        }
-    });
-
-    // 3. Balikin data detail terbaru
-    return await getDetailMataKuliahObe(id);
-};
-
-export const deleteMataKuliahObe = async (id) => {
-    const { MataKuliah } = models;
-    const mk = await MataKuliah.findByPk(id);
-    if (!mk) throw new CustomError.NotFoundError(`Mata Kuliah tidak ditemukan.`);
-
-    await mk.destroy();
-    return true;
-};
-
 // =========================================================
 // 6. UPDATE MATA KULIAH
 // =========================================================
 export const updateMataKuliah = async (id, mataKuliahData) => {
-    try {
-        const existMataKuliah = await MataKuliah.findByPk(id);
-        if (!existMataKuliah) throw new Error(`Mata Kuliah tidak ditemukan`);
-
-        await MataKuliah.update({
-            siakProgramStudiId: mataKuliahData.siakProgramStudiId,
-            siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
-            siakKelompokMataKuliahId: mataKuliahData.kelompokMataKuliahId,
-            siakRumpunMataKuliahId: mataKuliahData.rumpunMataKuliahId,
-            nama: mataKuliahData.nama,
-            namaEn: mataKuliahData.namaEn,
-            kode: mataKuliahData.kode,
-            jenis: mataKuliahData.jenis,
-            adaPraktikum: mataKuliahData.adaPraktikum,
-
-            sksTatapMuka: mataKuliahData.sksTatapMuka,
-            sksPraktikum: mataKuliahData.sksPraktikum,
-            sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
-            sksSimulasi: mataKuliahData.sksSimulasi,
-            totalSks: (mataKuliahData.sksTatapMuka || 0) +
-                      (mataKuliahData.sksPraktikum || 0) +
-                      (mataKuliahData.sksPraktikLapangan || 0) +
-                      (mataKuliahData.sksSimulasi || 0),
-
-            merupakanMku: mataKuliahData.merupakanMku,
-            adaSap: mataKuliahData.adaSap,
-            adaSilabus: mataKuliahData.adaSilabus,
-            adaBahanAjar: mataKuliahData.adaBahanAjar,
-            adaDiktat: mataKuliahData.adaDiktat,
-
-            koordinatorMkId: mataKuliahData.koordinatorMkId, // PERBAIKAN: disamakan dengan model ORM
-
-            prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1Id,
-            prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2Id,
-            prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3Id
-        }, { where: { id: id } });
-
-        // UPDATE DATA PENGEMBANG RPS DI TABEL PIVOT
-        if (mataKuliahData.pengembangRpsIds) {
-            await existMataKuliah.setPengembangRps(mataKuliahData.pengembangRpsIds);
-        }
-
-        // Mengembalikan format detail lengkap setelah berhasil update
-        return await getDetailMataKuliahObe(id);
-    } catch (error) {
-        throw new Error(`Kesalahan saat memperbarui data: ${error.message}`);
+    const existMataKuliah = await MataKuliah.findByPk(id);
+    if (!existMataKuliah) {
+        throw new Error(`Mata Kuliah tidak ditemukan`);
     }
+
+    await MataKuliah.update({
+        siakProgramStudiId: mataKuliahData.siakProgramStudiId,
+        siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
+        siakKelompokMataKuliahId: mataKuliahData.kelompokMataKuliahId,
+        siakRumpunMataKuliahId: mataKuliahData.rumpunMataKuliahId,
+        nama: mataKuliahData.nama,
+        namaEn: mataKuliahData.namaEn,
+        kode: mataKuliahData.kode,
+        jenis: mataKuliahData.jenis,
+        adaPraktikum: mataKuliahData.adaPraktikum,
+
+        sksTatapMuka: mataKuliahData.sksTatapMuka,
+        sksPraktikum: mataKuliahData.sksPraktikum,
+        sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
+        sksSimulasi: mataKuliahData.sksSimulasi,
+        totalSks: (mataKuliahData.sksTatapMuka || 0) +
+            (mataKuliahData.sksPraktikum || 0) +
+            (mataKuliahData.sksPraktikLapangan || 0) +
+            (mataKuliahData.sksSimulasi || 0),
+
+        merupakanMku: mataKuliahData.merupakanMku,
+        adaSap: mataKuliahData.adaSap,
+        adaSilabus: mataKuliahData.adaSilabus,
+        adaBahanAjar: mataKuliahData.adaBahanAjar,
+        adaDiktat: mataKuliahData.adaDiktat,
+
+        koordinatorMkId: mataKuliahData.koordinatorMkId, // PERBAIKAN: disamakan dengan model ORM
+
+        prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1Id,
+        prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2Id,
+        prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3Id
+    }, { where: { id: id } });
+
+    // UPDATE DATA PENGEMBANG RPS DI TABEL PIVOT
+    if (mataKuliahData.pengembangRpsIds) {
+        await existMataKuliah.setPengembangRps(mataKuliahData.pengembangRpsIds);
+    }
+
+    // Mengembalikan format detail lengkap setelah berhasil update
+    return await getDetailMataKuliahObe(id);
 }
 
 // =========================================================
 // 7. DELETE MATA KULIAH
 // =========================================================
 export const deleteMataKuliah = async (id) => {
-    try {
-        const deletedRowsCount = await MataKuliah.destroy({
-            where: { id: id }
-        })
-
-        return deletedRowsCount > 0;
+    const cekDataMataKuliah = await MataKuliah.findByPk(id)
+    if (!cekDataMataKuliah) {
+        throw new NotFoundError("Mata Kuliah tidak dapat ditemukan")
     }
-    catch (error) {
-        throw new Error(`Kesalahan saat menghapus Mata Kuliah: ${error.message}`);
+
+    await cekDataMataKuliah.destroy()
+}
+
+// Private function
+const validatePrasyarat = async (mataKuliahData, transaction) => {
+    for (let i = 1; i <= 3; i++) {
+        const prasyaratId = mataKuliahData[`prasyaratMataKuliah${i}Id`];
+        if (prasyaratId != null) {
+            const prasyarat = await MataKuliah.findByPk(prasyaratId, {
+                transaction,
+                lock: transaction.LOCK
+            });
+            if (!prasyarat) {
+                throw new Error(`Prasyarat Mata Kuliah ${i} tidak ditemukan`);
+            }
+        }
     }
 }
 // =========================================================
@@ -651,19 +374,19 @@ export const deleteMataKuliah = async (id) => {
 //     try {
 //         const mk = await MataKuliah.findByPk(mataKuliahId, {
 //             // ✅ TAMBAHAN: Masukkan totalSks dan jenis
-//             attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis'], 
+//             attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis'],
 //             include: [
 //                 // ✅ TAMBAHAN: Tarik nama Prodi untuk "Unit Pengampu"
 //                 { model: models.ProgramStudi, as: 'programStudi', attributes: ['nama'] },
-                
+
 //                 // ✅ TAMBAHAN: Tarik Tahun Kurikulum
 //                 { model: models.TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
-                
+
 //                 {
 //                     model: models.CapaianPembelajaranLulusan,
 //                     as: 'cplDipetakan',
 //                     // Kalau CPL punya deskripsi bahasa Inggris di tabel, tambahkan 'deskripsiEn'
-//                     attributes: ['id', 'kode', 'deskripsi'], 
+//                     attributes: ['id', 'kode', 'deskripsi'],
 //                     through: { attributes: [] }
 //                 }
 //             ],
@@ -678,9 +401,9 @@ export const deleteMataKuliah = async (id) => {
 
 //         // ✅ FORMAT ULANG MATA KULIAH AGAR PAS DENGAN HEADER UI
 //         return {
-//             mataKuliah: { 
-//                 id: mk.id, 
-//                 kodeMataKuliah: mk.kode, 
+//             mataKuliah: {
+//                 id: mk.id,
+//                 kodeMataKuliah: mk.kode,
 //                 namaMataKuliah: mk.nama,
 //                 tahunKurikulum: mk.tahunKurikulum?.tahun || '-',
 //                 sks: mk.totalSks,
@@ -716,7 +439,7 @@ export const deleteMataKuliah = async (id) => {
 
 //         // Setelah berhasil disimpan, kembalikan data terbarunya
 //         return await getCplForMapping(mataKuliahId);
-        
+
 //     } catch (error) {
 //         throw new Error(`Gagal menyimpan pemetaan CPL: ${error.message}`);
 //     }

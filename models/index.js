@@ -1,27 +1,32 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
-import Sequelize from 'sequelize';
+import { Sequelize, DataTypes } from 'sequelize';
 import process from 'process';
 
-// These are needed to properly get the directory name in ESM
+// Import konfigurasi JS yang baru dibuat
+import dbConfig from '../config/database.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const basename = path.basename(__filename);
-const env = process.env.NODE_ENV || 'development';
-// We must dynamically import the JSON config file
-const config = (await import('../config/config.json', { with: { type: 'json' } })).default[env];
+
+// Ambil environment, default ke production sesuai kode Anda sebelumnya
+const env = process.env.NODE_ENV || 'production';
+
+// Pilih konfigurasi berdasarkan environment aktif
+const config = dbConfig[env];
 const db = {};
 
 let sequelize;
 if (config.use_env_variable) {
     sequelize = new Sequelize(process.env[config.use_env_variable], config);
 } else {
+    // Inisialisasi Sequelize dengan konfigurasi dari database.js
     sequelize = new Sequelize(config.database, config.username, config.password, config);
 }
 
-// Read all files in the current directory
+// Baca semua file model di direktori ini
 const files = await fs.readdir(__dirname);
 
 const modelFiles = files.filter(file => {
@@ -33,11 +38,13 @@ const modelFiles = files.filter(file => {
     );
 });
 
-// Asynchronously import and initialize each model
+// Import dan inisialisasi setiap model secara asinkron
 for (const file of modelFiles) {
     const filePath = path.join(__dirname, file);
     const module = await import(pathToFileURL(filePath));
-    const model = module.default(sequelize, Sequelize.DataTypes);
+
+    // Pastikan untuk meneruskan DataTypes dari import Sequelize di atas
+    const model = module.default(sequelize, DataTypes);
     db[model.name] = model;
 }
 
@@ -58,7 +65,7 @@ if (!db._associationsConfigured) {
     db._associationsConfigured = true; // Tandai bahwa relasi sudah selesai dibuat
 }
 
- db.sequelize = sequelize;
+db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
 export default db;

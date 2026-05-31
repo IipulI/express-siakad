@@ -6,4 +6,6 @@ const router = new Router();
 router.get('/', MahasiswaController.findAll)
 router.get('/:id', MahasiswaController.findOne)
 
+router.post('/', MahasiswaController.create)
+
 export default router;
