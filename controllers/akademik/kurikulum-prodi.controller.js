@@ -1,89 +1,225 @@
-import * as KurikulumProdiService from '../../services/kurikulum-prodi.service.js'
+// import * as KurikulumProdiService from '../../services/kurikulum-prodi.service.js'
+// import ResponseBuilder from "../../utils/response.js";
+
+// export const fetchKurikulumProdi = async (req, res) => {
+//     const programStudiId = req.query.siakProgramStudiId
+//     const tahunKurikulumId = req.query.siakTahunKurikulumId
+
+//     if (!programStudiId || !tahunKurikulumId) {
+//         throw new Error(`Program Studi dan Tahun Kurikulum wajib diisi`)
+//     }
+
+//     const responseBuilder = new ResponseBuilder(res);
+
+//     try {
+//         const courses = await KurikulumProdiService.fetchKurikulumProdi(programStudiId, tahunKurikulumId)
+
+//         const coursesGroupedBySemester = courses.reduce((acc, course) => {
+//             const { semester, totalSks } = course;
+//             if (!acc[semester]) {
+//                 acc[semester] = {
+//                     semester,
+//                     mataKuliah: [],
+//                     totalSks: 0,
+//                 };
+//             }
+//             acc[semester].totalSks += totalSks
+
+//             acc[semester].mataKuliah.push(course);
+//             return acc;
+//         }, {});
+
+//         const finalResponse = Object.values(coursesGroupedBySemester);
+
+//         return  responseBuilder
+//             .code(200)
+//             .message("Data berhasil diambil")
+//             .json(finalResponse)
+//     }
+//     catch (error) {
+//         return responseBuilder
+//             .status("failure")
+//             .code(500)
+//             .message(error.message || 'Terjadi kesalahan tak terduga.')
+//             .json();
+//     }
+// }
+
+// export const addCourseToKurikulumProdi = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     const id = req.params.id;
+
+//     try {
+//         await KurikulumProdiService.addCourseToKurikulumProdi(id, req.body)
+
+//         return responseBuilder
+//             .code(200)
+//             .message("Data berhasil diperbarui")
+//             .json();
+//     }
+//     catch (error) {
+//         return responseBuilder
+//             .status("failure")
+//             .code(500)
+//             .message(error.message || 'Terjadi kesalahan tak terduga')
+//             .json();
+//     }
+// }
+
+// export const deleteCourseFromKurikulumProdi = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     const id = req.params.id;
+
+//     try {
+//         await KurikulumProdiService.deleteCourseFromKurikulumProdi(id)
+
+//         return responseBuilder
+//             .status('success')
+//             .code(200)
+//             .message("Data berhasil diperbarui")
+//             .json();
+//     }
+//     catch (error) {
+//         return responseBuilder
+//             .status('failure')
+//             .code(500)
+//             .message(error.message)
+//             .json()
+//     }
+// }
+import * as kurikulumProdiService from '../../services/kurikulum-prodi.service.js';
 import ResponseBuilder from "../../utils/response.js";
 
-export const fetchKurikulumProdi = async (req, res) => {
-    const programStudiId = req.query.siakProgramStudiId
-    const tahunKurikulumId = req.query.siakTahunKurikulumId
+// 1. GET: Rekap Tahun Kurikulum (Untuk halaman paling depan)
+// export const fetchRekapTahunKurikulum = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         const data = await kurikulumProdiService.getRekapTahunKurikulum();
+//         return responseBuilder.code(200).message("Berhasil mengambil rekap tahun kurikulum").json(data);
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
 
-    if (!programStudiId || !tahunKurikulumId) {
-        throw new Error(`Program Studi dan Tahun Kurikulum wajib diisi`)
-    }
 
-    const responseBuilder = new ResponseBuilder(res);
 
+// // 2. GET: Daftar Prodi & Status OBE (Tab Jenis Kurikulum)
+// export const fetchListProdi = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         // 👇 Tangkap search dan jenisKurikulum dari query
+//         const { tahunKurikulumId, jenjangId, search, jenisKurikulum } = req.query;
+        
+//         // Validasi parameter URL
+//         if (!tahunKurikulumId || !jenjangId) {
+//             throw new Error("Parameter tahunKurikulumId dan jenjangId wajib dikirim!");
+//         }
+        
+//         // 👇 Lempar ke service
+//         const data = await kurikulumProdiService.getDaftarKurikulumProdi(tahunKurikulumId, jenjangId, search, jenisKurikulum);
+//         return responseBuilder.code(200).message("Berhasil mengambil daftar prodi dan status kurikulum").json(data);
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
+
+// // 3. POST: Set Aturan OBE & Target Capaian (Modal Checkbox)
+// export const updateAturanObe = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         const { programStudiId, tahunKurikulumId, isObe } = req.body;
+
+//         // Validasi body: isObe harus ada (bisa true/false), id prodi dan kurikulum wajib ada
+//         if (!programStudiId || !tahunKurikulumId || isObe === undefined) {
+//             throw new Error("Parameter programStudiId, tahunKurikulumId, dan isObe wajib dikirim!");
+//         }
+        
+//         // Lempar seluruh isi req.body ke service
+//         const message = await kurikulumProdiService.setAturanObeProdi(req.body);
+        
+//         return responseBuilder.code(200).message(message).json();
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
+export const storeKurikulum = async (req, res, next) => {
     try {
-        const courses = await KurikulumProdiService.fetchKurikulumProdi(programStudiId, tahunKurikulumId)
-
-        const coursesGroupedBySemester = courses.reduce((acc, course) => {
-            const { semester, totalSks } = course;
-            if (!acc[semester]) {
-                acc[semester] = {
-                    semester,
-                    mataKuliah: [],
-                    totalSks: 0,
-                };
-            }
-            acc[semester].totalSks += totalSks
-
-            acc[semester].mataKuliah.push(course);
-            return acc;
-        }, {});
-
-        const finalResponse = Object.values(coursesGroupedBySemester);
-
-        return  responseBuilder
-            .code(200)
-            .message("Data berhasil diambil")
-            .json(finalResponse)
-    }
-    catch (error) {
-        return responseBuilder
-            .status("failure")
-            .code(500)
-            .message(error.message || 'Terjadi kesalahan tak terduga.')
-            .json();
-    }
-}
-
-export const addCourseToKurikulumProdi = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
-    const id = req.params.id;
-
+        const result = await kurikulumProdiService.createKurikulum(req.body);
+        return new ResponseBuilder(res)
+            .code(201)
+            .message("Berhasil menambah Tahun Kurikulum baru")
+            .json(result);
+    } catch (error) { next(error); }
+};
+export const fetchRekapTahunKurikulum = async (req, res, next) => {
     try {
-        await KurikulumProdiService.addCourseToKurikulumProdi(id, req.body)
+        const result = await kurikulumProdiService.getRekapTahunKurikulum(req.query);
+        return new ResponseBuilder(res).code(200).message("Berhasil mengambil rekap").json(result);
+    } catch (error) { next(error); }
+};
 
-        return responseBuilder
-            .code(200)
-            .message("Data berhasil diperbarui")
-            .json();
-    }
-    catch (error) {
-        return responseBuilder
-            .status("failure")
-            .code(500)
-            .message(error.message || 'Terjadi kesalahan tak terduga')
-            .json();
-    }
-}
-
-export const deleteCourseFromKurikulumProdi = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
-    const id = req.params.id;
-
+// export const fetchListProdi = async (req, res, next) => {
+//     try {
+//         const result = await kurikulumProdiService.getDaftarKurikulumProdi(req.query);
+//         return new ResponseBuilder(res).code(200).message("Berhasil mengambil list prodi").json(result);
+//     } catch (error) { next(error); }
+// };
+export const fetchListProdi = async (req, res, next) => {
     try {
-        await KurikulumProdiService.deleteCourseFromKurikulumProdi(id)
-
-        return responseBuilder
-            .status('success')
+        const { tahunKurikulumId, jenjangId, search, jenisKurikulum } = req.query;
+        const result = await kurikulumProdiService.getDetailKurikulum(tahunKurikulumId, jenjangId, { search, jenisKurikulum });
+        
+        return new ResponseBuilder(res)
             .code(200)
-            .message("Data berhasil diperbarui")
+            .message("Berhasil mengambil data detail kurikulum")
+            .json(result);
+    } catch (error) { next(error); }
+};
+
+// export const updateAturanObe = async (req, res, next) => {
+//     try {
+//         const message = await kurikulumProdiService.setAturanObeProdi(req.body);
+//         return new ResponseBuilder(res).code(200).message(message).json();
+//     } catch (error) { next(error); }
+// };
+export const updateAturanObe = async (req, res, next) => {
+    try {
+        await kurikulumProdiService.saveAturanObeBulk(req.body);
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Berhasil memperbarui aturan OBE Program Studi")
             .json();
-    }
-    catch (error) {
-        return responseBuilder
-            .status('failure')
-            .code(500)
-            .message(error.message)
-            .json()
-    }
-}
+    } catch (error) { next(error); }
+};
+
+
+// // 4. PREDIKAT KELULUSAN
+// export const fetchPredikat = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         const data = await kurikulumProdiService.fetchPredikatKelulusan();
+//         return responseBuilder.code(200).message("Data Predikat berhasil diambil").json(data);
+//     } catch (error) {å
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
+
+// export const savePredikat = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         await kurikulumProdiService.upsertPredikatKelulusan(req.body);
+//         return responseBuilder.code(200).message("Data Predikat berhasil disimpan").json();
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };
+
+// export const destroyPredikat = async (req, res) => {
+//     const responseBuilder = new ResponseBuilder(res);
+//     try {
+//         await kurikulumProdiService.deletePredikatKelulusan(req.params.id);
+//         return responseBuilder.code(200).message("Data Predikat berhasil dihapus").json();
+//     } catch (error) {
+//         return responseBuilder.status("failure").code(500).message(error.message).json();
+//     }
+// };

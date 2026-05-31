@@ -1,27 +1,29 @@
-import { body } from "express-validator";
+import { body, query, param, validationResult } from 'express-validator';
+import * as CustomError from '../utils/custom-error.js';
 
-export const validateCreateBatasSks = [
-  body("siakJenjangId")
-    .notEmpty()
-    .withMessage("siakJenjangId is required.")
-    .isUUID()
-    .withMessage("siakJenjangId must be a UUID."),
-  body("ipsMin")
-    .notEmpty()
-    .withMessage("ipsMin is required.")
-    .isDecimal()
-    .withMessage("ipsMin must be a Decimal."),
+const validate = (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        throw new CustomError.BadRequestError(errors.array()[0].msg);
+    }
+    next();
+};
 
-  body("ipsMax")
-    .notEmpty()
-    .withMessage("ipsMax is required.")
-    .isDecimal()
-    .withMessage("ipsMax must be a Decimal."),
-  
-  body("batasSks")
-    .notEmpty()
-    .withMessage("batasSks is required.")
-    .isInt()
-    .withMessage("batasSks must be a Int."),
+export const validateGetBatasSks = [
+    query('jenjangId').isUUID().withMessage('Jenjang ID wajib valid UUID'),
+    query('tahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID wajib valid UUID'),
+    validate
 ];
 
+export const validateSaveBatasSks = [
+    body('siakJenjangId').isUUID().withMessage('Jenjang ID wajib valid UUID'),
+    body('ipsMin').isFloat({ min: 0, max: 4 }).withMessage('IPS Minimal harus angka 0-4'),
+    body('ipsMax').isFloat({ min: 0, max: 4 }).withMessage('IPS Maksimal harus angka 0-4'),
+    body('batasSks').isInt({ min: 1 }).withMessage('Batas SKS harus berupa angka bulat'),
+    validate
+];
+
+export const validateDeleteBatasSks = [
+    param('id').isUUID().withMessage('ID Batas SKS wajib valid UUID'),
+    validate
+];

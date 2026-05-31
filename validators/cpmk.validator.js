@@ -1,0 +1,35 @@
+import { body, param, validationResult } from 'express-validator';
+import * as CustomError from '../utils/custom-error.js';
+
+export const validateSaveCpmk = [
+    param('id').isUUID().withMessage('ID Mata Kuliah tidak valid'),
+    
+    // 1. Validasi Baris Induk (Parent CPMK)
+    body('cpmkList').isArray({ min: 1 }).withMessage('Daftar CPMK tidak boleh kosong'),
+    body('cpmkList.*.kode').notEmpty().withMessage('Setiap kode CPMK wajib diisi'),
+    body('cpmkList.*.deskripsi').notEmpty().withMessage('Deskripsi CPMK wajib diisi'), // 👈 Tambahan
+    body('cpmkList.*.bobot').isFloat({ min: 0, max: 100 }).withMessage('Bobot CPMK harus 0-100'),
+
+    // 2. Validasi Sub-Array 1 (Pemetaan CPL di dalam CPMK Induk)
+    body('cpmkList.*.cplPemetaan').isArray().withMessage('Pemetaan CPL harus berupa array'),
+    body('cpmkList.*.cplPemetaan.*.idCpl').isUUID().withMessage('ID CPL tidak valid'),
+    body('cpmkList.*.cplPemetaan.*.bobotCpl').isFloat({ min: 0, max: 100 }).withMessage('Bobot CPL tidak valid'),
+
+    // 👇 3. TAMBAHAN BARU: Validasi untuk anak-anaknya (Sub-CPMK) 👇
+    body('cpmkList.*.subCpmk')
+        .optional()
+        .isArray().withMessage('Sub CPMK harus berupa array'),
+    body('cpmkList.*.subCpmk.*.kode')
+        .notEmpty().withMessage('Kode Sub-CPMK wajib diisi jika ada'),
+    body('cpmkList.*.subCpmk.*.deskripsi')
+        .notEmpty().withMessage('Deskripsi Sub-CPMK wajib diisi jika ada'),
+
+    // Eksekutor
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            throw new CustomError.BadRequestError(errors.array()[0].msg);
+        }
+        next();
+    }
+];

@@ -1,11 +1,28 @@
+// import { Router } from "express";
+// import * as BatasSksController from "../../controllers/akademik/batas-sks.controller.js";
+// import { validateCreateBatasSks } from "../../validators/batas-sks.validator.js";
+// const router = new Router();
+
+// router.get("/", BatasSksController.findAll);
+// router.post("/", validateCreateBatasSks, BatasSksController.create)
+// router.put("/:id", BatasSksController.updateBatasSks)
+// router.delete("/:id", BatasSksController.deleteBatasSks)
+
+// export default router;
 import { Router } from "express";
 import * as BatasSksController from "../../controllers/akademik/batas-sks.controller.js";
-import { validateCreateBatasSks } from "../../validators/batas-sks.validator.js";
+import { 
+    validateGetBatasSks, 
+    validateSaveBatasSks, 
+    validateDeleteBatasSks 
+} from "../../validators/batas-sks.validator.js";
+
 const router = new Router();
 
-router.get("/", BatasSksController.findAll);
-router.post("/", validateCreateBatasSks, BatasSksController.create)
-router.put("/:id", BatasSksController.updateBatasSks)
-router.delete("/:id", BatasSksController.deleteBatasSks)
+// Tambahkan validator di masing-masing rute
+router.get("/", validateGetBatasSks, BatasSksController.fetchBatasSks);
+router.post("/", validateSaveBatasSks, BatasSksController.create);
+router.put("/:id", validateSaveBatasSks, BatasSksController.updateBatasSks);
+router.delete("/:id", validateDeleteBatasSks, BatasSksController.deleteBatasSks);
 
 export default router;

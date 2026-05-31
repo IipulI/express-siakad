@@ -16,6 +16,9 @@ async function startServer() {
         // Using { force: true } will drop the table if it already exists.
         // Use with caution in production.
         // await sequelize.sync({ force: process.env.NODE_ENV === 'development' });
+        // console.log("All models were synchronized successfully.");
+        // Sync all models secara cerdas (nambahin kolom yang kurang tanpa hapus data)
+        await sequelize.sync({ alter: true }); 
         console.log("All models were synchronized successfully.");
 
         server.listen(port, () => {

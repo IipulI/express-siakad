@@ -6,6 +6,10 @@ export default (sequelize) => {
     class ProfilLulusan extends Model {
         static associate(models) {
             // define assoc
+            this.belongsTo(models.Obe, { 
+                foreignKey: 'siak_obe_id', 
+                as: 'obe' 
+            });
         }
     }
 
@@ -31,7 +35,12 @@ export default (sequelize) => {
             },
             deskripsi: {
                 type: DataTypes.TEXT
-            }
+            },
+            deskripsiEn: {
+        type: DataTypes.TEXT,
+        field: 'deskripsi_en', // Mapping ke nama kolom snake_case di DB
+        allowNull: true
+    },
         },
         {
             sequelize,

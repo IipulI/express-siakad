@@ -19,10 +19,27 @@ import ObeRouter from "./obe.router.js";
 import RpsRouter from "./rps.router.js";
 import BatasSks from "./batas-sks.router.js";
 import JalurPendaftaran from "./jalur-pendaftaran.router.js";
+import TemplateEvaluasi from "./template-evaluasi.routes.js";
+import GrupMk from "./grup-mk.route.js";
+import KetentuanAkademik from "./ketentuan-akademik.route.js";
+import SkalaNilai from "./skala-nilai.route.js";
+import PredikatKelulusan from "./predikat-kelulusan.route.js";
+import Ekivalensi from "./ekivalensi.route.js";
+import MkKurikulum from "./mata-kuliah-kurikulum.route.js";
 import BidangIlmuRouter from "./bidang-ilmu.router.js";
 import JenisMataKuliahRouter from "./jenis-mata-kuliah.router.js";
 import KelompokMataKuliahRouter from "./kelompok-mata-kuliah.router.js";
 import MahasiswaRouter from "./mahasiswa.router.js";
+
+import EkivalensiMataKuliah from "./ekivalensi-mata-kuliah.router.js";
+
+import CPLUmum from "./cpl-umum.router.js";
+
+import AturanEvaluasiRouter from "./aturan-evaluasi.router.js";
+import KrsRouter from "./krs.router.js";
+import MonitoringRouter from "./monitoring.router.js";
+import koordinatorMkRouter from './koordinator-mk_router.js';
+import dosenPengampuRouter from './dosen-pengampu_router.js';
 
 const router = Router();
 
@@ -35,8 +52,18 @@ router.use("/rps", RpsRouter);
 router.use("/obe", ObeRouter)
 router.use("/batas-sks", BatasSks);
 
+
+
+// CPL UMUM TAHUN AKADEMIK
+router.use("/cpl-umum", CPLUmum);
+
+
+//aturan evaluasi
+router.use('/aturan-evaluasi', AturanEvaluasiRouter);
+
 // kelas kuliah
 router.use("/kelas-kuliah", KelasKuliahRouter);
+router.use("/krs-mahasiswa", KrsRouter);
 
 
 // --- MAHASISWA ---
@@ -73,5 +100,20 @@ router.use("/kebutuhan-khusus", KebutuhanKhususRouter);
 router.use("/periode-akademik", PeriodeAkademikRouter);
 
 router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
+router.use("/template-evaluasi", TemplateEvaluasi)
+router.use("/grup-mk", GrupMk)
+router.use("/ketentuan-akademik", KetentuanAkademik)
+router.use("/skala-nilai", SkalaNilai)
+router.use("/predikat-kelulusan", PredikatKelulusan)
+router.use("/ekivalensi", Ekivalensi)
+router.use("/mata-kuliah-kurikulum", MkKurikulum)
+router.use("/ekivalensi-mata-kuliah", EkivalensiMataKuliah)
+router.use("/monitoring", MonitoringRouter)
+
+// Router baru untuk Koordinator MK:
+router.use('/koordinator-mk', koordinatorMkRouter);
+
+// Router baru untuk Dosen Pengampu:
+router.use('/dosen', dosenPengampuRouter);
 
 export default router;
