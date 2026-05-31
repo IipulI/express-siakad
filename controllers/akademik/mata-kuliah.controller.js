@@ -231,7 +231,7 @@ export const updateMataKuliahObe = async (req, res, next) => {
 export const deleteMataKuliahObe = async (req, res, next) => {
     try {
         const { id } = req.params;
-        await MataKuliahService.deleteMataKuliahObe(id);
+        await MataKuliahService.deleteMataKuliah(id);
 
         return new ResponseBuilder(res)
             .code(200)
