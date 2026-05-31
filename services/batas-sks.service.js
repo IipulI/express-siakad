@@ -1,4 +1,5 @@
 import models from "../models/index.js";
+import { Op } from "sequelize";
 import { getPagination } from "../utils/pagination.js";
 import { NotFoundError, UnprocessableEntityError } from "../utils/custom-error.js";
 
