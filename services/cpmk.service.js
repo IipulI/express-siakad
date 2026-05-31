@@ -1,7 +1,7 @@
 import models from "../models/index.js";
 import * as CustomError from "../utils/custom-error.js";
 
-const { MataKuliah, CapaianMataKuliah, CapaianPembelajaranLulusan, ProgramStudi, TahunKurikulum, Jenjang, PemetaanCplCpmk, sequelize } = models;
+const { MataKuliah, CapaianMataKuliah, CapaianPembelajaranLulusan, ProgramStudi, TahunKurikulum, Jenjang, PemetaanCplCpmk, Obe, sequelize } = models;
 
 // =========================================================
 // GET: Ambil Data untuk Render UI Pemetaan CPMK
@@ -247,6 +247,15 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
         throw new CustomError.BadRequestError(`Total seluruh bobot CPMK adalah ${totalBobotVertikal}%. Wajib pas 100%!`);
     }
 
+    // Ambil siakObeId dari mata kuliah
+    const mk = await MataKuliah.findByPk(mataKuliahId, {
+        attributes: ['siakProgramStudiId', 'siakTahunKurikulumId']
+    });
+    const obe = mk ? await Obe.findOne({
+        where: { siakProgramStudiId: mk.siakProgramStudiId, siakTahunKurikulumId: mk.siakTahunKurikulumId }
+    }) : null;
+    const siakObeId = obe?.id || null;
+
     // 💾 2. EKSEKUSI DATABASE
     return await sequelize.transaction(async (t) => {
         // A. Ambil ID CPMK lama dulu, lalu hapus pivot-nya, lalu soft-delete CPMK-nya
@@ -270,6 +279,7 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
         // B. Looping untuk simpan Induk (Parent)
         for (const parent of cpmkList) {
             const newParent = await CapaianMataKuliah.create({
+                siakObeId,
                 siakMataKuliahId: mataKuliahId,
                 kode: parent.kode,
                 deskripsi: parent.deskripsi,
@@ -291,6 +301,7 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
             // D. Simpan Anak-anaknya (Sub-CPMK)
             if (parent.subCpmk?.length > 0) {
                 const subData = parent.subCpmk.map(sub => ({
+                    siakObeId,
                     siakMataKuliahId: mataKuliahId,
                     kode: sub.kode,
                     deskripsi: sub.deskripsi,
