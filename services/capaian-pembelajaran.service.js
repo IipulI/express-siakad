@@ -315,9 +315,9 @@ export const getCapaianCplKelas = async (kelasId) => {
                     totalBobot += bobot;
                 }
             });
-            // Formula SEVIMA: CPL = Σ(nilaiCPMK × bobotCpl / 100) — direct weighted sum
+            // CPL = weighted average: Σ(nilaiCPMK × bobot) / Σbobot
             const nilaiCpl = totalBobot > 0
-                ? parseFloat(totalNilai.toFixed(2))
+                ? parseFloat((totalNilai / (totalBobot / 100)).toFixed(2))
                 : null;
             nilaiPerCpl[cpl.kode] = nilaiCpl;
             if (nilaiCpl !== null) {
