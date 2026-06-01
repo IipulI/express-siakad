@@ -20,12 +20,12 @@ const DEFAULT_SKALA = [
 ];
 
 const getGrade = (nilai, skala) => {
-    for (const s of skala) {
-        if (nilai >= s.nilaiMin && nilai <= s.nilaiMax) {
+    const sorted = [...skala].sort((a, b) => b.nilaiMin - a.nilaiMin);
+    for (const s of sorted) {
+        if (nilai >= s.nilaiMin) {
             return { hurufMutu: s.hurufMutu, angkaMutu: s.angkaMutu };
         }
     }
-    // Nilai 0 atau tidak cocok range manapun
     return { hurufMutu: 'E', angkaMutu: 0 };
 };
 
