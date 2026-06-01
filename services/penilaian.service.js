@@ -217,12 +217,12 @@ export const hitungNilaiAkhir = async (krsId) => {
             // ====================================================================
             // 4. UPDATE NILAI AKHIR KRS
             // ====================================================================
-            try {
-                await models.RincianKrsMahasiswa.update(
-                    { nilaiAkhir: totalSkor, hurufMutu, angkaMutu, nilai_akhir: totalSkor, huruf_mutu: hurufMutu, angka_mutu: angkaMutu },
-                    { where: { id: krsId }, transaction: trx }
-                );
-            } catch (e) { }
+            await sequelize.query(
+                `UPDATE siak_rincian_krs_mahasiswa
+                 SET nilai_akhir = :nilaiAkhir, huruf_mutu = :hurufMutu, angka_mutu = :angkaMutu
+                 WHERE id = :krsId`,
+                { replacements: { nilaiAkhir: totalSkor, hurufMutu, angkaMutu, krsId }, transaction: trx }
+            );
 
             // ====================================================================
             // 5. SIMPAN KE TABEL MATERIALIZED (NILAI CPMK) MENGGUNAKAN RAW SQL
