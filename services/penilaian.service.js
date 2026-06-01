@@ -105,6 +105,11 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
         err.statusCode = 403;
         throw err;
     }
+    if (rincian.status === 'Lulus' || rincian.status === 'Tidak Lulus') {
+        const err = new Error('Nilai sudah difinalisasi dan bersifat permanen, tidak dapat diubah');
+        err.statusCode = 403;
+        throw err;
+    }
     try {
         await sequelize.transaction(async (trx) => {
             // Hapus nilai lama dengan FORCE: TRUE agar terhapus permanen (hard-delete),
@@ -174,7 +179,9 @@ export const hitungNilaiAkhir = async (krsId) => {
             let angkaMutu = 0.0;
 
             const queryTrace = `
-                SELECT mk.siak_program_studi_id AS prodi_id, mk.siak_tahun_kurikulum_id AS kurikulum_id
+                SELECT mk.siak_program_studi_id AS prodi_id,
+                       mk.siak_tahun_kurikulum_id AS kurikulum_id,
+                       kk.siak_mata_kuliah_id AS mk_id
                 FROM siak_rincian_krs_mahasiswa rkm
                 LEFT JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
                 LEFT JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
@@ -183,7 +190,7 @@ export const hitungNilaiAkhir = async (krsId) => {
             const traceResult = await sequelize.query(queryTrace, { replacements: { krsId }, type: sequelize.QueryTypes.SELECT, transaction: trx });
 
             if (traceResult && traceResult.length > 0) {
-                const { prodi_id, kurikulum_id } = traceResult[0];
+                const { prodi_id, kurikulum_id, mk_id } = traceResult[0];
 
                 const querySkala = `
                     SELECT huruf_mutu AS grade, angka_mutu AS bobot, nilai_min
@@ -211,6 +218,50 @@ export const hitungNilaiAkhir = async (krsId) => {
                     else if (totalSkor >= 61.00) { hurufMutu = 'C'; angkaMutu = 2.0; }
                     else if (totalSkor >= 41.00) { hurufMutu = 'CD'; angkaMutu = 1.5; }
                     else if (totalSkor >= 1.00) { hurufMutu = 'D'; angkaMutu = 1.0; }
+                }
+            }
+
+            // ====================================================================
+            // 3.5 CEK SYARAT LULUS PER KOMPONEN EVALUASI
+            // Jika ada komponen yang ditandai MENJADI_SYARAT_LULUS dan nilainya
+            // di bawah 60, paksa grade menjadi E meskipun nilai akhir tinggi
+            // ====================================================================
+            if (traceResult && traceResult.length > 0) {
+                const { mk_id } = traceResult[0];
+
+                const syaratRows = await sequelize.query(`
+                    SELECT re.metode_evaluasi, re.syarat_lulus
+                    FROM siak_rencana_evaluasi re
+                    WHERE re.siak_mata_kuliah_id = :mkId
+                      AND re.syarat_lulus = 'MENJADI_SYARAT_LULUS'
+                      AND re.deleted_at IS NULL
+                `, { replacements: { mkId: mk_id }, type: sequelize.QueryTypes.SELECT, transaction: trx });
+
+                if (syaratRows.length > 0) {
+                    // Bangun map: key komposisi → skor mahasiswa
+                    const nilaiMap = {};
+                    listNilai.forEach(n => {
+                        const komp = n.komposisiNilai;
+                        if (komp?.key) nilaiMap[komp.key.toLowerCase()] = parseFloat(n.skor || 0);
+                    });
+
+                    for (const syarat of syaratRows) {
+                        // Cocokkan metode_evaluasi (e.g. "UTS") dengan key komposisi (e.g. "uts")
+                        const metode = (syarat.metode_evaluasi || '').toLowerCase();
+                        // Cari key yang cocok: exact match atau key ada di dalam metode
+                        const matchedKey = Object.keys(nilaiMap).find(
+                            k => k === metode || metode.includes(k) || k.includes(metode.split(' ')[0])
+                        );
+
+                        if (matchedKey !== undefined) {
+                            const nilaiKomponen = nilaiMap[matchedKey];
+                            if (nilaiKomponen < 60) {
+                                hurufMutu = 'E';
+                                angkaMutu = 0.0;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -662,21 +713,79 @@ export const getPesertaKelasList = async (kelasId) => {
 // KUNCI / BUKA KUNCI NILAI
 // ─────────────────────────────────────────────
 
+const STATUS_FINAL = ['Lulus', 'Tidak Lulus'];
+
 export const kunciNilaiKelas = async (kelasId, action = 'kunci') => {
+    if (action === 'buka') {
+        const adaFinal = await RincianKrsMahasiswa.count({
+            where: { siak_kelas_kuliah_id: kelasId, status: STATUS_FINAL }
+        });
+        if (adaFinal > 0) {
+            throw new Error(`${adaFinal} mahasiswa sudah difinalisasi dan tidak dapat dibuka kembali`);
+        }
+    }
+
     const newStatus = action === 'kunci' ? 'Dikunci' : null;
     const [jumlahDiupdate] = await RincianKrsMahasiswa.update(
         { status: newStatus },
-        { where: { siak_kelas_kuliah_id: kelasId } }
+        { where: { siak_kelas_kuliah_id: kelasId, status: { [Op.notIn]: STATUS_FINAL } } }
     );
     return { kelasId, jumlahDiupdate, status: newStatus ?? 'Aktif' };
 };
 
 export const kunciNilaiSatuMahasiswa = async (rincianKrsId, action = 'kunci') => {
-    const newStatus = action === 'kunci' ? 'Dikunci' : null;
     const rincian = await RincianKrsMahasiswa.findByPk(rincianKrsId);
     if (!rincian) throw new Error('Data rincian KRS tidak ditemukan');
+
+    if (STATUS_FINAL.includes(rincian.status) && action === 'buka') {
+        throw new Error('Nilai sudah difinalisasi dan bersifat permanen, tidak dapat dibuka kembali');
+    }
+
+    const newStatus = action === 'kunci' ? 'Dikunci' : null;
     await rincian.update({ status: newStatus });
     return { rincianKrsId, status: newStatus ?? 'Aktif' };
+};
+
+// ====================================================================
+// FINALISASI NILAI KELAS (Permanent Lock setelah masa sanggah habis)
+// Koordinator MK mengeksekusi ini setelah masa sanggah berakhir.
+// Status berubah dari 'Dikunci' → 'Lulus' / 'Tidak Lulus' (permanen)
+// ====================================================================
+const GRADE_LULUS = ['A', 'AB', 'B', 'BC', 'C'];
+
+export const finalisasiNilaiKelas = async (kelasId) => {
+    const rincianList = await RincianKrsMahasiswa.findAll({
+        where: { siak_kelas_kuliah_id: kelasId },
+        attributes: ['id', 'status', 'huruf_mutu', 'hurufMutu']
+    });
+
+    if (rincianList.length === 0) throw new Error('Tidak ada mahasiswa di kelas ini');
+
+    const belumDikunci = rincianList.filter(r => r.status !== 'Dikunci' && !STATUS_FINAL.includes(r.status));
+    if (belumDikunci.length > 0) {
+        throw new Error(`${belumDikunci.length} mahasiswa belum dikunci nilainya. Kunci semua nilai terlebih dahulu sebelum finalisasi.`);
+    }
+
+    const yangBisaFinal = rincianList.filter(r => !STATUS_FINAL.includes(r.status));
+
+    let jumlahLulus = 0;
+    let jumlahTidakLulus = 0;
+
+    for (const r of yangBisaFinal) {
+        const grade = r.hurufMutu || r.huruf_mutu;
+        const isLulus = GRADE_LULUS.includes(grade);
+        await r.update({ status: isLulus ? 'Lulus' : 'Tidak Lulus' });
+        if (isLulus) jumlahLulus++;
+        else jumlahTidakLulus++;
+    }
+
+    return {
+        kelasId,
+        jumlahLulus,
+        jumlahTidakLulus,
+        jumlahSudahFinalSebelumnya: rincianList.length - yangBisaFinal.length,
+        pesan: `Finalisasi selesai. ${jumlahLulus} lulus, ${jumlahTidakLulus} tidak lulus.`
+    };
 };
 const getMetadataKelas = async (kelasId) => {
 

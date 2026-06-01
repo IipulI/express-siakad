@@ -73,6 +73,17 @@ export const kunciNilaiKelas = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const finalisasiNilaiKelas = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const result = await penilaianService.finalisasiNilaiKelas(kelasId);
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(result.pesan)
+            .json(result);
+    } catch (error) { next(error); }
+};
+
 export const kunciNilaiMahasiswa = async (req, res, next) => {
     try {
         const { rincianKrsId } = req.params;
