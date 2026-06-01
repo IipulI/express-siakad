@@ -85,6 +85,11 @@ router.post('/kelas/:kelasId/nilai-cpmk/:krsId', PenilaianController.simpanNilai
 // Setelah finalisasi: status → 'Lulus' / 'Tidak Lulus' (tidak bisa dibuka kembali)
 router.patch('/kelas/:kelasId/nilai/finalisasi', PenilaianController.finalisasiNilaiKelas);
 
+// [RESET - DEV/TESTING ONLY]
+router.patch('/kelas/:kelasId/nilai/reset-finalisasi', PenilaianController.resetFinalisasiKelas);
+router.delete('/kelas/:kelasId/nilai/:rincianKrsId/reset', PenilaianController.resetNilaiMahasiswa);
+router.delete('/kelas/:kelasId/nilai/reset-semua', PenilaianController.resetNilaiKelas);
+
 // [Export Nilai Kelas] - ?format=pdf -> PDF, default -> Excel
 router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
     if (req.query.format === 'pdf') return ExportNilaiKelasController.exportPdfNilaiKelas(req, res, next);

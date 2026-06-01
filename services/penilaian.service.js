@@ -1020,6 +1020,90 @@ export const getDataLaporanPerkuliahan = async (kelasId) => {
 // ─────────────────────────────────────────────────────────────
 // LAPORAN 2: Daftar nilai mahasiswa (ringkas)
 // ─────────────────────────────────────────────────────────────
+// ============================================================
+// RESET FUNCTIONS (DEV/TESTING ONLY)
+// ============================================================
+
+export const resetFinalisasiKelas = async (kelasId) => {
+    const [updated] = await sequelize.query(`
+        UPDATE siak_rincian_krs_mahasiswa
+        SET status = 'Dikunci', updated_at = NOW()
+        WHERE siak_kelas_kuliah_id = :kelasId
+          AND status IN ('Lulus', 'Tidak Lulus')
+          AND deleted_at IS NULL
+    `, { replacements: { kelasId }, type: sequelize.QueryTypes.UPDATE });
+    return { reset: updated, pesan: `${updated} mahasiswa direset dari finalisasi → Dikunci` };
+};
+
+export const resetNilaiMahasiswa = async (rincianKrsId) => {
+    const rkm = await RincianKrsMahasiswa.findByPk(rincianKrsId);
+    if (!rkm) throw new Error('Rincian KRS tidak ditemukan');
+
+    const kelasId = rkm.siakKelasKuliahId || rkm.siak_kelas_kuliah_id;
+    const krsId = rkm.siakKrsMahasiswaId || rkm.siak_krs_mahasiswa_id;
+    const krs = await KrsMahasiswa.findByPk(krsId);
+    const mhsId = krs?.siakMahasiswaId || krs?.siak_mahasiswa_id;
+
+    await sequelize.transaction(async (trx) => {
+        await sequelize.query(`
+            DELETE FROM siak_nilai_evaluasi_mahasiswa
+            WHERE siak_rincian_krs_mahasiswa_id = :rincianKrsId
+        `, { replacements: { rincianKrsId }, transaction: trx });
+
+        if (mhsId) {
+            await sequelize.query(`
+                DELETE FROM siak_nilai_cpmk_mahasiswa
+                WHERE siak_kelas_kuliah_id = :kelasId
+                  AND siak_mahasiswa_id = :mhsId
+            `, { replacements: { kelasId, mhsId }, transaction: trx });
+        }
+
+        await sequelize.query(`
+            UPDATE siak_rincian_krs_mahasiswa
+            SET nilai_akhir = NULL,
+                huruf_mutu  = NULL,
+                angka_mutu  = NULL,
+                status      = 'Disetujui',
+                updated_at  = NOW()
+            WHERE id = :rincianKrsId
+        `, { replacements: { rincianKrsId }, transaction: trx });
+    });
+
+    return { pesan: 'Nilai mahasiswa berhasil direset ke Belum Dinilai' };
+};
+
+export const resetNilaiKelas = async (kelasId) => {
+    let jumlahMhs = 0;
+    await sequelize.transaction(async (trx) => {
+        await sequelize.query(`
+            DELETE FROM siak_nilai_evaluasi_mahasiswa nem
+            USING siak_rincian_krs_mahasiswa rkm
+            WHERE nem.siak_rincian_krs_mahasiswa_id = rkm.id
+              AND rkm.siak_kelas_kuliah_id = :kelasId
+        `, { replacements: { kelasId }, transaction: trx });
+
+        await sequelize.query(`
+            DELETE FROM siak_nilai_cpmk_mahasiswa
+            WHERE siak_kelas_kuliah_id = :kelasId
+        `, { replacements: { kelasId }, transaction: trx });
+
+        const [res] = await sequelize.query(`
+            UPDATE siak_rincian_krs_mahasiswa
+            SET nilai_akhir = NULL,
+                huruf_mutu  = NULL,
+                angka_mutu  = NULL,
+                status      = 'Disetujui',
+                updated_at  = NOW()
+            WHERE siak_kelas_kuliah_id = :kelasId
+              AND deleted_at IS NULL
+            RETURNING id
+        `, { replacements: { kelasId }, transaction: trx });
+        jumlahMhs = res.length;
+    });
+
+    return { reset: jumlahMhs, pesan: `${jumlahMhs} mahasiswa direset ke Belum Dinilai (nilai & CPMK dihapus)` };
+};
+
 export const getDataDaftarNilai = async (kelasId) => {
     const [metadata, pesertaData] = await Promise.all([
         getMetadataKelas(kelasId),

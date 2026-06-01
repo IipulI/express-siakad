@@ -310,6 +310,34 @@ export const injectKrsTester = async (req, res) => {
  * GET /api/akademik/dosen/kelas/:kelasId/laporan/perkuliahan
  * → JSON: detail nilai per komponen evaluasi + rata-rata kelas
  */
+// ============================================================
+// RESET CONTROLLERS (DEV/TESTING ONLY)
+// ============================================================
+
+export const resetFinalisasiKelas = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const result = await penilaianService.resetFinalisasiKelas(kelasId);
+        return new ResponseBuilder(res).code(200).message(result.pesan).json(result);
+    } catch (error) { next(error); }
+};
+
+export const resetNilaiMahasiswa = async (req, res, next) => {
+    try {
+        const { rincianKrsId } = req.params;
+        const result = await penilaianService.resetNilaiMahasiswa(rincianKrsId);
+        return new ResponseBuilder(res).code(200).message(result.pesan).json(result);
+    } catch (error) { next(error); }
+};
+
+export const resetNilaiKelas = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const result = await penilaianService.resetNilaiKelas(kelasId);
+        return new ResponseBuilder(res).code(200).message(result.pesan).json(result);
+    } catch (error) { next(error); }
+};
+
 export const getLaporanPerkuliahan = async (req, res, next) => {
     try {
         const data = await penilaianService.getDataLaporanPerkuliahan(req.params.kelasId);
