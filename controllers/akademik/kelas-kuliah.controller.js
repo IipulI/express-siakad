@@ -34,6 +34,23 @@ export const findAll = async (req, res) => {
             .status('failure')
             .code(500)
             .message(error.message || "Kesalahan yang tidak terduga")
+    }
+}
+
+export const create = async (req, res) => {
+    const responseBuilder = new ResponseBuilder(res);
+    try {
+        const payload = req.body;
+        const newClass = await KelasKuliahService.createClass(payload);
+        return responseBuilder
+            .code(201)
+            .message("Berhasil membuat kelas kuliah baru")
+            .json(newClass);
+    } catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(500)
+            .message(error.message || "Gagal membuat kelas kuliah")
             .json();
     }
 }

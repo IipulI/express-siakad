@@ -1,15 +1,41 @@
-// /models/fakultas.models.js
 import { Model, DataTypes } from "sequelize";
 import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
     class CapaianMataKuliah extends Model {
+        // static associate(models) {
+           
+        //     if (this._sudahDiRelasikan) return;
+        //     this._sudahDiRelasikan = true; 
+
+        //     // Relasi ke Master CPL
+        //     this.belongsToMany(models.CapaianPembelajaranLulusan, {
+        //         through: models.PemetaanCplCpmk,
+        //         foreignKey: 'siakCapaianMataKuliahId',       
+        //         otherKey: 'siakCapaianPembelajaranLulusanId',
+        //         as: 'cplDiCPMK'                              
+        //     });
+        // }
         static associate(models) {
-            this.hasMany(models.PemetaanCplCpmk, {
-                foreignKey: 'siak_capaian_mata_kuliah_id',
-                as: "pemetaanCplCpmk"
-            })
-        }
+        if (this._sudahDiRelasikan) return;
+        this._sudahDiRelasikan = true; 
+
+        // Relasi ke Master CPL
+        this.belongsToMany(models.CapaianPembelajaranLulusan, {
+            through: models.PemetaanCplCpmk,
+            foreignKey: 'siakCapaianMataKuliahId',       
+            otherKey: 'siakCapaianPembelajaranLulusanId',
+            as: 'cplDiCPMK'                              
+        });
+
+        // 👇 TAMBAHKAN BLOK INI: Relasi Balik ke Komposisi Nilai 👇
+        this.belongsToMany(models.KomposisiNilaiMataKuliah, {
+            through: models.PemetaanKomposisiCpmk,
+            foreignKey: "siakCpmkId",          
+            otherKey: "siakKomposisiNilaiId",     
+            as: "komposisiNilaiList"
+        });
+    }
     }
 
     CapaianMataKuliah.init(
@@ -22,7 +48,7 @@ export default (sequelize) => {
             siakObeId: {
                 type: DataTypes.UUID,
                 field: "siak_obe_id",
-                allowNull: false,
+                allowNull: true,
             },
             siakMataKuliahId: {
                 type: DataTypes.UUID,
@@ -34,18 +60,33 @@ export default (sequelize) => {
             },
             deskripsi: {
                 type: DataTypes.TEXT,
-            }
+            },
+            // 👇 INI DIA TERSANGKA UTAMANYA, SUDAH SAYA TAMBAHKAN 👇
+            target: {
+                type: DataTypes.DOUBLE,
+                allowNull: true,
+                defaultValue: 0
+            },
+            bobot: {
+                type: DataTypes.DOUBLE,
+                allowNull: true,
+                defaultValue: 0
+            },
+            parentId: {
+                type: DataTypes.UUID,
+                field: "parent_id", // Nama kolom fisik di DB
+                allowNull: true,
+            },
         },
         {
             sequelize,
             underscored: true,
             timestamps: true,
             paranoid: true,
-
             modelName: "CapaianMataKuliah",
             tableName: "siak_capaian_mata_kuliah",
         }
     );
 
-    return CapaianMataKuliah
+    return CapaianMataKuliah;
 }

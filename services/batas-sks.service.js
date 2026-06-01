@@ -1,44 +1,57 @@
-import { Op } from "sequelize";
 import models from "../models/index.js";
+import { Op } from "sequelize";
 import { getPagination } from "../utils/pagination.js";
 import { NotFoundError, UnprocessableEntityError } from "../utils/custom-error.js";
 
-const { BatasSks } = models;
+const {
+    TahunKurikulum,
+    PeriodeAkademik,
+    BatasSks
+} = models;
 
-export const findAll = async (page, size) => {
-    const isPaginated = page !== null && size !== null
+// Helper format tanggal
+const formatIndoDate = (dateString) => {
+    if (!dateString) return '-';
+    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(dateString));
+};
 
-    const queryBuilder = {
-        attributes: [
-            "id",
-            "siakJenjangId",
-            "ipsMin",
-            "ipsMax",
-            "batasSks"
-        ],
-    }
+export const getBatasSksList = async (jenjangId, tahunKurikulumId) => {
+    // 1. Ambil Data Header Kurikulum
+    const kurikulum = await TahunKurikulum.findByPk(tahunKurikulumId, {
+        attributes: ['tahun', 'keterangan', 'tanggalMulai', 'tanggalSelesai'],
+        include: [{ model: PeriodeAkademik, as: 'periodeAkademik', attributes: ['nama'] }]
+    });
 
-    if (isPaginated) {
-        const { limit, offset } = getPagination(page, size);
-        queryBuilder.limit = limit;
-        queryBuilder.offset = offset;
+    if (!kurikulum) throw new NotFoundError("Data Tahun Kurikulum tidak ditemukan");
 
-        const { count, rows } = await BatasSks.findAndCountAll(queryBuilder);
+    const headerLengkap = {
+        kurikulum: kurikulum.tahun,
+        keterangan: kurikulum.keterangan || '-',
+        mulaiBerlaku: kurikulum.periodeAkademik ? kurikulum.periodeAkademik.nama : `${kurikulum.tahun} Ganjil`,
+        tanggalAwal: formatIndoDate(kurikulum.tanggalMulai),
+        tanggalAkhir: formatIndoDate(kurikulum.tanggalSelesai)
+    };
 
-        return {
-            count,
-            rows,
-            isPaginated: true,
-        };
-    } else {
-        const data = await BatasSks.findAll(queryBuilder);
+    // 2. Ambil Data Tabel Batas SKS
+    const rawData = await BatasSks.findAll({
+        where: { siak_jenjang_id: jenjangId },
+        order: [['ips_min', 'ASC']] // Urutkan dari IPS terkecil
+    });
 
-        return {
-            count: data.length,
-            rows: data,
-            isPaginated: false,
-        };
-    }
+    // Rapikan nama field jadi camelCase biar seragam
+    const listBatasSks = rawData.map(item => ({
+        id: item.id,
+        siakJenjangId: item.siakJenjangId || item.siak_jenjang_id,
+        ipsMin: parseFloat(item.ipsMin || item.ips_min || 0),
+        ipsMax: parseFloat(item.ipsMax || item.ips_max || 0),
+        batasSks: parseInt(item.batasSks || item.batas_sks || 0)
+    }));
+
+    // Return Header + Tabel Data
+    return {
+        header: headerLengkap,
+        batasSks: listBatasSks
+    };
 };
 
 export const findOneById = async(id) => {
@@ -63,6 +76,9 @@ export const findOneById = async(id) => {
 }
 
 
+// ==========================================
+// 2. CREATE (POST)
+// ==========================================
 export const createBatasSks = async (batasSksData) => {
     const { siakJenjangId, ipsMin, ipsMax, batasSks } = batasSksData;
 
@@ -93,6 +109,9 @@ export const createBatasSks = async (batasSksData) => {
     });
 };
 
+// ==========================================
+// 3. UPDATE (PUT)
+// ==========================================
 export const updateBatasSks = async (id, batasSksData) => {
     const { siakJenjangId, ipsMin, ipsMax, batasSks } = batasSksData;
 
@@ -129,6 +148,9 @@ export const updateBatasSks = async (id, batasSksData) => {
     })
 }
 
+// ==========================================
+// 4. DELETE (DELETE)
+// ==========================================
 export const deleteBatasSks = async (id) => {
     const cekDataBatasSks = await BatasSks.findByPk(id)
 

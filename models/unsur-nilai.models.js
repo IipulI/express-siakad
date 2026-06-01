@@ -4,12 +4,24 @@ import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
     class UnsurNilai extends Model {
+        // static associate(models) {
+        //     this.belongsTo(models.MetodeEvaluasi, {
+        //         foreignKey: "siak_metode_evaluasi_id",
+        //         as: "metodeEvaluasi"
+        //     })
+        // }
         static associate(models) {
-            this.belongsTo(models.MetodeEvaluasi, {
-                foreignKey: "siak_metode_evaluasi_id",
-                as: "metodeEvaluasi"
-            })
-        }
+        this.belongsTo(models.MetodeEvaluasi, {
+            foreignKey: "siakMetodeEvaluasiId", //camelCase 
+            as: "metodeEvaluasi"
+        })
+        this.belongsToMany(models.CapaianMataKuliah, {
+    through: models.PemetaanKomposisiCpmk,
+    foreignKey: "siakKomposisiNilaiId", 
+    otherKey: "siakCpmkId",
+    as: "cpmkList" // <--- Alias ini yang harus sama persis dengan 'cpmkList' di service
+});
+    }
     }
 
     UnsurNilai.init(

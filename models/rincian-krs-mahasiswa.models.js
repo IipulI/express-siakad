@@ -14,6 +14,10 @@ export default (sequelize) => {
                 foreignKey: "siak_kelas_kuliah_id",
                 as: "kelasKuliah",
             })
+            this.hasMany(models.NilaiEvaluasiMahasiswa, {
+            foreignKey: "siak_rincian_krs_mahasiswa_id",
+            as: "daftarNilaiEvaluasi"
+            })
         }
     }
 
@@ -26,11 +30,11 @@ export default (sequelize) => {
             },
             siakKrsMahasiswaId: {
                 type: DataTypes.UUID,
-                fields: "siak_krs_mahasiswa_id"
+                field: "siak_krs_mahasiswa_id"
             },
             siakKelasKuliahId: {
                 type: DataTypes.UUID,
-                fields: "siak_kelas_kuliah_id"
+                field: "siak_kelas_kuliah_id"
             },
             kategori: {
                 type: DataTypes.STRING
@@ -55,15 +59,15 @@ export default (sequelize) => {
             },
             hurufMutu: {
                 type: DataTypes.STRING(3),
-                fields: "huruf_mutu"
+                field: "huruf_mutu"
             },
             angkaMutu: {
-                type: DataTypes.DOUBLE(5,2),
-                fields: "angka_mutu"
+                type: DataTypes.DECIMAL(5,2),
+                field: "angka_mutu"
             },
             nilaiAkhir: {
-                type: DataTypes.DOUBLE(5,2),
-                fields: "nilai_akhir"
+                type: DataTypes.DECIMAL(5,2),
+                field: "nilai_akhir"
             },
         },
         {

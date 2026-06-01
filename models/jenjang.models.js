@@ -4,7 +4,12 @@ import { v7 as uuid7 } from "uuid";
 
 export default (sequelize) => {
   class Jenjang extends Model {
-    static associate(models) {}
+    static associate(models) {
+      this.hasMany(models.ProgramStudi, {
+        foreignKey: "siak_jenjang_id",
+        as: "programStudi"
+      });
+    }
   }
 
   Jenjang.init(

@@ -32,6 +32,11 @@ export default (sequelize) => {
             type: DataTypes.UUID,
             field: "siak_capaian_mata_kuliah_id",
         },
+        bobotCpl: {
+            type: DataTypes.FLOAT,
+            field: "bobot_cpl",
+            defaultValue: 0
+        }
     }, {
         sequelize,
         underscored: true,
