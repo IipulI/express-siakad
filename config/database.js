@@ -13,6 +13,12 @@ const config = {
         dialect: process.env.DB_DIALECT_DEV || 'postgres',
         logging: true,
         timezone: '+07:00',
+        dialectOptions: {
+            ssl: {
+                require: true,
+                rejectUnauthorized: false
+            }
+        }
     },
     test: {
         username: process.env.DB_USER_TEST || 'postgres',

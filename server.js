@@ -2,6 +2,7 @@ import http from 'http';
 import app from './app.js';
 import db from './models/index.js';
 
+// Trigger restart after successful database seeding
 const { sequelize } = db;
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
