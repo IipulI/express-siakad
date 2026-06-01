@@ -606,11 +606,14 @@ export const getPesertaKelasList = async (kelasId) => {
                 : (adaNilai ? nilaiAkhirHitung : 0);
 
             // Grade dari skala nilai (DB atau default)
+            // Sequelize underscored:true → field dikembalikan sebagai camelCase
+            const storedGrade = item.hurufMutu || item.huruf_mutu;
+            const storedAngka = item.angkaMutu ?? item.angka_mutu;
             let grade;
-            if (item.huruf_mutu && item.huruf_mutu !== '-') {
+            if (storedGrade && storedGrade !== '-') {
                 grade = {
-                    hurufMutu: item.huruf_mutu,
-                    angkaMutu: parseFloat(item.angka_mutu || 0)
+                    hurufMutu: storedGrade,
+                    angkaMutu: parseFloat(storedAngka || 0)
                 };
             } else if (adaNilai && nilaiAkhirFinal > 0) {
                 grade = getGrade(nilaiAkhirFinal, skalaAktif);
