@@ -5,7 +5,8 @@ const {
     sequelize, KomposisiNilaiMataKuliah, PemetaanEvaluasiCpmk, PemetaanKomposisiCpmk,
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
-    ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang
+    ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
+    NilaiCpmkMahasiswa, CapaianMataKuliah
 } = models;
 
 const DEFAULT_SKALA = [
@@ -861,6 +862,108 @@ const hitungRataRata = (tabel, headerKolom) => {
         rataPerKomponen,
         rataNilaiAkhir: parseFloat((totalNilaiAkhir / count).toFixed(2)),
     };
+};
+
+// ====================================================================
+// INPUT NILAI PER CPMK LANGSUNG (Pendekatan OBE Langsung)
+// Dosen input nilai tiap CPMK secara terpisah.
+// nilaiAkhir = Σ(nilaiCPMK × bobotCPMK / 100)
+// Mahasiswa tidak lulus jika nilai CPMK < target CPMK
+// ====================================================================
+export const inputNilaiPerCpmk = async (krsId, nilaiCpmkList) => {
+    const rincian = await RincianKrsMahasiswa.findByPk(krsId, {
+        include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
+    });
+    if (!rincian) throw Object.assign(new Error('Data rincian KRS tidak ditemukan'), { statusCode: 404 });
+    if (STATUS_FINAL.includes(rincian.status)) throw Object.assign(new Error('Nilai sudah difinalisasi, tidak dapat diubah'), { statusCode: 403 });
+    if (rincian.status === 'Dikunci') throw Object.assign(new Error('Nilai sudah dikunci, tidak dapat diedit'), { statusCode: 403 });
+
+    const kelasId = rincian.siakKelasKuliahId;
+    const mahasiswaId = rincian.krsMahasiswa?.siakMahasiswaId;
+    if (!mahasiswaId) throw new Error('Data mahasiswa tidak ditemukan');
+
+    // Ambil CPMK + bobot + target dari MK
+    const kelas = await KelasKuliah.findByPk(kelasId, { attributes: ['siakMataKuliahId'] });
+    const mkId = kelas?.siakMataKuliahId;
+
+    const cpmkList = await CapaianMataKuliah.findAll({
+        where: { siakMataKuliahId: mkId, parentId: null },
+        attributes: ['id', 'kode', 'bobot', 'target']
+    });
+
+    return await sequelize.transaction(async (trx) => {
+        // Wipe & replace nilai CPMK lama
+        await NilaiCpmkMahasiswa.destroy({
+            where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaId },
+            force: true, transaction: trx
+        });
+
+        // Simpan nilai per CPMK
+        let nilaiAkhir = 0;
+        let adaCpmkGagal = false;
+
+        for (const cpmk of cpmkList) {
+            const input = nilaiCpmkList.find(n => n.cpmkId === cpmk.id);
+            const nilaiCpmk = input ? parseFloat(input.nilai) : 0;
+
+            await NilaiCpmkMahasiswa.create({
+                siakKelasKuliahId: kelasId,
+                siakMahasiswaId: mahasiswaId,
+                siakCapaianMataKuliahId: cpmk.id,
+                nilai: nilaiCpmk
+            }, { transaction: trx });
+
+            nilaiAkhir += nilaiCpmk * (parseFloat(cpmk.bobot) / 100);
+
+            // Cek apakah CPMK di bawah target
+            if (nilaiCpmk < parseFloat(cpmk.target || 0)) adaCpmkGagal = true;
+        }
+
+        nilaiAkhir = Math.round(nilaiAkhir * 100) / 100;
+
+        // Ambil skala nilai
+        const queryTrace = `
+            SELECT mk.siak_program_studi_id AS prodi_id, mk.siak_tahun_kurikulum_id AS kurikulum_id
+            FROM siak_kelas_kuliah kk
+            LEFT JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
+            WHERE kk.id = :kelasId LIMIT 1
+        `;
+        const [trace] = await sequelize.query(queryTrace, { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT, transaction: trx });
+
+        let hurufMutu = 'E', angkaMutu = 0;
+
+        if (trace) {
+            const skalaList = await sequelize.query(
+                `SELECT huruf_mutu AS grade, angka_mutu AS bobot, nilai_min
+                 FROM siak_skala_penilaian
+                 WHERE siak_program_studi_id = :prodiId AND siak_tahun_kurikulum_id = :kurikulumId
+                   AND deleted_at IS NULL ORDER BY nilai_min DESC`,
+                { replacements: { prodiId: trace.prodi_id, kurikulumId: trace.kurikulum_id }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+            );
+
+            const skala = skalaList.length > 0 ? skalaList : DEFAULT_SKALA;
+            const sorted = [...skala].sort((a, b) => (b.nilaiMin ?? b.nilai_min) - (a.nilaiMin ?? a.nilai_min));
+            for (const s of sorted) {
+                if (nilaiAkhir >= parseFloat(s.nilaiMin ?? s.nilai_min)) {
+                    hurufMutu = String(s.grade ?? s.hurufMutu).trim();
+                    angkaMutu = parseFloat(s.bobot ?? s.angkaMutu);
+                    break;
+                }
+            }
+        }
+
+        // Jika ada CPMK di bawah target → paksa tidak lulus
+        if (adaCpmkGagal) { hurufMutu = 'E'; angkaMutu = 0; }
+
+        await sequelize.query(
+            `UPDATE siak_rincian_krs_mahasiswa
+             SET nilai_akhir = :nilaiAkhir, huruf_mutu = :hurufMutu, angka_mutu = :angkaMutu
+             WHERE id = :krsId`,
+            { replacements: { nilaiAkhir, hurufMutu, angkaMutu, krsId }, transaction: trx }
+        );
+
+        return { krsId, nilaiAkhir, hurufMutu, angkaMutu, adaCpmkGagal };
+    });
 };
 
 // ─────────────────────────────────────────────────────────────

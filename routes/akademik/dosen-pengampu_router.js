@@ -75,10 +75,14 @@ router.get('/kelas/:id/peserta-kelas', cekKepemilikanKelas, KelasKuliahControlle
 // [Nilai Perkuliahan]
 // GET: lihat nilai + komposisi evaluasi
 router.get('/kelas/:kelasId/nilai', cekKepemilikanKelas, PenilaianController.getPesertaKelas);
-// POST: INPUT NILAI — satu-satunya endpoint write dosen
+// POST: INPUT NILAI per komponen evaluasi (Tugas/UTS/UAS)
 // Body: { nilai: [{ komposisiId, skor }] }
-// Otomatis: hitung nilai akhir + grade + nilai CPMK + simpan materialized
 router.post('/kelas/:kelasId/nilai/:krsId', cekKepemilikanKelas, PenilaianController.simpanNilaiMahasiswa);
+
+// POST: INPUT NILAI per CPMK langsung (OBE Langsung)
+// Body: { nilaiCpmk: [{ cpmkId, nilai }] }
+// nilaiAkhir = Σ(nilaiCPMK × bobotCPMK). Jika ada CPMK < target → otomatis E
+router.post('/kelas/:kelasId/nilai-cpmk/:krsId', cekKepemilikanKelas, PenilaianController.simpanNilaiPerCpmk);
 // PATCH: KUNCI / BUKA KUNCI NILAI
 // Body: { action: 'kunci' | 'buka' }
 router.patch('/kelas/:kelasId/nilai/kunci', cekKepemilikanKelas, PenilaianController.kunciNilaiKelas);

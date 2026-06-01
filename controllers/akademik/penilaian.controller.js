@@ -73,6 +73,19 @@ export const kunciNilaiKelas = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+// Input nilai per CPMK langsung (OBE Langsung)
+export const simpanNilaiPerCpmk = async (req, res, next) => {
+    try {
+        const { krsId } = req.params;
+        const { nilaiCpmk } = req.body;
+        if (!nilaiCpmk || !Array.isArray(nilaiCpmk)) {
+            return new ResponseBuilder(res).code(400).message('nilaiCpmk harus berupa array [{ cpmkId, nilai }]').json();
+        }
+        const result = await penilaianService.inputNilaiPerCpmk(krsId, nilaiCpmk);
+        return new ResponseBuilder(res).code(200).message('Nilai per CPMK berhasil disimpan').json(result);
+    } catch (error) { next(error); }
+};
+
 export const finalisasiNilaiKelas = async (req, res, next) => {
     try {
         const { kelasId } = req.params;

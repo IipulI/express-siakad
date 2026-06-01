@@ -77,6 +77,9 @@ router.get('/kelas/:kelasId/nilai', PenilaianController.getPesertaKelas);
 router.patch('/kelas/:kelasId/nilai/kunci', PenilaianController.kunciNilaiKelas);
 router.patch('/kelas/:kelasId/nilai/:rincianKrsId/kunci', PenilaianController.kunciNilaiMahasiswa);
 
+// [Input Nilai per CPMK] - Koordinator bisa input nilai langsung per CPMK
+router.post('/kelas/:kelasId/nilai-cpmk/:krsId', PenilaianController.simpanNilaiPerCpmk);
+
 // [Finalisasi Nilai] - Permanent lock setelah masa sanggah habis
 // Semua nilai harus dikunci dulu sebelum finalisasi
 // Setelah finalisasi: status → 'Lulus' / 'Tidak Lulus' (tidak bisa dibuka kembali)
