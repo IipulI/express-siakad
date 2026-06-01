@@ -15,7 +15,8 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
         MataKuliah,
         ProgramStudi,
         TahunKurikulum,
-        CapaianMataKuliah
+        CapaianMataKuliah,
+        Rps
     } = models;
 
     // 2. Hitung limit & offset untuk pagination
@@ -51,8 +52,11 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
         // Cek CPL (Pakai count dari relasi)
         const countCpl = await mk.countCplDipetakan();
 
-        // Cek CPMK (Asumsi model CapaianMataKuliah ada di models)
         const countCpmk = await CapaianMataKuliah.count({
+            where: { siakMataKuliahId: mk.id }
+        });
+
+        const countRps = await Rps.count({
             where: { siakMataKuliahId: mk.id }
         });
 
@@ -65,7 +69,7 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
             jenisMk: mk.jenis,
             prodiPengampu: mk.programStudi?.nama || '-',
             statusPengisian: {
-                isRpsTerisi: mk.adaSilabus === true,
+                isRpsTerisi: countRps > 0,
                 isCplTerisi: countCpl > 0,
                 isCpmkTerisi: countCpmk > 0
             }
