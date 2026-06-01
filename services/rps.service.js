@@ -1,5 +1,6 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import * as CustomError from "../utils/custom-error.js";
 
 const { 
     sequelize, Rps, MataKuliah, ProgramStudi, TahunKurikulum, 
@@ -437,15 +438,9 @@ export const getRencanaPembelajaran = async (mkId, periodeId) => {
 
 export const createRencanaPembelajaran = async (mkId, payload) => {
     return await sequelize.transaction(async (t) => {
-        // Validasi 100% Bobot
-        const existingSesi = await RencanaPembelajaran.findAll({
-            where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: payload.siakPeriodeAkademikId },
-            transaction: t
-        });
-        const totalBobotLama = existingSesi.reduce((acc, curr) => acc + parseFloat(curr.bobotPenilaian || 0), 0);
-        const totalBaru = totalBobotLama + parseFloat(payload.bobotPenilaian || 0);
-
-        if (totalBaru > 100) throw new CustomError.BadRequestError(`Gagal! Total bobot sudah mencapai ${totalBaru}%. Batas maksimal 100%.`);
+        // Validasi bobot per sesi tidak boleh melebihi 100
+        const bobotSesi = parseFloat(payload.bobotPenilaian || 0);
+        if (bobotSesi > 100) throw new CustomError.BadRequestError(`Bobot per sesi tidak boleh lebih dari 100%. Input: ${bobotSesi}%.`);
 
         const sesiBaru = await RencanaPembelajaran.create({
             siakMataKuliahId: mkId,
