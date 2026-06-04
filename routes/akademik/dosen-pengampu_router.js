@@ -83,10 +83,6 @@ router.post('/kelas/:kelasId/nilai/:krsId', cekKepemilikanKelas, PenilaianContro
 // Body: { nilaiCpmk: [{ cpmkId, nilai }] }
 // nilaiAkhir = Σ(nilaiCPMK × bobotCPMK). Jika ada CPMK < target → otomatis E
 router.post('/kelas/:kelasId/nilai-cpmk/:krsId', cekKepemilikanKelas, PenilaianController.simpanNilaiPerCpmk);
-// PATCH: KUNCI / BUKA KUNCI NILAI
-// Body: { action: 'kunci' | 'buka' }
-router.patch('/kelas/:kelasId/nilai/kunci', cekKepemilikanKelas, PenilaianController.kunciNilaiKelas);
-router.patch('/kelas/:kelasId/nilai/:rincianKrsId/kunci', cekKepemilikanKelas, PenilaianController.kunciNilaiMahasiswa);
 
 // [Capaian Pembelajaran] - tab CPMK dan tab CPL
 // ?tab=cpmk -> tabel nilai CPMK per mahasiswa

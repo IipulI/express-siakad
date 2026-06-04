@@ -69,26 +69,9 @@ router.get('/kelas/:id', KelasKuliahController.findOne);
 // [Peserta Kelas]
 router.get('/kelas/:id/peserta-kelas', KelasKuliahController.classParticipant);
 
-// [Nilai Perkuliahan] - Koordinator lihat nilai semua dosen di MK yang dia koordinatori
 router.get('/kelas/:kelasId/nilai', PenilaianController.getPesertaKelas);
 
-// [Kunci / Buka Kunci Nilai] - Koordinator punya akses supervisor (semua kelas di MK-nya)
-// Body: { action: 'kunci' | 'buka' }
-router.patch('/kelas/:kelasId/nilai/kunci', PenilaianController.kunciNilaiKelas);
-router.patch('/kelas/:kelasId/nilai/:rincianKrsId/kunci', PenilaianController.kunciNilaiMahasiswa);
-
-// [Input Nilai per CPMK] - Koordinator bisa input nilai langsung per CPMK
 router.post('/kelas/:kelasId/nilai-cpmk/:krsId', PenilaianController.simpanNilaiPerCpmk);
-
-// [Finalisasi Nilai] - Permanent lock setelah masa sanggah habis
-// Semua nilai harus dikunci dulu sebelum finalisasi
-// Setelah finalisasi: status → 'Lulus' / 'Tidak Lulus' (tidak bisa dibuka kembali)
-router.patch('/kelas/:kelasId/nilai/finalisasi', PenilaianController.finalisasiNilaiKelas);
-
-// [RESET - DEV/TESTING ONLY]
-router.patch('/kelas/:kelasId/nilai/reset-finalisasi', PenilaianController.resetFinalisasiKelas);
-router.delete('/kelas/:kelasId/nilai/:rincianKrsId/reset', PenilaianController.resetNilaiMahasiswa);
-router.delete('/kelas/:kelasId/nilai/reset-semua', PenilaianController.resetNilaiKelas);
 
 // [Export Nilai Kelas] - ?format=pdf -> PDF, default -> Excel
 router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
