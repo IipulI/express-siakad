@@ -196,7 +196,7 @@ export const getCapaianCplKelas = async (kelasId) => {
 
     const [adaNilaiDikunci, pesertaCountRaw] = await Promise.all([
         RincianKrsMahasiswa.findOne({
-            where: { siak_kelas_kuliah_id: kelasId, nilai_akhir: { [require('sequelize').Op.not]: null } }
+            where: { siak_kelas_kuliah_id: kelasId, status: 'Dikunci' }
         }),
         sequelize.query(`
             SELECT COUNT(DISTINCT krs.siak_mahasiswa_id) AS count
@@ -230,7 +230,7 @@ export const getCapaianCplKelas = async (kelasId) => {
     if (!adaNilaiDikunci) {
         return {
             header: baseHeader,
-            pesan: 'Belum ada nilai yang diinput untuk kelas ini.',
+            pesan: 'Silakan lakukan penguncian nilai untuk dapat melihat hasil Capaian Pembelajaran Lulusan (CPL).',
             cplInfo: cplList.map(c => ({ id: c.id, kode: c.kode, deskripsi: c.deskripsi })),
             targetCpl: Object.fromEntries(cplList.map(c => [c.kode, parseFloat(c.targetCpl || 0)])),
             tabel: [], rerataPerolehan: {}
