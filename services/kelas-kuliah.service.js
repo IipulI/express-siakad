@@ -51,6 +51,9 @@ export const findAll = async (page, size, filter) => {
     if (filter.siakDosenId !== undefined) {
         dosenWhere.id = filter.siakDosenId
     }
+    if (filter.search !== undefined) {
+        mataKuliahWhere.nama = { [Op.iLike]: `%${filter.search}%` }
+    }
 
     let kelasKuliahQueryBuilder = {
         attributes: [

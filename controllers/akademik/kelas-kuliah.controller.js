@@ -3,8 +3,8 @@ import ResponseBuilder from "../../utils/response.js";
 import {getPagingData} from "../../utils/pagination.js";
 
 export const findAll = async (req, res) => {
-    const page = req.query.page ? parseInt(req.query.page) : null;
-    const size = req.query.size ? parseInt(req.query.size) : null;
+    const page = req.query.page ?? 1;
+    const size = req.query.size ?? 10;
     const responseBuilder = new ResponseBuilder(res);
 
     const filter = {
@@ -12,17 +12,13 @@ export const findAll = async (req, res) => {
         siakProgramStudiId : req.query.siakProgramStudiId,
         siakSistemKuliahId : req.query.siakSistemKuliahId,
         siakTahunKurikulumId: req.query.siakTahunKurikulumId,
+        search: req.query.search,
     }
 
     try {
         const classes = await KelasKuliahService.findAll(page, size, filter);
 
-        let payload;
-        if (classes.isPaginated === true) {
-            payload = getPagingData(classes, page, size);
-        } else {
-            payload = classes.rows;
-        }
+        const payload = getPagingData(classes, page, size);
 
         return responseBuilder
             .code(200)
