@@ -473,8 +473,8 @@ export const updateRencanaPembelajaran = async (id, payload, mkId) => {
 
         // Validasi 100% Bobot (Kecualikan ID yang sedang diupdate)
         const existingSesi = await RencanaPembelajaran.findAll({
-            where: { 
-                siakMataKuliahId: mkId, 
+            where: {
+                siakMataKuliahId: sesi.siakMataKuliahId,
                 siakPeriodeAkademikId: payload.siakPeriodeAkademikId,
                 id: { [Op.ne]: id } // Kecualikan sesi ini sendiri
             },
