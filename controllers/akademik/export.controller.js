@@ -442,16 +442,7 @@ export const exportPdfLaporanLengkap = async (req, res, next) => {
             // =========================================================
             // 🚨 SCRIPT PENYELAMAT: FILTER DUPLIKAT CPL DARI JSON 🚨
             // =========================================================
-            const uniqueCpls = [];
-            const seenCpls = new Set();
-            if (pemetaanPlCpl && pemetaanPlCpl.columns) {
-                pemetaanPlCpl.columns.forEach(c => {
-                    if (!seenCpls.has(c.kode)) {
-                        seenCpls.add(c.kode);
-                        uniqueCpls.push(c);
-                    }
-                });
-            }
+            const uniqueCpls = capaianPembelajaran.map(c => ({ kode: c.kode, deskripsi: c.deskripsi }));
 
             const cplColWidth = uniqueCpls.length > 0 ? Math.floor(450 / uniqueCpls.length) : 45;
 
