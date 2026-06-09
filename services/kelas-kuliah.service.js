@@ -67,6 +67,7 @@ export const findAll = async (page, size, filter) => {
                     'id', 'nama', 'kode', 'totalSks'
                 ],
                 where: mataKuliahWhere,
+                required: Object.keys(mataKuliahWhere).length > 0,
                 model: MataKuliah,
                 as: 'mataKuliah',
             },
