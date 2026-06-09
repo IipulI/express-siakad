@@ -426,6 +426,7 @@ export const exportPdfLaporanLengkap = async (req, res, next) => {
             // =========================================================
             // C. TABEL 2: CAPAIAN PEMBELAJARAN LULUSAN (CPL)
             // =========================================================
+            doc.addPage();
             await doc.table({
                 title: "Capaian Pembelajaran Lulusan (CPL)",
                 headers: [
