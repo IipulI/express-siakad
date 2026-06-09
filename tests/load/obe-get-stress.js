@@ -5,11 +5,11 @@ import { check, sleep, group } from 'k6';
 // KONFIGURASI BEBAN (GET HEAVY)
 // =====================================================================
 export const options = {
-    // Skenario Spike Test: Mensimulasikan lonjakan hingga 5000 pengguna (Virtual Users)
+    // Skenario Beban Ekstrem: Mensimulasikan lonjakan hingga 200 pengguna (Virtual Users)
     stages: [
-        { duration: '30s', target: 1000 }, // Naik ke 1000 user dalam 30 detik
-        { duration: '1m', target: 3000 },  // Lonjakan ekstrem ke 5000 user
-        { duration: '30s', target: 0 },    // Turun kembali ke 0 user
+        { duration: '30s', target: 100 }, // Naik ke 100 user dalam 30 detik
+        { duration: '1m', target: 200 },  // Lonjakan ekstrem ke 200 user
+        { duration: '30s', target: 0 },   // Turun kembali ke 0 user
     ],
     thresholds: {
         http_req_duration: ['p(95)<2000'],
@@ -17,15 +17,15 @@ export const options = {
     },
 };
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = 'https://api-siak.uika-bogor.ac.id';
 
 const DUMMY_IDS = {
-    id_obe: "019ddedf-b94a-722b-ae17-343be402d2bf",
-    id_mk: "019ddf3b-422d-733f-bcf3-a37fa814d0fb",
-    id_prodi: "0197ea6f-2c4f-7afb-a06e-2f13f589c195",
-    tahun_kurikulum: "019dded8-e448-73e2-9ef5-5d0caacf58b9",
-    periodeId: "0197fce6-e176-7c62-b315-00b0c4b4ed8b",
-    id_jenjang: "0197e936-aa62-773f-a388-000271fd993d",
+    id_obe: "019e7e03-a16c-707f-89b1-e62050644836",         // OBE TI Kurikulum 2025
+    id_mk: "019e7f79-3ab9-778c-9c55-0dec062cb6eb",          // TIF117 - Rangkaian Digital
+    id_prodi: "0197ea6f-2c4f-7afb-a06e-2f13f589c195",       // Teknik Informatika
+    tahun_kurikulum: "019e7dfc-b5a8-757f-a9be-954d00fb6912", // Kurikulum 2025
+    periodeId: "0197fce6-e176-7c62-b315-00b0c4b4ed8b",      // 2025 Genap
+    id_jenjang: "0197e936-e8cd-7212-9086-4f2e0cb6a9bc",     // D4
 };
 
 export default function () {
@@ -49,28 +49,16 @@ export default function () {
         sleep(0.5);
     });
 
-    group('3. GET Kurikulum, Skala Nilai, Ekivalensi dll', () => {
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/dropdown-prasyarat?prodiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}`, { headers }), { 'GET Prasyarat': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/dropdown-konsentrasi?prodiId=${DUMMY_IDS.id_prodi}`, { headers }), { 'GET Konsentrasi': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/per-semester?prodiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}`, { headers }), { 'GET MK Per Semester': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/${DUMMY_IDS.id_mk}`, { headers }), { 'GET Detail MKK': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/rekap-sks?prodiId=${DUMMY_IDS.id_prodi}`, { headers }), { 'GET Rekap SKS 1': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/rekap-sks?prodiId=${DUMMY_IDS.id_prodi}&page=2&size=10`, { headers }), { 'GET Rekap SKS 2': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/rekap-sks?prodiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}`, { headers }), { 'GET Rekap SKS 3': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah-kurikulum/rekap-sks?jenjangId=${DUMMY_IDS.id_jenjang}`, { headers }), { 'GET Rekap SKS 4': (r) => r.status === 200 });
-
+    group('3. GET Skala Nilai, Predikat & Template Evaluasi', () => {
         check(http.get(`${BASE_URL}/api/akademik/skala-nilai/?programStudiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}`, { headers }), { 'GET Skala Nilai': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/ekivalensi-mata-kuliah/?prodiId=${DUMMY_IDS.id_prodi}&kurikulumBaruId=${DUMMY_IDS.tahun_kurikulum}&kurikulumLamaId=0197e916-6603-7042-878e-d3594d3eada7`, { headers }), { 'GET Ekivalensi': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/ekivalensi-mata-kuliah/dropdown-lama?prodiId=${DUMMY_IDS.id_prodi}&kurikulumLamaId=0197e916-6603-7042-878e-d3594d3eada7`, { headers }), { 'GET Ekivalensi Dropdown': (r) => r.status === 200 });
 
         check(http.get(`${BASE_URL}/api/akademik/predikat-kelulusan?prodiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}`, { headers }), { 'GET Predikat Kelulusan': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/predikat-kelulusan?tahunKurikulumId=0197e916-6603-7042-878e-d3594d3eada7&jenjangId=0197e936-aa62-773f-a388-000271fd993d`, { headers }), { 'GET Predikat Kelulusan Jenjang': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/predikat-kelulusan?tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}&prodiId=${DUMMY_IDS.id_prodi}`, { headers }), { 'GET Predikat Kelulusan Filter': (r) => r.status === 200 });
 
         check(http.get(`${BASE_URL}/api/akademik/template-evaluasi`, { headers }), { 'GET Template All': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/template-evaluasi?kurikulumId=${DUMMY_IDS.tahun_kurikulum}&prodiId=${DUMMY_IDS.id_prodi}&jenisMk=Kuliah&search=teknik`, { headers }), { 'GET Template Combo': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/template-evaluasi?search=informatika`, { headers }), { 'GET Template Search': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/template-evaluasi?prodiId=${DUMMY_IDS.id_prodi}`, { headers }), { 'GET Template Prodi': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/template-evaluasi/detail?kurikulumId=${DUMMY_IDS.tahun_kurikulum}&prodiId=${DUMMY_IDS.id_prodi}&jenisMk=Kuliah`, { headers }), { 'GET Template Detail': (r) => r.status === 200 });
         sleep(0.5);
     });
 

@@ -245,36 +245,36 @@ export const classParticipant = async(id) => {
         throw new NotFoundError(`Kelas Kuliah tidak ditemukan`)
     }
 
-    return await Mahasiswa.findAll({
-        attributes: ['id', 'nama', 'npm', 'angkatan'],
-        include : [
-            {
-                attributes: ['id','nama'],
-                model: ProgramStudi,
-                as: 'programStudi',
+    const rincianList = await RincianKrsMahasiswa.findAll({
+        attributes: ['id', 'status'],
+        where: { siak_kelas_kuliah_id: id },
+        include: {
+            attributes: ['id'],
+            model: KrsMahasiswa,
+            as: 'krsMahasiswa',
+            include: {
+                attributes: ['id', 'nama', 'npm', 'angkatan'],
+                model: Mahasiswa,
+                as: 'mahasiswa',
                 include: {
-                    attributes: ['jenjang'],
-                    model: Jenjang,
-                    as: 'jenjang'
-                }
-            },
-            {
-                attributes: ['status'],
-                required: true,
-                model: KrsMahasiswa,
-                as: 'krsMahasiswa',
-                include: {
-                    attributes: [],
-                    required: true,
-                    model: RincianKrsMahasiswa,
-                    as: 'rincianKrsMahasiswa',
-                    where: {
-                        siak_kelas_kuliah_id: id
+                    attributes: ['id', 'nama'],
+                    model: ProgramStudi,
+                    as: 'programStudi',
+                    include: {
+                        attributes: ['jenjang'],
+                        model: Jenjang,
+                        as: 'jenjang'
                     }
                 }
             }
-        ]
-    })
+        }
+    });
+
+    return rincianList.map(r => ({
+        ...r.krsMahasiswa?.mahasiswa?.toJSON(),
+        status: r.status,
+        rincianKrsId: r.id,
+    }));
 }
 
 export const enrollMahasiswaToClass = async(mahasiswaId, kelasKuliahId, periodeAkademikId) => {

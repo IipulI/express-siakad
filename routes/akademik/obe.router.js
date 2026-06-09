@@ -254,4 +254,5 @@ router.get('/export/pdf/transkrip-obe', ExportController.exportPdfTranskripObeMa
 
 router.get('/monitoring/cpmk-mahasiswa', MonitoringController.getLaporanCpmkPerMahasiswa);
 router.get('/export/pdf/monitoring-cpmk-mahasiswa', ExportController.exportPdfLaporanCpmkPerMahasiswa);
+router.get('/monitoring/cpl-prodi', MonitoringController.getMonitoringCplProdi);
 export default router;

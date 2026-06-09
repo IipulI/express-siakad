@@ -17,7 +17,7 @@ export default (sequelize) => {
                 defaultValue: uuid7
             },
             nama: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.STRING,
                 field: 'nama'
             },
         },
