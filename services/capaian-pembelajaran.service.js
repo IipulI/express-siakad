@@ -194,19 +194,14 @@ export const getCapaianCplKelas = async (kelasId) => {
     const kelas = await getKelasHeader(kelasId);
     const mkId = kelas.siakMataKuliahId || kelas.siak_mata_kuliah_id;
 
-    const [adaNilaiDikunci, pesertaCountRaw] = await Promise.all([
-        RincianKrsMahasiswa.findOne({
-            where: { siak_kelas_kuliah_id: kelasId, status: 'Dikunci' }
-        }),
-        sequelize.query(`
+    const pesertaCountRaw = await sequelize.query(`
             SELECT COUNT(DISTINCT krs.siak_mahasiswa_id) AS count
             FROM siak_rincian_krs_mahasiswa rkm
             JOIN siak_krs_mahasiswa krs ON rkm.siak_krs_mahasiswa_id = krs.id
             WHERE rkm.siak_kelas_kuliah_id = :kelasId
               AND rkm.deleted_at IS NULL
               AND krs.deleted_at IS NULL
-        `, { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT })
-    ]);
+        `, { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT });
     const pesertaCount = parseInt(pesertaCountRaw[0]?.count || 0, 10);
 
     const baseHeader = { ...buildHeader(kelas), peserta: pesertaCount };
@@ -224,16 +219,6 @@ export const getCapaianCplKelas = async (kelasId) => {
             header: baseHeader,
             pesan: 'CPL belum dipetakan ke Mata Kuliah ini',
             cplInfo: [], targetCpl: {}, tabel: [], rerataPerolehan: {}
-        };
-    }
-
-    if (!adaNilaiDikunci) {
-        return {
-            header: baseHeader,
-            pesan: 'Silakan lakukan penguncian nilai untuk dapat melihat hasil Capaian Pembelajaran Lulusan (CPL).',
-            cplInfo: cplList.map(c => ({ id: c.id, kode: c.kode, deskripsi: c.deskripsi })),
-            targetCpl: Object.fromEntries(cplList.map(c => [c.kode, parseFloat(c.targetCpl || 0)])),
-            tabel: [], rerataPerolehan: {}
         };
     }
 

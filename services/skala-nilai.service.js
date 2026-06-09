@@ -237,8 +237,8 @@ export const upsertSkalaNilai = async (payload) => {
             whereClause.siak_program_studi_id = programStudiId;
         }
         
-        // Wipe data lama sebelum insert baru
-        await SkalaPenilaian.destroy({ where: whereClause, transaction: trx });
+        // Wipe data lama sebelum insert baru (force: true = hard delete, bukan soft-delete)
+        await SkalaPenilaian.destroy({ where: whereClause, force: true, transaction: trx });
 
         // 2. Insert data baru
         for (const item of dataSkala) {
