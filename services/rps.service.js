@@ -1,6 +1,7 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
 import * as CustomError from "../utils/custom-error.js";
+import { Op } from "sequelize";
 
 const { 
     sequelize, Rps, MataKuliah, ProgramStudi, TahunKurikulum, 
