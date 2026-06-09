@@ -682,7 +682,7 @@ export const saveRencanaEvaluasi = async (mkId, payload) => {
             if (row.cpmkData && row.cpmkData.length > 0) {
                 const pivotData = row.cpmkData.map(c => ({
                     siakRencanaEvaluasiId: newEvaluasi.id,
-                    siakCpmkId: c.cpmkId,
+                    siakCpmkId: c.siakCpmkId || c.cpmkId,
                     bobotCpmk: c.bobotCpmk
                 }));
                 await models.PemetaanEvaluasiCpmk.bulkCreate(pivotData, { transaction: trx });
