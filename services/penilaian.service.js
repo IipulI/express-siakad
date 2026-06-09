@@ -752,7 +752,7 @@ export const kunciNilaiSatuMahasiswa = async (rincianKrsId, action = 'kunci') =>
 // Koordinator MK mengeksekusi ini setelah masa sanggah berakhir.
 // Status berubah dari 'Dikunci' → 'Lulus' / 'Tidak Lulus' (permanen)
 // ====================================================================
-const GRADE_LULUS = ['A', 'AB', 'B', 'BC', 'C'];
+const GRADE_LULUS = ['A', 'AB', 'B', 'BC', 'C', 'CD'];
 
 export const finalisasiNilaiKelas = async (kelasId) => {
     const rincianList = await RincianKrsMahasiswa.findAll({
