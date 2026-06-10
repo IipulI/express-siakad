@@ -729,7 +729,15 @@ export const kunciNilaiKelas = async (kelasId, action = 'kunci') => {
     const newStatus = action === 'kunci' ? 'Dikunci' : null;
     const [jumlahDiupdate] = await RincianKrsMahasiswa.update(
         { status: newStatus },
-        { where: { siak_kelas_kuliah_id: kelasId, status: { [Op.notIn]: STATUS_FINAL } } }
+        {
+            where: {
+                siak_kelas_kuliah_id: kelasId,
+                [Op.or]: [
+                    { status: { [Op.notIn]: STATUS_FINAL } },
+                    { status: null }
+                ]
+            }
+        }
     );
     return { kelasId, jumlahDiupdate, status: newStatus ?? 'Aktif' };
 };
