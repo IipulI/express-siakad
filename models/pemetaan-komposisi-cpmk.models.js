@@ -30,7 +30,12 @@ export default (sequelize) => {
         siakCpmkId: {
             type: DataTypes.UUID,
             field: 'siak_cpmk_id',
-            allowNull: false, 
+            allowNull: false,
+        },
+        bobot: {
+            type: DataTypes.FLOAT,
+            allowNull: true,
+            defaultValue: 0
         }
     }, {
         sequelize, 

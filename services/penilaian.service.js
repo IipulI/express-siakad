@@ -305,7 +305,8 @@ export const hitungNilaiAkhir = async (krsId) => {
                     if (komposisiIds.length > 0) {
                         const pemetaanRows = await sequelize.query(
                             `SELECT pkc.siak_komposisi_nilai_id AS komposisi_id,
-                                    pkc.siak_cpmk_id            AS cpmk_id
+                                    pkc.siak_cpmk_id            AS cpmk_id,
+                                    pkc.bobot                   AS bobot_cpmk
                              FROM siak_pemetaan_komposisi_cpmk pkc
                              WHERE pkc.siak_komposisi_nilai_id IN (:komposisiIds)
                                AND pkc.deleted_at IS NULL`,
@@ -320,11 +321,15 @@ export const hitungNilaiAkhir = async (krsId) => {
                         console.log('Komposisi IDs:', komposisiIds);
                         console.log('Pemetaan Komposisi->CPMK ditemukan:', pemetaanRows.length);
 
-                        // Build map komposisiId -> [cpmkId]
+                        // Build map komposisiId -> [{ cpmkId, bobotCpmk }]
                         const pemetaanMap = {};
                         pemetaanRows.forEach(row => {
                             if (!pemetaanMap[row.komposisi_id]) pemetaanMap[row.komposisi_id] = [];
-                            pemetaanMap[row.komposisi_id].push(row.cpmk_id);
+                            pemetaanMap[row.komposisi_id].push({
+                                cpmkId: row.cpmk_id,
+                                // Fallback ke 100 jika bobot belum diset (data lama sebelum kolom bobot ada)
+                                bobotCpmk: parseFloat(row.bobot_cpmk || 0) || 100
+                            });
                         });
 
                         const raporCPMK = {}; // { cpmkId: { skorTerbobot, totalBobot } }
@@ -336,12 +341,14 @@ export const hitungNilaiAkhir = async (krsId) => {
                             const komposisiId = nilai.siak_komposisi_nilai_id || nilai.siakKomposisiNilaiId;
                             const skor = parseFloat(nilai.skor || 0);
                             const bobotPersen = parseFloat(nilai.komposisiNilai.persentase || 0);
-                            const cpmkIds = pemetaanMap[komposisiId] || [];
+                            const pemetaanItems = pemetaanMap[komposisiId] || [];
 
-                            cpmkIds.forEach(cpmkId => {
+                            pemetaanItems.forEach(({ cpmkId, bobotCpmk }) => {
+                                // Kontribusi = bobot komponen evaluasi × bobot CPMK dalam komponen tsb
+                                const kontribusi = bobotPersen * (bobotCpmk / 100);
                                 if (!raporCPMK[cpmkId]) raporCPMK[cpmkId] = { skorTerbobot: 0, totalBobot: 0 };
-                                raporCPMK[cpmkId].skorTerbobot += skor * (bobotPersen / 100);
-                                raporCPMK[cpmkId].totalBobot += bobotPersen;
+                                raporCPMK[cpmkId].skorTerbobot += skor * (kontribusi / 100);
+                                raporCPMK[cpmkId].totalBobot += kontribusi;
                             });
                         });
 
