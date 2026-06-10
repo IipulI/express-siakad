@@ -680,6 +680,10 @@ export const getPesertaKelasList = async (kelasId) => {
                 grade = { hurufMutu: '-', angkaMutu: 0 };
             }
 
+            // Lulus mata kuliah ditentukan dari huruf mutu vs skala (CD ke atas = Lulus),
+            // bukan dari status workflow kunci nilai.
+            const lulus = !!grade.hurufMutu && !['-', 'D', 'E'].includes(grade.hurufMutu);
+
             return {
                 no: no++,
                 rincianKrsId: item.id,
@@ -692,9 +696,9 @@ export const getPesertaKelasList = async (kelasId) => {
                 nilaiAkhir: nilaiAkhirFinal,
                 grade: grade.hurufMutu,
                 angkaMutu: grade.angkaMutu,
-                lulus: item.status === 'Lulus',
+                lulus,
                 keterangan: item.status === 'Dikunci'
-                    ? 'Nilai KRS sudah dikunci' : ''
+                    ? 'Nilai KRS sudah dikunci' : 'Belum Terkunci'
             };
         });
 
