@@ -557,28 +557,27 @@ export const getPesertaKelasList = async (kelasId) => {
         if (prodiId && kurikulumId) {
             const rawSkala = await SkalaPenilaian.findAll({
                 where: {
-                    siak_program_studi_id: prodiId,
-                    siak_tahun_kurikulum_id: kurikulumId,
-                    deleted_at: null
+                    siakProgramStudiId: prodiId,
+                    siakTahunKurikulumId: kurikulumId
                 },
-                attributes: ['huruf_mutu', 'angka_mutu', 'nilai_min', 'nilai_max'],
-                order: [['nilai_min', 'DESC']]
+                attributes: ['hurufMutu', 'angkaMutu', 'nilaiMin', 'nilaiMax'],
+                order: [['nilaiMin', 'DESC']]
             });
 
             if (rawSkala.length > 0) {
                 skalaAktif = rawSkala.map(s => ({
-                    hurufMutu: s.huruf_mutu,
-                    angkaMutu: parseFloat(s.angka_mutu || 0),
-                    nilaiMin: parseFloat(s.nilai_min || 0),
-                    nilaiMax: parseFloat(s.nilai_max || 0),
+                    hurufMutu: s.hurufMutu,
+                    angkaMutu: parseFloat(s.angkaMutu || 0),
+                    nilaiMin: parseFloat(s.nilaiMin || 0),
+                    nilaiMax: parseFloat(s.nilaiMax || 0),
                 }));
             }
         }
 
         // 4. Ambil semua rincian KRS di kelas
         const allRincian = await RincianKrsMahasiswa.findAll({
-            where: { siak_kelas_kuliah_id: kelasId },
-            attributes: ['id', 'nilai_akhir', 'huruf_mutu', 'angka_mutu', 'status'],
+            where: { siakKelasKuliahId: kelasId },
+            attributes: ['id', 'nilaiAkhir', 'hurufMutu', 'angkaMutu', 'status'],
             include: [
                 {
                     model: KrsMahasiswa,
@@ -593,7 +592,7 @@ export const getPesertaKelasList = async (kelasId) => {
                 {
                     model: NilaiEvaluasiMahasiswa,
                     as: 'daftarNilaiEvaluasi',
-                    attributes: ['id', 'siak_komposisi_nilai_id', 'skor'],
+                    attributes: ['id', 'siakKomposisiNilaiId', 'skor'],
                     required: false
                 }
             ]
@@ -608,14 +607,14 @@ export const getPesertaKelasList = async (kelasId) => {
 
             // Cek apakah detailNilai item ini cocok dengan komposisi kelas ini
             const nilaiYangCocok = (item.daftarNilaiEvaluasi || []).filter(
-                n => komposisiIds.has(n.siak_komposisi_nilai_id)
+                n => komposisiIds.has(n.siakKomposisiNilaiId)
             );
             const punyaNilaiCocok = nilaiYangCocok.length > 0;
 
             const existing = mahasiswaMap[mhsId];
             const existingCocok = existing
                 ? (existing.daftarNilaiEvaluasi || []).filter(
-                    n => komposisiIds.has(n.siak_komposisi_nilai_id)
+                    n => komposisiIds.has(n.siakKomposisiNilaiId)
                 ).length > 0
                 : false;
 
@@ -641,7 +640,7 @@ export const getPesertaKelasList = async (kelasId) => {
             let adaNilai = false;
 
             nilaiList.forEach(n => {
-                const komp = komposisiMap[n.siak_komposisi_nilai_id];
+                const komp = komposisiMap[n.siakKomposisiNilaiId];
                 if (komp) {
                     const skor = parseFloat(n.skor || 0);
                     nilaiPerKomponen[komp.label] = skor;
@@ -659,15 +658,14 @@ export const getPesertaKelasList = async (kelasId) => {
             nilaiAkhirHitung = Math.round(nilaiAkhirHitung * 100) / 100;
 
             // Nilai akhir final
-            const nilaiAkhirDB = parseFloat(item.nilai_akhir || 0);
+            const nilaiAkhirDB = parseFloat(item.nilaiAkhir || 0);
             const nilaiAkhirFinal = nilaiAkhirDB > 0
                 ? nilaiAkhirDB
                 : (adaNilai ? nilaiAkhirHitung : 0);
 
             // Grade dari skala nilai (DB atau default)
-            // Sequelize underscored:true → field dikembalikan sebagai camelCase
-            const storedGrade = item.hurufMutu || item.huruf_mutu;
-            const storedAngka = item.angkaMutu ?? item.angka_mutu;
+            const storedGrade = item.hurufMutu;
+            const storedAngka = item.angkaMutu;
             let grade;
             if (storedGrade && storedGrade !== '-') {
                 grade = {
