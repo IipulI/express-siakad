@@ -293,16 +293,18 @@ export const getCapaianCplKelas = async (kelasId) => {
             cpmkList.forEach(cpmk => {
                 const pemetaan = cpmk.cplDiCPMK?.find(c => c.id === cpl.id);
                 if (pemetaan) {
-                    const bobot = parseFloat(pemetaan.PemetaanCplCpmk?.bobotCpl || 0);
+                    const bobotCpl = parseFloat(pemetaan.PemetaanCplCpmk?.bobotCpl || 0);
+                    const bobotCpmk = parseFloat(cpmk.bobot || 0);
+                    const kontribusi = bobotCpmk * (bobotCpl / 100);
                     const safeCId = String(cpmk.id || cpmk.getDataValue?.('id'));
                     const nilaiCpmk = nilaiCpmkMap[safeMhsId]?.[safeCId] || 0;
-                    totalNilai += nilaiCpmk * (bobot / 100);
-                    totalBobot += bobot;
+                    totalNilai += nilaiCpmk * kontribusi;
+                    totalBobot += kontribusi;
                 }
             });
-            // CPL = weighted average: Σ(nilaiCPMK × bobot) / Σbobot
+            // CPL = weighted average: Σ(nilaiCPMK × bobotCPMK × bobotCpl) / Σ(bobotCPMK × bobotCpl)
             const nilaiCpl = totalBobot > 0
-                ? parseFloat((totalNilai / (totalBobot / 100)).toFixed(2))
+                ? parseFloat((totalNilai / totalBobot).toFixed(2))
                 : null;
             nilaiPerCpl[cpl.kode] = nilaiCpl;
             if (nilaiCpl !== null) {
