@@ -7,9 +7,9 @@ import * as MonitoringService from '../../services/monitoring.service.js';
 import path from 'path';
 
 // ─── Env-based institutional constants (same pattern as export-nilai-kelas) ───
-const ENV_NAMA_UNIV    = () => process.env.NAMA_UNIVERSITAS   || ENV_NAMA_UNIV();
-const ENV_ALAMAT_UNIV  = () => process.env.ALAMAT_UNIVERSITAS || ENV_ALAMAT_UNIV();
-const ENV_KONTAK_UNIV  = () => process.env.KONTAK_UNIVERSITAS || ENV_KONTAK_UNIV();
+const ENV_NAMA_UNIV    = () => process.env.NAMA_UNIVERSITAS   || 'UNIVERSITAS IBN KHALDUN BOGOR';
+const ENV_ALAMAT_UNIV  = () => process.env.ALAMAT_UNIVERSITAS || 'Jl KH Sholeh Iskandar KM 2 Kedung Badak Bogor';
+const ENV_KONTAK_UNIV  = () => process.env.KONTAK_UNIVERSITAS || 'Website: uika-bogor.ac.id | Email: info@uika-bogor.ac.id | Telp: 0251-8356884';
 const ENV_APP_URL      = () => process.env.APP_URL            || 'siakad.uika-bogor.ac.id';
 const ENV_WAKIL_REKTOR = () => process.env.NAMA_WAKIL_REKTOR  || '-';
 const ENV_KOTA_TTD     = () => process.env.KOTA_TTD           || 'Bogor';

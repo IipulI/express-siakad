@@ -18,7 +18,7 @@ async function startServer() {
         // await sequelize.sync({ force: process.env.NODE_ENV === 'development' });
         // console.log("All models were synchronized successfully.");
         // Sync all models secara cerdas (nambahin kolom yang kurang tanpa hapus data)
-        await sequelize.sync({ alter: true }); 
+        await sequelize.sync();
         console.log("All models were synchronized successfully.");
 
         server.listen(port, () => {
