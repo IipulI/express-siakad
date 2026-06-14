@@ -1273,7 +1273,7 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
                         totalBobotMaksimal += bobotCpmk;
                     });
 
-                    let persentaseAkhir = totalBobotMaksimal > 0 ? (totalSkorTerbobot / totalBobotMaksimal) * 100 : 0;
+                    let persentaseAkhir = totalBobotMaksimal > 0 ? (totalSkorTerbobot / totalBobotMaksimal) : 0;
                     const nilaiAkhirCpmk = Math.round(persentaseAkhir * 100) / 100;
                     row.cpmk[cpmk.kode] = nilaiAkhirCpmk;
 

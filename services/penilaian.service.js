@@ -412,7 +412,7 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
             kodeCpmk: item.kode,
             deskripsi: item.deskripsi,
             nilaiCapaian: item.totalBobot > 0
-                ? parseFloat(((item.totalSkorTerbobot / item.totalBobot) * 100).toFixed(2))
+                ? parseFloat((item.totalSkorTerbobot / item.totalBobot).toFixed(2))
                 : 0
         }));
 
