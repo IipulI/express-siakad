@@ -2,7 +2,7 @@ import models from "../models/index.js";
 import { Op } from 'sequelize';
 
 const {
-    sequelize, KomposisiNilaiMataKuliah, PemetaanEvaluasiCpmk, PemetaanKomposisiCpmk,
+    sequelize, KomposisiNilaiMataKuliah, PemetaanEvaluasiCpmk,
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
     ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
@@ -30,44 +30,11 @@ const getGrade = (nilai, skala) => {
     return { hurufMutu: 'E', angkaMutu: 0 };
 };
 
-// 1. SETUP RPS: Dosen mensetup komponen evaluasi (Teori/Praktikum/Proyek) beserta relasi CPMK
+// 1. SETUP RPS (DEPRECATED): komponen evaluasi + pemetaan CPMK sekarang disimpan
+// lewat RencanaEvaluasi/PemetaanEvaluasiCpmk (POST /mata-kuliah/:id/rencana-evaluasi).
+// Endpoint lama ini ditolak supaya tidak ada lagi 2 sumber data yang bisa berbeda.
 export const createKomposisiEvaluasi = async (mataKuliahId, komposisiData) => {
-    try {
-        let createdRecords = [];
-        await sequelize.transaction(async (trx) => {
-            // Bersihkan data lama jika dosen melakukan update skema
-            await KomposisiNilaiMataKuliah.destroy({ where: { siakMataKuliahId: mataKuliahId }, transaction: trx });
-
-            for (const item of komposisiData) {
-                const komposisi = await KomposisiNilaiMataKuliah.create({
-                    siakMataKuliahId: mataKuliahId,
-                    namaKomponen: item.tipe || item.namaKomponen,
-                    persentase: item.persentase,
-                    key: item.key
-                }, { transaction: trx });
-
-                createdRecords.push({
-                    id: komposisi.id,
-                    key: komposisi.key,
-                    persentase: komposisi.persentase
-                });
-
-                // Mapping ke CPMK menggunakan pivot yang benar (bersih tanpa try-catch bersarang)
-                if (item.mappingCpmk && Array.isArray(item.mappingCpmk) && item.mappingCpmk.length > 0) {
-                    const pemetaan = item.mappingCpmk.map(cpmkData => ({
-                        siakKomposisiNilaiId: komposisi.id,
-                        siakCpmkId: cpmkData.siakCapaianMataKuliahId, // Kembali pakai ini
-                        bobot: cpmkData.bobot // 🟢 FIX UTAMA: Tambahan bobot agar tidak kosong
-                    }));
-
-                    await PemetaanKomposisiCpmk.bulkCreate(pemetaan, { transaction: trx });
-                }
-            }
-        });
-        return createdRecords;
-    } catch (error) {
-        throw new Error("Gagal menyimpan struktur evaluasi RPS: " + error.message);
-    }
+    throw new Error("Endpoint ini sudah tidak digunakan. Gunakan POST /mata-kuliah/:id/rencana-evaluasi untuk mengatur komponen evaluasi & pemetaan CPMK.");
 }
 
 // GET SETUP EVALUASI (Untuk menampilkan data di Halaman 8 PDF)
