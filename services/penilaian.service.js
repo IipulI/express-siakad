@@ -6,7 +6,7 @@ const {
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
     ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
-    NilaiCpmkMahasiswa, CapaianMataKuliah
+    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi
 } = models;
 
 const DEFAULT_SKALA = [
@@ -131,8 +131,8 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
             const payload = arrNilai.map(item => ({
                 siakRincianKrsMahasiswaId: krsId,
                 siak_rincian_krs_mahasiswa_id: krsId,
-                siakKomposisiNilaiId: item.komposisiId,
-                siak_komposisi_nilai_id: item.komposisiId,
+                siakRencanaEvaluasiId: item.komposisiId,
+                siak_rencana_evaluasi_id: item.komposisiId,
                 skor: item.skor
             }));
 
@@ -155,9 +155,9 @@ export const hitungNilaiAkhir = async (krsId) => {
             const listNilai = await models.NilaiEvaluasiMahasiswa.findAll({
                 where: { siakRincianKrsMahasiswaId: krsId },
                 include: [{
-                    model: models.KomposisiNilaiMataKuliah,
-                    as: 'komposisiNilai',
-                    attributes: ['id', 'persentase', 'key']
+                    model: models.RencanaEvaluasi,
+                    as: 'rencanaEvaluasi',
+                    attributes: ['id', 'bobot', 'metodeEvaluasi']
                 }],
                 transaction: trx
             });
@@ -165,9 +165,9 @@ export const hitungNilaiAkhir = async (krsId) => {
             // 2. Hitung total skor nilai akhir
             let totalSkor = 0;
             listNilai.forEach(item => {
-                if (item.komposisiNilai) {
+                if (item.rencanaEvaluasi) {
                     const skor = parseFloat(item.skor);
-                    const bobot = parseFloat(item.komposisiNilai.persentase) / 100;
+                    const bobot = parseFloat(item.rencanaEvaluasi.bobot) / 100;
                     totalSkor += (skor * bobot);
                 }
             });
@@ -182,7 +182,8 @@ export const hitungNilaiAkhir = async (krsId) => {
             const queryTrace = `
                 SELECT mk.siak_program_studi_id AS prodi_id,
                        mk.siak_tahun_kurikulum_id AS kurikulum_id,
-                       kk.siak_mata_kuliah_id AS mk_id
+                       kk.siak_mata_kuliah_id AS mk_id,
+                       kk.siak_periode_akademik_id AS periode_id
                 FROM siak_rincian_krs_mahasiswa rkm
                 LEFT JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
                 LEFT JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
@@ -228,22 +229,23 @@ export const hitungNilaiAkhir = async (krsId) => {
             // di bawah 60, paksa grade menjadi E meskipun nilai akhir tinggi
             // ====================================================================
             if (traceResult && traceResult.length > 0) {
-                const { mk_id } = traceResult[0];
+                const { mk_id, periode_id } = traceResult[0];
 
                 const syaratRows = await sequelize.query(`
                     SELECT re.metode_evaluasi, re.syarat_lulus
                     FROM siak_rencana_evaluasi re
                     WHERE re.siak_mata_kuliah_id = :mkId
+                      AND re.siak_periode_akademik_id = :periodeId
                       AND re.syarat_lulus = 'MENJADI_SYARAT_LULUS'
                       AND re.deleted_at IS NULL
-                `, { replacements: { mkId: mk_id }, type: sequelize.QueryTypes.SELECT, transaction: trx });
+                `, { replacements: { mkId: mk_id, periodeId: periode_id }, type: sequelize.QueryTypes.SELECT, transaction: trx });
 
                 if (syaratRows.length > 0) {
-                    // Bangun map: key komposisi → skor mahasiswa
+                    // Bangun map: metode evaluasi → skor mahasiswa
                     const nilaiMap = {};
                     listNilai.forEach(n => {
-                        const komp = n.komposisiNilai;
-                        if (komp?.key) nilaiMap[komp.key.toLowerCase()] = parseFloat(n.skor || 0);
+                        const metode = n.rencanaEvaluasi?.metodeEvaluasi;
+                        if (metode) nilaiMap[metode.toLowerCase()] = parseFloat(n.skor || 0);
                     });
 
                     for (const syarat of syaratRows) {
@@ -297,82 +299,61 @@ export const hitungNilaiAkhir = async (krsId) => {
                         { replacements: { kelasId, mhsId }, transaction: trx }
                     );
 
-                    // 🔴 FIX FINAL: Pastikan ID ditangkap dengan aman baik saat camelCase maupun snake_case
-                    const komposisiIds = listNilai
-                        .map(n => n.siak_komposisi_nilai_id || n.siakKomposisiNilaiId)
+                    const rencanaEvaluasiIds = listNilai
+                        .map(n => n.siak_rencana_evaluasi_id || n.siakRencanaEvaluasiId)
                         .filter(Boolean);
 
-                    if (komposisiIds.length > 0) {
+                    if (rencanaEvaluasiIds.length > 0) {
                         const pemetaanRows = await sequelize.query(
-                            `SELECT pkc.siak_komposisi_nilai_id AS komposisi_id,
-                                    pkc.siak_cpmk_id            AS cpmk_id,
-                                    pkc.bobot                   AS bobot_cpmk
-                             FROM siak_pemetaan_komposisi_cpmk pkc
-                             WHERE pkc.siak_komposisi_nilai_id IN (:komposisiIds)
-                               AND pkc.deleted_at IS NULL`,
+                            `SELECT pec.siak_rencana_evaluasi_id AS rencana_evaluasi_id,
+                                    pec.siak_cpmk_id             AS cpmk_id,
+                                    pec.bobot_cpmk               AS bobot_cpmk
+                             FROM siak_pemetaan_evaluasi_cpmk pec
+                             WHERE pec.siak_rencana_evaluasi_id IN (:rencanaEvaluasiIds)
+                               AND pec.deleted_at IS NULL`,
                             {
-                                replacements: { komposisiIds },
+                                replacements: { rencanaEvaluasiIds },
                                 type: sequelize.QueryTypes.SELECT,
                                 transaction: trx
                             }
                         );
 
-                        console.log(`\n====== DEBUG NILAI CPMK (krsId=${krsId}) ======`);
-                        console.log('Komposisi IDs:', komposisiIds);
-                        console.log('Pemetaan Komposisi->CPMK ditemukan:', pemetaanRows.length);
-
-                        // Build map komposisiId -> [{ cpmkId, bobotCpmk }]
+                        // Build map rencanaEvaluasiId -> [{ cpmkId, bobotCpmk }]
                         const pemetaanMap = {};
                         pemetaanRows.forEach(row => {
-                            if (!pemetaanMap[row.komposisi_id]) pemetaanMap[row.komposisi_id] = [];
-                            pemetaanMap[row.komposisi_id].push({
+                            if (!pemetaanMap[row.rencana_evaluasi_id]) pemetaanMap[row.rencana_evaluasi_id] = [];
+                            pemetaanMap[row.rencana_evaluasi_id].push({
                                 cpmkId: row.cpmk_id,
-                                // Fallback ke 100 jika bobot belum diset (data lama sebelum kolom bobot ada)
-                                bobotCpmk: parseFloat(row.bobot_cpmk || 0) || 100
+                                bobotCpmk: parseFloat(row.bobot_cpmk || 0)
                             });
                         });
 
                         const raporCPMK = {}; // { cpmkId: { skorTerbobot, totalBobot } }
 
                         listNilai.forEach(nilai => {
-                            if (!nilai.komposisiNilai) return;
+                            if (!nilai.rencanaEvaluasi) return;
 
-                            // 🔴 FIX FINAL: Sinkronisasi pemanggilan ID Komponen
-                            const komposisiId = nilai.siak_komposisi_nilai_id || nilai.siakKomposisiNilaiId;
+                            const rencanaEvaluasiId = nilai.siak_rencana_evaluasi_id || nilai.siakRencanaEvaluasiId;
                             const skor = parseFloat(nilai.skor || 0);
-                            const bobotPersen = parseFloat(nilai.komposisiNilai.persentase || 0);
-                            const pemetaanItems = pemetaanMap[komposisiId] || [];
 
-                            pemetaanItems.forEach(({ cpmkId, bobotCpmk }) => {
-                                // Kontribusi = bobot komponen evaluasi × bobot CPMK dalam komponen tsb
-                                const kontribusi = bobotPersen * (bobotCpmk / 100);
+                            (pemetaanMap[rencanaEvaluasiId] || []).forEach(({ cpmkId, bobotCpmk }) => {
                                 if (!raporCPMK[cpmkId]) raporCPMK[cpmkId] = { skorTerbobot: 0, totalBobot: 0 };
-                                raporCPMK[cpmkId].skorTerbobot += skor * (kontribusi / 100);
-                                raporCPMK[cpmkId].totalBobot += kontribusi;
+                                raporCPMK[cpmkId].skorTerbobot += skor * bobotCpmk;
+                                raporCPMK[cpmkId].totalBobot += bobotCpmk;
                             });
                         });
 
-                        console.log('Rapor CPMK (sebelum normalisasi):', raporCPMK);
-                        console.log('================================================\n');
-
-                        const payloadCpmk = Object.entries(raporCPMK).map(([cpmkId, item]) => {
-                            // Normalisasi: bagi dengan total bobot agar skala tetap 0-100
-                            const nilaiCpmk = item.totalBobot > 0
-                                ? Math.round((item.skorTerbobot / (item.totalBobot / 100)) * 100) / 100
-                                : 0;
-                            return {
-                                siakKelasKuliahId: kelasId,
-                                siakMahasiswaId: mhsId,
-                                siakCapaianMataKuliahId: cpmkId,
-                                nilai: nilaiCpmk
-                            };
-                        });
+                        const payloadCpmk = Object.entries(raporCPMK).map(([cpmkId, item]) => ({
+                            siakKelasKuliahId: kelasId,
+                            siakMahasiswaId: mhsId,
+                            siakCapaianMataKuliahId: cpmkId,
+                            nilai: item.totalBobot > 0
+                                ? Math.round((item.skorTerbobot / item.totalBobot) * 100) / 100
+                                : 0
+                        }));
 
                         if (payloadCpmk.length > 0) {
                             await models.NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
-                            console.log(`✅ Berhasil simpan ${payloadCpmk.length} nilai CPMK ke DB.`);
-                        } else {
-                            console.warn('⚠️  Tidak ada CPMK yang dipetakan ke komponen evaluasi. Cek setup-evaluasi!');
                         }
                     }
                 }
@@ -388,20 +369,16 @@ export const hitungNilaiAkhir = async (krsId) => {
 // 4. GENERATOR RAPOR OBE MAHASISWA
 export const getRaporOBEMahasiswa = async (rincianKrsId) => {
     try {
-        const ModelNilai = models.NilaiEvaluasiMahasiswa || models.siak_nilai_evaluasi_mahasiswa;
-        const ModelKomposisi = models.KomposisiNilaiMataKuliah || models.siak_komposisi_nilai_mata_kuliah;
-        const ModelCPMK = models.CapaianMataKuliah || models.siak_capaian_mata_kuliah;
-
-        const listNilai = await ModelNilai.findAll({
+        const listNilai = await models.NilaiEvaluasiMahasiswa.findAll({
             where: { siakRincianKrsMahasiswaId: rincianKrsId },
             include: [{
-                model: ModelKomposisi,
-                as: 'komposisiNilai',
+                model: models.RencanaEvaluasi,
+                as: 'rencanaEvaluasi',
                 include: [{
-                    model: ModelCPMK,
-                    as: 'cpmkList', // Pastikan alias ini masih sama
-                    attributes: ['id', 'kode', 'deskripsi'], // Ambil kode dan deskripsi CPMK
-                    through: { attributes: ['bobot'] } // Bobot CPMK dalam komponen ini (PemetaanKomposisiCpmk.bobot)
+                    model: models.CapaianMataKuliah,
+                    as: 'cpmkList',
+                    attributes: ['id', 'kode', 'deskripsi'],
+                    through: { attributes: ['bobotCpmk'] }
                 }]
             }]
         });
@@ -409,51 +386,35 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
         let raporCPMK = {};
 
         listNilai.forEach(nilai => {
-            if (nilai.komposisiNilai) {
-                const skorAsli = parseFloat(nilai.skor);
-                const bobotPersentase = parseFloat(nilai.komposisiNilai.persentase) / 100;
+            if (!nilai.rencanaEvaluasi?.cpmkList) return;
+            const skorAsli = parseFloat(nilai.skor);
 
-                if (nilai.komposisiNilai.cpmkList) {
-                    nilai.komposisiNilai.cpmkList.forEach(cpmk => {
-                        // Gunakan KODE CPMK agar jelas dibaca oleh Frontend
-                        const kodeCpmk = cpmk.kode || cpmk.id;
+            nilai.rencanaEvaluasi.cpmkList.forEach(cpmk => {
+                const kodeCpmk = cpmk.kode || cpmk.id;
+                if (!kodeCpmk) return;
 
-                        if (kodeCpmk) {
-                            // Kontribusi = bobot komponen evaluasi × bobot CPMK dalam komponen tsb
-                            // (samakan dengan formula materialized di hitungNilaiAkhir)
-                            const bobotCpmk = parseFloat(cpmk.PemetaanKomposisiCpmk?.bobot || 0) || 100;
-                            const kontribusi = bobotPersentase * (bobotCpmk / 100);
+                const bobotCpmk = parseFloat(cpmk.PemetaanEvaluasiCpmk?.bobotCpmk || 0);
 
-                            if (!raporCPMK[kodeCpmk]) {
-                                raporCPMK[kodeCpmk] = {
-                                    kode: kodeCpmk,
-                                    deskripsi: cpmk.deskripsi || '-',
-                                    totalSkorTerbobot: 0,
-                                    totalBobotMaksimal: 0
-                                };
-                            }
-                            raporCPMK[kodeCpmk].totalSkorTerbobot += skorAsli * kontribusi;
-                            raporCPMK[kodeCpmk].totalBobotMaksimal += (100 * kontribusi);
-                        }
-                    });
+                if (!raporCPMK[kodeCpmk]) {
+                    raporCPMK[kodeCpmk] = {
+                        kode: kodeCpmk,
+                        deskripsi: cpmk.deskripsi || '-',
+                        totalSkorTerbobot: 0,
+                        totalBobot: 0
+                    };
                 }
-            }
+                raporCPMK[kodeCpmk].totalSkorTerbobot += skorAsli * bobotCpmk;
+                raporCPMK[kodeCpmk].totalBobot += bobotCpmk;
+            });
         });
 
-        // Format hasil akhir menjadi array dengan persentase 0-100%
-        return Object.keys(raporCPMK).map(kode => {
-            const item = raporCPMK[kode];
-            // Hitung persentase akhir capaian kompetensi
-            const persentase = item.totalBobotMaksimal > 0
-                ? (item.totalSkorTerbobot / item.totalBobotMaksimal) * 100
-                : 0;
-
-            return {
-                kodeCpmk: item.kode,
-                deskripsi: item.deskripsi,
-                nilaiCapaian: parseFloat(persentase.toFixed(2)) // Dibulatkan 2 angka desimal
-            };
-        });
+        return Object.values(raporCPMK).map(item => ({
+            kodeCpmk: item.kode,
+            deskripsi: item.deskripsi,
+            nilaiCapaian: item.totalBobot > 0
+                ? parseFloat(((item.totalSkorTerbobot / item.totalBobot) * 100).toFixed(2))
+                : 0
+        }));
 
     } catch (error) {
         throw new Error("Gagal menggenerate rapor OBE: " + error.message);
@@ -540,20 +501,20 @@ export const getPesertaKelasList = async (kelasId) => {
         const prodiId = kelas.mataKuliah?.siakProgramStudiId;
         const kurikulumId = kelas.mataKuliah?.siakTahunKurikulumId;
 
-        // 2. Ambil komposisi nilai MK
-        const komposisiList = await KomposisiNilaiMataKuliah.findAll({
-            where: { siakMataKuliahId: mkId },
-            attributes: ['id', 'persentase', 'key'],
+        // 2. Ambil komposisi nilai MK (dari Rencana Evaluasi, per MK + per periode)
+        const komposisiList = await RencanaEvaluasi.findAll({
+            where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: kelas.siakPeriodeAkademikId },
+            attributes: ['id', 'bobot', 'metodeEvaluasi'],
             order: [['createdAt', 'ASC']]
         });
 
-        // Map by ID, tampilkan key sebagai uppercase label
+        // Map by ID, tampilkan metodeEvaluasi sebagai uppercase label
         const komposisiMap = {};
         komposisiList.forEach(k => {
             komposisiMap[k.id] = {
                 id: k.id,
-                label: (k.key || '-').toUpperCase(),
-                persentase: parseFloat(k.persentase || 0)
+                label: (k.metodeEvaluasi || '-').toUpperCase(),
+                persentase: parseFloat(k.bobot || 0)
             };
         });
 
@@ -597,7 +558,7 @@ export const getPesertaKelasList = async (kelasId) => {
                 {
                     model: NilaiEvaluasiMahasiswa,
                     as: 'daftarNilaiEvaluasi',
-                    attributes: ['id', 'siakKomposisiNilaiId', 'skor'],
+                    attributes: ['id', 'siakRencanaEvaluasiId', 'skor'],
                     required: false
                 }
             ]
@@ -612,14 +573,14 @@ export const getPesertaKelasList = async (kelasId) => {
 
             // Cek apakah detailNilai item ini cocok dengan komposisi kelas ini
             const nilaiYangCocok = (item.daftarNilaiEvaluasi || []).filter(
-                n => komposisiIds.has(n.siakKomposisiNilaiId)
+                n => komposisiIds.has(n.siakRencanaEvaluasiId)
             );
             const punyaNilaiCocok = nilaiYangCocok.length > 0;
 
             const existing = mahasiswaMap[mhsId];
             const existingCocok = existing
                 ? (existing.daftarNilaiEvaluasi || []).filter(
-                    n => komposisiIds.has(n.siakKomposisiNilaiId)
+                    n => komposisiIds.has(n.siakRencanaEvaluasiId)
                 ).length > 0
                 : false;
 
@@ -645,7 +606,7 @@ export const getPesertaKelasList = async (kelasId) => {
             let adaNilai = false;
 
             nilaiList.forEach(n => {
-                const komp = komposisiMap[n.siakKomposisiNilaiId];
+                const komp = komposisiMap[n.siakRencanaEvaluasiId];
                 if (komp) {
                     const skor = parseFloat(n.skor || 0);
                     nilaiPerKomponen[komp.label] = skor;
@@ -656,7 +617,7 @@ export const getPesertaKelasList = async (kelasId) => {
 
             // Komponen belum diinput -> null (tampil kosong)
             komposisiList.forEach(k => {
-                const label = (k.key || '-').toUpperCase();
+                const label = (k.metodeEvaluasi || '-').toUpperCase();
                 if (!(label in nilaiPerKomponen)) nilaiPerKomponen[label] = null;
             });
 
@@ -708,9 +669,9 @@ export const getPesertaKelasList = async (kelasId) => {
         // Header kolom untuk frontend (dinamis sesuai komposisi)
         const headerKolom = komposisiList.map(k => ({
             id: k.id,
-            label: (k.key || '-').toUpperCase(),
-            bobot: parseFloat(k.persentase || 0),
-            labelKolom: `${(k.key || '-').toUpperCase()} (${parseFloat(k.persentase || 0).toFixed(2)}%)`
+            label: (k.metodeEvaluasi || '-').toUpperCase(),
+            bobot: parseFloat(k.bobot || 0),
+            labelKolom: `${(k.metodeEvaluasi || '-').toUpperCase()} (${parseFloat(k.bobot || 0).toFixed(2)}%)`
         }));
 
         return {

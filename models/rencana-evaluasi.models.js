@@ -17,7 +17,13 @@ export default (sequelize) => {
         foreignKey: "siak_periode_akademik_id",
         as: "periode",
     });
-      
+
+      this.belongsToMany(models.CapaianMataKuliah, {
+        through: models.PemetaanEvaluasiCpmk,
+        foreignKey: "siak_rencana_evaluasi_id",
+        otherKey: "siak_cpmk_id",
+        as: "cpmkList",
+      });
     }
   }
 

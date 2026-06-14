@@ -1223,19 +1223,19 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
             const queryScores = `
                 SELECT
                     m.id AS mahasiswa_id,
-                    pkc.siak_cpmk_id AS cpmk_id_langsung,
+                    pec.siak_cpmk_id AS cpmk_id_langsung,
                     cpmk_master.kode AS cpmk_kode,
                     nem.skor,
-                    kn.persentase AS bobot_komposisi,
-                    pkc.bobot AS bobot_cpmk
+                    pec.bobot_cpmk AS bobot_cpmk
                 FROM siak_mahasiswa m
                 JOIN siak_krs_mahasiswa km ON m.id = km.siak_mahasiswa_id AND km.deleted_at IS NULL
                 JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
                 JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
                 JOIN siak_nilai_evaluasi_mahasiswa nem ON rkm.id = nem.siak_rincian_krs_mahasiswa_id AND nem.deleted_at IS NULL
-                JOIN siak_komposisi_nilai_mata_kuliah kn ON nem.siak_komposisi_nilai_id = kn.id AND kn.deleted_at IS NULL
-                JOIN siak_pemetaan_komposisi_cpmk pkc ON kn.id = pkc.siak_komposisi_nilai_id AND pkc.deleted_at IS NULL
-                JOIN siak_capaian_mata_kuliah cpmk_master ON pkc.siak_cpmk_id = cpmk_master.id AND cpmk_master.deleted_at IS NULL
+                JOIN siak_rencana_evaluasi re ON nem.siak_rencana_evaluasi_id = re.id AND re.deleted_at IS NULL
+                    AND re.siak_periode_akademik_id = kk.siak_periode_akademik_id
+                JOIN siak_pemetaan_evaluasi_cpmk pec ON re.id = pec.siak_rencana_evaluasi_id AND pec.deleted_at IS NULL
+                JOIN siak_capaian_mata_kuliah cpmk_master ON pec.siak_cpmk_id = cpmk_master.id AND cpmk_master.deleted_at IS NULL
                 WHERE kk.siak_mata_kuliah_id = :mataKuliahId
                   AND m.siak_program_studi_id = :prodiId
                   AND m.angkatan = :angkatan
@@ -1268,13 +1268,9 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
 
                     relatedScores.forEach(rs => {
                         const skorAsli = parseFloat(rs.skor) || 0;
-                        const bobotPersentase = parseFloat(rs.bobot_komposisi) / 100;
-                        // Kontribusi = bobot komponen evaluasi × bobot CPMK dalam komponen tsb
-                        // (samakan dengan formula materialized di hitungNilaiAkhir)
-                        const bobotCpmk = parseFloat(rs.bobot_cpmk || 0) || 100;
-                        const kontribusi = bobotPersentase * (bobotCpmk / 100);
-                        totalSkorTerbobot += skorAsli * kontribusi;
-                        totalBobotMaksimal += kontribusi * 100;
+                        const bobotCpmk = parseFloat(rs.bobot_cpmk || 0);
+                        totalSkorTerbobot += skorAsli * bobotCpmk;
+                        totalBobotMaksimal += bobotCpmk;
                     });
 
                     let persentaseAkhir = totalBobotMaksimal > 0 ? (totalSkorTerbobot / totalBobotMaksimal) * 100 : 0;
