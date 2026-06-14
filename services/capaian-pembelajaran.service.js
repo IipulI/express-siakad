@@ -55,18 +55,21 @@ export const getCapaianCpmkKelas = async (kelasId) => {
 
     // Ambil peserta aktif di kelas ini
     const pesertaRaw = await sequelize.query(`
-        SELECT DISTINCT ON (m.id)
-            m.id AS mahasiswa_id,
-            m.npm,
-            m.nama,
-            m.angkatan
-        FROM siak_rincian_krs_mahasiswa rkm
-        LEFT JOIN siak_krs_mahasiswa krs ON rkm.siak_krs_mahasiswa_id = krs.id
-        LEFT JOIN siak_mahasiswa m ON krs.siak_mahasiswa_id = m.id
-        WHERE rkm.siak_kelas_kuliah_id = :kelasId
-          AND rkm.deleted_at IS NULL
-          AND krs.deleted_at IS NULL
-        ORDER BY m.id
+        SELECT * FROM (
+            SELECT DISTINCT ON (m.id)
+                m.id AS mahasiswa_id,
+                m.npm,
+                m.nama,
+                m.angkatan
+            FROM siak_rincian_krs_mahasiswa rkm
+            LEFT JOIN siak_krs_mahasiswa krs ON rkm.siak_krs_mahasiswa_id = krs.id
+            LEFT JOIN siak_mahasiswa m ON krs.siak_mahasiswa_id = m.id
+            WHERE rkm.siak_kelas_kuliah_id = :kelasId
+              AND rkm.deleted_at IS NULL
+              AND krs.deleted_at IS NULL
+            ORDER BY m.id
+        ) peserta
+        ORDER BY peserta.npm ASC
     `, {
         replacements: { kelasId },
         type: sequelize.QueryTypes.SELECT
