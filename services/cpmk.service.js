@@ -257,60 +257,82 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
     const siakObeId = obe?.id || null;
 
     // 💾 2. EKSEKUSI DATABASE
+    // Upsert by kode -- CPMK yang kode-nya tidak berubah dipertahankan id-nya,
+    // supaya referensi siak_pemetaan_evaluasi_cpmk.siak_cpmk_id (dari Rencana
+    // Evaluasi) tidak jadi yatim setiap kali form pemetaan CPMK ini disimpan ulang.
     return await sequelize.transaction(async (t) => {
-        // A. Ambil ID CPMK lama dulu, lalu hapus pivot-nya, lalu soft-delete CPMK-nya
-        const oldCpmkList = await CapaianMataKuliah.findAll({
+        const existingList = await CapaianMataKuliah.findAll({
             where: { siakMataKuliahId: mataKuliahId },
-            attributes: ['id'],
+            attributes: ['id', 'kode'],
             transaction: t
         });
-        const oldCpmkIds = oldCpmkList.map(c => c.id);
+        const existingIdByKode = new Map(existingList.map(c => [c.kode, c.id]));
+        const usedKode = new Set();
 
-        if (oldCpmkIds.length > 0) {
+        const upsertCpmk = async (item, parentId) => {
+            usedKode.add(item.kode);
+            const existingId = existingIdByKode.get(item.kode);
+
+            if (existingId) {
+                await CapaianMataKuliah.update({
+                    siakObeId,
+                    deskripsi: item.deskripsi,
+                    bobot: item.bobot || 0,
+                    target: item.target || 0,
+                    parentId
+                }, { where: { id: existingId }, transaction: t });
+                return existingId;
+            }
+
+            const created = await CapaianMataKuliah.create({
+                siakObeId,
+                siakMataKuliahId: mataKuliahId,
+                kode: item.kode,
+                deskripsi: item.deskripsi,
+                bobot: item.bobot || 0,
+                target: item.target || 0,
+                parentId
+            }, { transaction: t });
+            return created.id;
+        };
+
+        for (const parent of cpmkList) {
+            const parentCpmkId = await upsertCpmk(parent, null);
+
+            // Pivot ke CPL (hanya di level Induk sesuai UI) -- replace
             await PemetaanCplCpmk.destroy({
-                where: { siakCapaianMataKuliahId: oldCpmkIds },
+                where: { siakCapaianMataKuliahId: parentCpmkId },
                 force: true,
                 transaction: t
             });
-        }
-
-        await CapaianMataKuliah.destroy({ where: { siakMataKuliahId: mataKuliahId }, transaction: t });
-
-        // B. Looping untuk simpan Induk (Parent)
-        for (const parent of cpmkList) {
-            const newParent = await CapaianMataKuliah.create({
-                siakObeId,
-                siakMataKuliahId: mataKuliahId,
-                kode: parent.kode,
-                deskripsi: parent.deskripsi,
-                bobot: parent.bobot,
-                target: parent.target || 0,
-                parentId: null // Ini Bosnya
-            }, { transaction: t });
-
-            // C. Simpan Pivot ke CPL (Hanya di level Induk sesuai UI)
             if (parent.cplPemetaan?.length > 0) {
                 const pivotData = parent.cplPemetaan.map((p) => ({
-                    siakCapaianMataKuliahId: newParent.id,
+                    siakCapaianMataKuliahId: parentCpmkId,
                     siakCapaianPembelajaranLulusanId: p.idCpl,
                     bobotCpl: p.bobotCpl
                 }));
                 await PemetaanCplCpmk.bulkCreate(pivotData, { transaction: t });
             }
 
-            // D. Simpan Anak-anaknya (Sub-CPMK)
+            // Anak-anaknya (Sub-CPMK) -- upsert juga, bobot/target tetap 0
             if (parent.subCpmk?.length > 0) {
-                const subData = parent.subCpmk.map(sub => ({
-                    siakObeId,
-                    siakMataKuliahId: mataKuliahId,
-                    kode: sub.kode,
-                    deskripsi: sub.deskripsi,
-                    bobot: 0, // Anak nggak punya bobot sendiri
-                    target: 0,
-                    parentId: newParent.id // 👈 Sambungkan ke ID Bapaknya
-                }));
-                await CapaianMataKuliah.bulkCreate(subData, { transaction: t });
+                for (const sub of parent.subCpmk) {
+                    await upsertCpmk({ ...sub, bobot: 0, target: 0 }, parentCpmkId);
+                }
             }
+        }
+
+        // CPMK lama yang kode-nya tidak ada lagi di payload -> baru di sini soft-delete
+        const removedIds = existingList
+            .filter(c => !usedKode.has(c.kode))
+            .map(c => c.id);
+        if (removedIds.length > 0) {
+            await PemetaanCplCpmk.destroy({
+                where: { siakCapaianMataKuliahId: removedIds },
+                force: true,
+                transaction: t
+            });
+            await CapaianMataKuliah.destroy({ where: { id: removedIds }, transaction: t });
         }
 
         return { success: true };
