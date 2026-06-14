@@ -2,7 +2,7 @@ import models from "../models/index.js";
 import { Op } from 'sequelize';
 
 const {
-    sequelize, KomposisiNilaiMataKuliah, PemetaanEvaluasiCpmk,
+    sequelize, PemetaanEvaluasiCpmk,
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
     ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
@@ -398,7 +398,6 @@ export const getDropdownMasterEvaluasi = async () => {
 
 export const getTemplateEvaluasiList = async (page = 1, limit = 10, search = '') => {
     const MKModel = models.MataKuliah || models.siak_mata_kuliah;
-    const KomposisiModel = models.KomposisiNilaiMataKuliah || models.siak_komposisi_nilai_mata_kuliah;
 
     if (!MKModel) {
         throw new Error("Model Mata Kuliah tidak ditemukan di Sequelize!");
@@ -410,14 +409,11 @@ export const getTemplateEvaluasiList = async (page = 1, limit = 10, search = '')
             nama: { [Op.iLike]: `%${search}%` }
         } : {};
 
+        // Catatan: include komposisiNilai (KomposisiNilaiMataKuliah) dilepas -- tabel
+        // ini sudah tidak diupdate lagi (lihat createKomposisiEvaluasi/getKomposisiEvaluasi),
+        // datanya basi. Komponen evaluasi sekarang ada di RencanaEvaluasi per MK+periode.
         const { count, rows } = await MKModel.findAndCountAll({
             where: whereCondition,
-            include: [{
-                model: KomposisiModel,
-                as: 'komposisiNilai',
-                attributes: ['id', 'persentase', 'key'],
-                required: false
-            }],
             limit: parseInt(limit),
             offset: parseInt(offset),
             order: [['nama', 'ASC']]
