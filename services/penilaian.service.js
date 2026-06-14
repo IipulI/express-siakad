@@ -37,27 +37,10 @@ export const createKomposisiEvaluasi = async (mataKuliahId, komposisiData) => {
     throw new Error("Endpoint ini sudah tidak digunakan. Gunakan POST /mata-kuliah/:id/rencana-evaluasi untuk mengatur komponen evaluasi & pemetaan CPMK.");
 }
 
-// GET SETUP EVALUASI (Untuk menampilkan data di Halaman 8 PDF)
+// DEPRECATED: data evaluasi RPS sekarang dibaca dari RencanaEvaluasi/PemetaanEvaluasiCpmk
+// (lihat GET /mata-kuliah/:id/rencana-evaluasi), bukan dari KomposisiNilaiMataKuliah lagi.
 export const getKomposisiEvaluasi = async (mataKuliahId) => {
-    try {
-        const { KomposisiNilaiMataKuliah, CapaianMataKuliah } = models;
-
-        const data = await KomposisiNilaiMataKuliah.findAll({
-            where: { siakMataKuliahId: mataKuliahId },
-            attributes: ['id', 'persentase', 'key'],
-            include: [{
-                model: models.CapaianMataKuliah,
-                as: 'cpmkList',
-                attributes: ['id', 'kode'],
-                through: { attributes: [] } // Wajib ada agar tabel pemetaan ikut terbaca
-            }],
-            order: [['createdAt', 'ASC']]
-        });
-
-        return data;
-    } catch (error) {
-        throw new Error("Gagal mengambil struktur evaluasi RPS: " + error.message);
-    }
+    throw new Error("Endpoint ini sudah tidak digunakan. Gunakan GET /mata-kuliah/:id/rencana-evaluasi untuk melihat komponen evaluasi & pemetaan CPMK.");
 }
 
 // 2. INPUT NILAI DINAMIS: Menyimpan skor mahasiswa dalam bentuk Array
