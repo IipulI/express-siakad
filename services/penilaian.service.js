@@ -695,8 +695,8 @@ export const getPesertaKelasList = async (kelasId) => {
                 grade: grade.hurufMutu,
                 angkaMutu: grade.angkaMutu,
                 lulus,
-                keterangan: item.status === 'Dikunci'
-                    ? 'Nilai KRS sudah dikunci' : 'Belum Terkunci'
+                keterangan: ['Dikunci', 'Lulus', 'Tidak Lulus'].includes(item.status)
+                    ? 'Nilai sudah final, tidak dapat diedit' : 'Belum Terkunci'
             };
         });
 
