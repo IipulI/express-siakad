@@ -1221,12 +1221,13 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
         let scoreData = [];
         if (mhsList.length > 0 && cpmkList.length > 0) {
             const queryScores = `
-                SELECT 
-                    m.id AS mahasiswa_id, 
+                SELECT
+                    m.id AS mahasiswa_id,
                     pkc.siak_cpmk_id AS cpmk_id_langsung,
                     cpmk_master.kode AS cpmk_kode,
-                    nem.skor, 
-                    kn.persentase AS bobot_komposisi
+                    nem.skor,
+                    kn.persentase AS bobot_komposisi,
+                    pkc.bobot AS bobot_cpmk
                 FROM siak_mahasiswa m
                 JOIN siak_krs_mahasiswa km ON m.id = km.siak_mahasiswa_id AND km.deleted_at IS NULL
                 JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
@@ -1268,8 +1269,12 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
                     relatedScores.forEach(rs => {
                         const skorAsli = parseFloat(rs.skor) || 0;
                         const bobotPersentase = parseFloat(rs.bobot_komposisi) / 100;
-                        totalSkorTerbobot += skorAsli * bobotPersentase;
-                        totalBobotMaksimal += bobotPersentase * 100;
+                        // Kontribusi = bobot komponen evaluasi × bobot CPMK dalam komponen tsb
+                        // (samakan dengan formula materialized di hitungNilaiAkhir)
+                        const bobotCpmk = parseFloat(rs.bobot_cpmk || 0) || 100;
+                        const kontribusi = bobotPersentase * (bobotCpmk / 100);
+                        totalSkorTerbobot += skorAsli * kontribusi;
+                        totalBobotMaksimal += kontribusi * 100;
                     });
 
                     let persentaseAkhir = totalBobotMaksimal > 0 ? (totalSkorTerbobot / totalBobotMaksimal) * 100 : 0;

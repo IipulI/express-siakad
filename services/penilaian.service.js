@@ -400,7 +400,8 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
                 include: [{
                     model: ModelCPMK,
                     as: 'cpmkList', // Pastikan alias ini masih sama
-                    attributes: ['id', 'kode', 'deskripsi'] // Ambil kode dan deskripsi CPMK
+                    attributes: ['id', 'kode', 'deskripsi'], // Ambil kode dan deskripsi CPMK
+                    through: { attributes: ['bobot'] } // Bobot CPMK dalam komponen ini (PemetaanKomposisiCpmk.bobot)
                 }]
             }]
         });
@@ -411,7 +412,6 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
             if (nilai.komposisiNilai) {
                 const skorAsli = parseFloat(nilai.skor);
                 const bobotPersentase = parseFloat(nilai.komposisiNilai.persentase) / 100;
-                const skorTerbobot = skorAsli * bobotPersentase;
 
                 if (nilai.komposisiNilai.cpmkList) {
                     nilai.komposisiNilai.cpmkList.forEach(cpmk => {
@@ -419,6 +419,11 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
                         const kodeCpmk = cpmk.kode || cpmk.id;
 
                         if (kodeCpmk) {
+                            // Kontribusi = bobot komponen evaluasi × bobot CPMK dalam komponen tsb
+                            // (samakan dengan formula materialized di hitungNilaiAkhir)
+                            const bobotCpmk = parseFloat(cpmk.PemetaanKomposisiCpmk?.bobot || 0) || 100;
+                            const kontribusi = bobotPersentase * (bobotCpmk / 100);
+
                             if (!raporCPMK[kodeCpmk]) {
                                 raporCPMK[kodeCpmk] = {
                                     kode: kodeCpmk,
@@ -427,8 +432,8 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
                                     totalBobotMaksimal: 0
                                 };
                             }
-                            raporCPMK[kodeCpmk].totalSkorTerbobot += skorTerbobot;
-                            raporCPMK[kodeCpmk].totalBobotMaksimal += (100 * bobotPersentase);
+                            raporCPMK[kodeCpmk].totalSkorTerbobot += skorAsli * kontribusi;
+                            raporCPMK[kodeCpmk].totalBobotMaksimal += (100 * kontribusi);
                         }
                     });
                 }
