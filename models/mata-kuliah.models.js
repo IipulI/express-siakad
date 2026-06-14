@@ -26,11 +26,6 @@ export default (sequelize) => {
                 as: "kelasKuliah"
             })
 
-            this.hasMany(models.KomposisiNilaiMataKuliah, {
-                foreignKey: "siak_mata_kuliah_id",
-                as: 'komposisiNilaiMataKuliah',
-            })
-
             // Prasyarat
             this.belongsTo(models.MataKuliah, {
                 foreignKey: "prasyarat_mata_kuliah_1",
@@ -49,10 +44,6 @@ export default (sequelize) => {
 
 
 
-           MataKuliah.hasMany(models.KomposisiNilaiMataKuliah, { // Sesuaikan nama model ini
-    foreignKey: 'siak_mata_kuliah_id',
-    as: 'komposisiNilai'
-  });
   // Pengembang RPS jadi Many-to-Many pakai tabel pivot
 // 1. Relasi Koordinator (1-to-1)
     this.belongsTo(models.Dosen, {

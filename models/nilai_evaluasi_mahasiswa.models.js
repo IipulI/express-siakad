@@ -4,10 +4,6 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class NilaiEvaluasiMahasiswa extends Model {
         static associate(models) {
-            this.belongsTo(models.KomposisiNilaiMataKuliah, {
-                foreignKey: "siak_komposisi_nilai_id",
-                as: "komposisiNilai"
-            });
             this.belongsTo(models.RencanaEvaluasi, {
                 foreignKey: "siak_rencana_evaluasi_id",
                 as: "rencanaEvaluasi"

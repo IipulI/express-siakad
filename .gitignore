@@ -5,3 +5,4 @@
 .DS_Store
 bahan/
 scripts/
+backup_*.json

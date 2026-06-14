@@ -12,15 +12,9 @@ export default (sequelize) => {
         // }
         static associate(models) {
         this.belongsTo(models.MetodeEvaluasi, {
-            foreignKey: "siakMetodeEvaluasiId", //camelCase 
+            foreignKey: "siakMetodeEvaluasiId", //camelCase
             as: "metodeEvaluasi"
         })
-        this.belongsToMany(models.CapaianMataKuliah, {
-    through: models.PemetaanKomposisiCpmk,
-    foreignKey: "siakKomposisiNilaiId", 
-    otherKey: "siakCpmkId",
-    as: "cpmkList" // <--- Alias ini yang harus sama persis dengan 'cpmkList' di service
-});
     }
     }
 

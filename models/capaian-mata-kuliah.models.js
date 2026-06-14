@@ -23,17 +23,9 @@ export default (sequelize) => {
         // Relasi ke Master CPL
         this.belongsToMany(models.CapaianPembelajaranLulusan, {
             through: models.PemetaanCplCpmk,
-            foreignKey: 'siakCapaianMataKuliahId',       
+            foreignKey: 'siakCapaianMataKuliahId',
             otherKey: 'siakCapaianPembelajaranLulusanId',
-            as: 'cplDiCPMK'                              
-        });
-
-        // 👇 TAMBAHKAN BLOK INI: Relasi Balik ke Komposisi Nilai 👇
-        this.belongsToMany(models.KomposisiNilaiMataKuliah, {
-            through: models.PemetaanKomposisiCpmk,
-            foreignKey: "siakCpmkId",          
-            otherKey: "siakKomposisiNilaiId",     
-            as: "komposisiNilaiList"
+            as: 'cplDiCPMK'
         });
     }
     }
