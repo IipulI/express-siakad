@@ -2,6 +2,7 @@ import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
 import * as CustomError from "../utils/custom-error.js";
 import { Op } from "sequelize";
+import { hitungNilaiAkhir } from "./penilaian.service.js";
 
 const { 
     sequelize, Rps, MataKuliah, ProgramStudi, TahunKurikulum, 
@@ -575,8 +576,7 @@ export const getRencanaEvaluasi = async (mataKuliahId, periodeId = null) => {
             },
             include: [{
                 model: models.PemetaanEvaluasiCpmk,
-                as: 'pemetaanCpmk',
-                include: [{ model: models.CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['id', 'kode'] }]
+                as: 'pemetaanCpmk'
             }]
         });
 
@@ -584,11 +584,12 @@ export const getRencanaEvaluasi = async (mataKuliahId, periodeId = null) => {
         const formattedEvaluasi = evaluasiData.map(ev => {
             const e = ev.toJSON();
             const mappingBobot = {};
-            
+
+            // Key by siakCpmkId langsung (kolom FK di pivot), bukan via include
+            // capaianMataKuliah -- include itu null kalau CPMK master-nya sudah
+            // soft-deleted, padahal pivot-nya sendiri masih valid.
             (e.pemetaanCpmk || []).forEach(p => {
-                if (p.capaianMataKuliah) {
-                    mappingBobot[p.capaianMataKuliah.id] = parseFloat(p.bobotCpmk || 0);
-                }
+                mappingBobot[p.siakCpmkId] = parseFloat(p.bobotCpmk || 0);
             });
 
             return {
@@ -655,42 +656,159 @@ export const saveRencanaEvaluasi = async (mkId, payload) => {
     }
 
     // ----------------------------------------------------------------
-    // 💾 BLOK DATABASE: WIPE & REPLACE
+    // 💾 BLOK DATABASE: UPSERT-IN-PLACE
+    // (id RencanaEvaluasi dipertahankan untuk baris yang masih ada, supaya
+    //  siak_nilai_evaluasi_mahasiswa.siak_rencana_evaluasi_id yang sudah
+    //  terisi nilai mahasiswa tidak jadi orphan setiap kali RPS diedit)
     // ----------------------------------------------------------------
-    return await sequelize.transaction(async (trx) => {
-        
-        // A. Bersihkan data evaluasi lama di periode ini (Pivot otomatis ikut kehapus)
-        await models.RencanaEvaluasi.destroy({ 
-            where: { siakMataKuliahId: mkId, siakPeriodeAkademikId }, 
-            transaction: trx 
+    const normalizeMapping = (pairs) => JSON.stringify(
+        pairs
+            .map(([cpmkId, bobot]) => [cpmkId, Math.round(parseFloat(bobot || 0) * 100)])
+            .sort((a, b) => a[0].localeCompare(b[0]))
+    );
+
+    const changedRencanaEvaluasiIds = await sequelize.transaction(async (trx) => {
+        // A. Ambil data lama untuk MK + periode ini, lengkap dengan pemetaan CPMK-nya
+        const existingRows = await models.RencanaEvaluasi.findAll({
+            where: { siakMataKuliahId: mkId, siakPeriodeAkademikId },
+            include: [{ model: models.PemetaanEvaluasiCpmk, as: 'pemetaanCpmk' }],
+            transaction: trx
         });
 
-        // B. Masukkan data evaluasi yang baru
-        for (const row of evaluasiList) {
-            const newEvaluasi = await models.RencanaEvaluasi.create({
-                siakMataKuliahId: mkId,
-                siakPeriodeAkademikId,
-                metodeEvaluasi: row.metodeEvaluasi,
-                jenisEvaluasi: row.jenisEvaluasi,
-                bobot: row.bobotEvaluasi,
-                deskripsi: row.deskripsi || '-',
-                deskripsiInggris: row.deskripsiInggris || '-',
-                syaratLulus: row.syaratLulus || 'TIDAK_MENJADI_SYARAT_LULUS' // Enum: 'TIDAK_MENJADI_SYARAT_LULUS' | 'MENJADI_SYARAT_LULUS' | 'LULUS_DENGAN_NILAI_MINIMUM'
-            }, { transaction: trx });
+        const existingById = new Map(existingRows.map(r => [r.id, r]));
+        const usedExistingIds = new Set();
+        const changedIds = [];
 
-            // C. Masukkan Mapping ke CPMK-nya
-            if (row.cpmkData && row.cpmkData.length > 0) {
-                const pivotData = row.cpmkData.map(c => ({
-                    siakRencanaEvaluasiId: newEvaluasi.id,
-                    siakCpmkId: c.siakCpmkId || c.cpmkId,
-                    bobotCpmk: c.bobotCpmk
-                }));
-                await models.PemetaanEvaluasiCpmk.bulkCreate(pivotData, { transaction: trx });
+        for (const row of evaluasiList) {
+            // Cocokkan ke baris lama: prioritas via id (kalau FE kirim balik),
+            // fallback via kombinasi metodeEvaluasi + jenisEvaluasi
+            let matched = null;
+            if (row.id && existingById.has(row.id) && !usedExistingIds.has(row.id)) {
+                matched = existingById.get(row.id);
+            }
+            if (!matched) {
+                matched = existingRows.find(r =>
+                    !usedExistingIds.has(r.id) &&
+                    (r.metodeEvaluasi || '').trim().toLowerCase() === (row.metodeEvaluasi || '').trim().toLowerCase() &&
+                    (r.jenisEvaluasi || '').trim().toLowerCase() === (row.jenisEvaluasi || '').trim().toLowerCase()
+                );
+            }
+
+            const newMappingPairs = (row.cpmkData || []).map(c => [c.siakCpmkId || c.cpmkId, c.bobotCpmk]);
+            // Hanya timpa pemetaan CPMK kalau payload memang membawa data baru.
+            // cpmkData kosong/tidak dikirim TIDAK dianggap "hapus semua mapping" --
+            // pemetaan lama dipertahankan (mencegah hilang gara-gara FE kirim
+            // baris tanpa cpmkData, mis. akibat bug GET yang tidak menyertakan
+            // CPMK yang master-nya sudah soft-deleted).
+            const willUpdateMapping = newMappingPairs.length > 0;
+
+            if (matched) {
+                usedExistingIds.add(matched.id);
+
+                const bobotBerubah = Math.round(parseFloat(matched.bobot || 0) * 100) !== Math.round(parseFloat(row.bobotEvaluasi || 0) * 100);
+                const oldMappingPairs = (matched.pemetaanCpmk || []).map(p => [p.siakCpmkId, p.bobotCpmk]);
+                const mappingBerubah = willUpdateMapping && normalizeMapping(oldMappingPairs) !== normalizeMapping(newMappingPairs);
+
+                await matched.update({
+                    metodeEvaluasi: row.metodeEvaluasi,
+                    jenisEvaluasi: row.jenisEvaluasi,
+                    bobot: row.bobotEvaluasi,
+                    deskripsi: row.deskripsi || '-',
+                    deskripsiInggris: row.deskripsiInggris || '-',
+                    syaratLulus: row.syaratLulus || 'TIDAK_MENJADI_SYARAT_LULUS'
+                }, { transaction: trx });
+
+                // Refresh pemetaan CPMK (id pivot tidak dirujuk tabel lain, aman destroy+recreate)
+                if (willUpdateMapping) {
+                    await models.PemetaanEvaluasiCpmk.destroy({ where: { siakRencanaEvaluasiId: matched.id }, transaction: trx });
+                    await models.PemetaanEvaluasiCpmk.bulkCreate(
+                        newMappingPairs.map(([cpmkId, bobotCpmk]) => ({
+                            siakRencanaEvaluasiId: matched.id,
+                            siakCpmkId: cpmkId,
+                            bobotCpmk
+                        })),
+                        { transaction: trx }
+                    );
+                }
+
+                if (bobotBerubah || mappingBerubah) {
+                    changedIds.push(matched.id);
+                }
+            } else {
+                // Baris baru
+                const newEvaluasi = await models.RencanaEvaluasi.create({
+                    siakMataKuliahId: mkId,
+                    siakPeriodeAkademikId,
+                    metodeEvaluasi: row.metodeEvaluasi,
+                    jenisEvaluasi: row.jenisEvaluasi,
+                    bobot: row.bobotEvaluasi,
+                    deskripsi: row.deskripsi || '-',
+                    deskripsiInggris: row.deskripsiInggris || '-',
+                    syaratLulus: row.syaratLulus || 'TIDAK_MENJADI_SYARAT_LULUS' // Enum: 'TIDAK_MENJADI_SYARAT_LULUS' | 'MENJADI_SYARAT_LULUS' | 'LULUS_DENGAN_NILAI_MINIMUM'
+                }, { transaction: trx });
+
+                if (newMappingPairs.length > 0) {
+                    await models.PemetaanEvaluasiCpmk.bulkCreate(
+                        newMappingPairs.map(([cpmkId, bobotCpmk]) => ({
+                            siakRencanaEvaluasiId: newEvaluasi.id,
+                            siakCpmkId: cpmkId,
+                            bobotCpmk
+                        })),
+                        { transaction: trx }
+                    );
+                }
             }
         }
 
-        return true;
+        // B. Baris lama yang tidak muncul lagi di payload = mau dihapus koordinator.
+        // Kalau sudah ada nilai mahasiswa yang menunjuk ke baris itu, tolak supaya
+        // nilai mahasiswa tidak jadi orphan diam-diam.
+        const removedRows = existingRows.filter(r => !usedExistingIds.has(r.id));
+        if (removedRows.length > 0) {
+            const removedIds = removedRows.map(r => r.id);
+            const jumlahNilai = await models.NilaiEvaluasiMahasiswa.count({
+                where: { siakRencanaEvaluasiId: { [Op.in]: removedIds } },
+                transaction: trx
+            });
+
+            if (jumlahNilai > 0) {
+                const namaKomponen = removedRows.map(r => r.metodeEvaluasi).join(', ');
+                throw new CustomError.BadRequestError(`Komponen "${namaKomponen}" tidak bisa dihapus karena sudah ada nilai mahasiswa yang tercatat untuk komponen tersebut.`);
+            }
+
+            await models.PemetaanEvaluasiCpmk.destroy({ where: { siakRencanaEvaluasiId: { [Op.in]: removedIds } }, transaction: trx });
+            await models.RencanaEvaluasi.destroy({ where: { id: { [Op.in]: removedIds } }, transaction: trx });
+        }
+
+        return changedIds;
     });
+
+    // ----------------------------------------------------------------
+    // 🔄 AUTO-RECALC: baris yang bobot/pemetaan CPMK-nya berubah dan sudah
+    // punya nilai mahasiswa → hitung ulang nilai akhir & CPMK mahasiswa
+    // yang statusnya belum dikunci/difinalisasi.
+    // ----------------------------------------------------------------
+    if (changedRencanaEvaluasiIds.length > 0) {
+        const affected = await sequelize.query(`
+            SELECT DISTINCT nem.siak_rincian_krs_mahasiswa_id AS krs_id
+            FROM siak_nilai_evaluasi_mahasiswa nem
+            JOIN siak_rincian_krs_mahasiswa rkm ON nem.siak_rincian_krs_mahasiswa_id = rkm.id
+            WHERE nem.siak_rencana_evaluasi_id IN (:ids)
+              AND nem.deleted_at IS NULL
+              AND rkm.deleted_at IS NULL
+              AND (rkm.status IS NULL OR rkm.status NOT IN ('Dikunci', 'Lulus', 'Tidak Lulus'))
+        `, { replacements: { ids: changedRencanaEvaluasiIds }, type: sequelize.QueryTypes.SELECT });
+
+        for (const row of affected) {
+            try {
+                await hitungNilaiAkhir(row.krs_id);
+            } catch (err) {
+                console.error(`Gagal recalc nilai akhir untuk krsId ${row.krs_id}:`, err.message);
+            }
+        }
+    }
+
+    return true;
 };
 export const deleteRencanaEvaluasi = async (id) => {
     try {
