@@ -4,7 +4,7 @@ import * as CustomError from '../utils/custom-error.js';
 const {
     KelasKuliah, MataKuliah, ProgramStudi, TahunKurikulum, PeriodeAkademik, Jenjang,
     CapaianMataKuliah, CapaianPembelajaranLulusan,
-    NilaiCpmkMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa,
+    RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa,
     PemetaanCplCpmk, sequelize
 } = models;
 
@@ -255,22 +255,31 @@ export const getCapaianCplKelas = async (kelasId) => {
         }]
     });
 
-    const cpmkIds = cpmkList.map(c => c.id);
-    const nilaiCpmkList = await NilaiCpmkMahasiswa.findAll({
-        where: { siak_kelas_kuliah_id: kelasId, siak_capaian_mata_kuliah_id: cpmkIds }
+    // Ambil nilai CPMK, agregasi sub-CPMK ke parent CPMK (sama seperti getCapaianCpmkKelas)
+    // agar Rencana Evaluasi yang memetakan ke Sub-CPMK tetap terbaca di tab CPL.
+    const nilaiCpmkRaw = await sequelize.query(`
+        SELECT
+            n.siak_mahasiswa_id,
+            CASE WHEN c.parent_id IS NOT NULL THEN c.parent_id ELSE c.id END AS parent_cpmk_id,
+            AVG(n.nilai)::FLOAT AS avg_nilai
+        FROM siak_nilai_cpmk_mahasiswa n
+        JOIN siak_capaian_mata_kuliah c
+            ON c.id = n.siak_capaian_mata_kuliah_id
+           AND c.deleted_at IS NULL
+        WHERE n.siak_kelas_kuliah_id = :kelasId
+          AND n.deleted_at IS NULL
+        GROUP BY n.siak_mahasiswa_id, parent_cpmk_id
+    `, {
+        replacements: { kelasId },
+        type: sequelize.QueryTypes.SELECT
     });
 
     const nilaiCpmkMap = {};
-    nilaiCpmkList.forEach(n => {
-        const data = n.toJSON ? n.toJSON() : n; 
-        const mId = data.siakMahasiswaId || data.siak_mahasiswa_id;
-        const cId = data.siakCapaianMataKuliahId || data.siak_capaian_mata_kuliah_id;
-        if (mId && cId) {
-            const safeMId = String(mId);
-            const safeCId = String(cId);
-            if (!nilaiCpmkMap[safeMId]) nilaiCpmkMap[safeMId] = {};
-            nilaiCpmkMap[safeMId][safeCId] = parseFloat(data.nilai || 0);
-        }
+    nilaiCpmkRaw.forEach(row => {
+        const mId = String(row.siak_mahasiswa_id);
+        const cId = String(row.parent_cpmk_id);
+        if (!nilaiCpmkMap[mId]) nilaiCpmkMap[mId] = {};
+        nilaiCpmkMap[mId][cId] = parseFloat(row.avg_nilai || 0);
     });
 
     const targetCpl = Object.fromEntries(cplList.map(c => [c.kode, parseFloat(c.targetCpl || 0)]));
