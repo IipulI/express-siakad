@@ -4,7 +4,7 @@ import path from 'path';
 import * as penilaianService from '../../services/penilaian.service.js';
 import models from '../../models/index.js';
 
-const { KelasKuliah, MataKuliah, ProgramStudi, Dosen, Jenjang } = models;
+const { KelasKuliah, MataKuliah, ProgramStudi, Dosen, Jenjang, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, PeriodeAkademik } = models;
 
 // ─────────────────────────────────────────────
 // HELPER: Ambil info kelas + kaprodi dari DB
@@ -26,6 +26,50 @@ const getInfoKelas = async (kelasId) => {
     });
     if (!kelas) throw new Error('Kelas tidak ditemukan');
     return kelas;
+};
+
+// ─────────────────────────────────────────────
+// HELPER: Ambil info rapor OBE (mahasiswa + kelas) dari rincianKrsId
+// ─────────────────────────────────────────────
+const getInfoRapor = async (rincianKrsId) => {
+    const rincian = await RincianKrsMahasiswa.findByPk(rincianKrsId, {
+        include: [
+            {
+                model: KrsMahasiswa, as: 'krsMahasiswa',
+                include: [{ model: Mahasiswa, as: 'mahasiswa', attributes: ['id', 'nama', 'npm', 'angkatan'] }]
+            },
+            {
+                model: KelasKuliah, as: 'kelasKuliah',
+                include: [
+                    {
+                        model: MataKuliah, as: 'mataKuliah',
+                        attributes: ['id', 'kode', 'nama', 'totalSks', 'siakProgramStudiId'],
+                        include: [{
+                            model: ProgramStudi, as: 'programStudi',
+                            attributes: ['id', 'nama', 'kode'],
+                            include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }]
+                        }]
+                    },
+                    { model: PeriodeAkademik, as: 'periodeAkademik', attributes: ['nama'] }
+                ]
+            }
+        ]
+    });
+    if (!rincian) throw new Error('Data KRS tidak ditemukan');
+    return rincian;
+};
+
+// ─────────────────────────────────────────────
+// HELPER: Status capaian CPL per mahasiswa (target vs nilai)
+// ─────────────────────────────────────────────
+const hitungStatusCapaianCpl = (nilaiPerCpl, targetCpl, cplInfo) => {
+    const sudahDinilai = cplInfo.some(c => nilaiPerCpl[c.kode] !== null && nilaiPerCpl[c.kode] !== undefined);
+    if (!sudahDinilai) return 'Belum Dinilai';
+    const semuaMencapai = cplInfo.every(c => {
+        const n = nilaiPerCpl[c.kode];
+        return n !== null && n !== undefined && n >= (targetCpl[c.kode] ?? 0);
+    });
+    return semuaMencapai ? 'Sudah Memenuhi' : 'Belum Memenuhi';
 };
 
 // ─────────────────────────────────────────────
@@ -755,6 +799,453 @@ export const exportPdfDaftarNilai = async (req, res, next) => {
         // Wait, getDataDaftarNilai doesn't explicitly return Kaprodi right now.
         // Let's pass '-' for Kaprodi or we can fetch it. I will just pass '-'.
         drawTtdSection(doc, boxX, boxW, '-', namaProdi);
+
+        doc.moveDown(3);
+        doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y)
+            .lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
+        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(7).fillColor('#555555')
+            .text(buildFooterText(namaPencetak), boxX, doc.y);
+
+        doc.end();
+    } catch (error) { next(error); }
+};
+
+
+// ============================================================================
+// 5. EXPORT EXCEL — CAPAIAN CPL PER KELAS
+// ============================================================================
+export const exportExcelCapaianCplKelas = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+
+        const { getCapaianCplKelas } = await import('../../services/capaian-pembelajaran.service.js');
+        const data  = await getCapaianCplKelas(kelasId);
+        const printDate = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'long' });
+
+        const workbook  = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Capaian CPL');
+
+        [
+            ['Program Studi',  data.header.programStudi],
+            ['Periode',        data.header.periode],
+            ['Mata Kuliah',    data.header.mataKuliah],
+            ['Nama Kelas',     data.header.namaKelas],
+            ['Kurikulum',      data.header.kurikulum],
+            ['Sistem Kuliah',  data.header.sistemKuliah],
+            ['Kapasitas',      `${data.header.kapasitas} / ${data.header.peserta} Peserta`],
+            ['Dicetak',        `${namaPencetak} | ${printDate}`],
+        ].forEach(([key, val]) => {
+            const r = worksheet.addRow([key, val]);
+            r.getCell(1).font = { bold: true };
+        });
+        worksheet.addRow([]);
+
+        const targetRow = ['', 'Target CPL', ''];
+        data.cplInfo.forEach(c => targetRow.push(data.targetCpl[c.kode] ?? '-'));
+        targetRow.push('');
+        const tblTarget = worksheet.addRow(targetRow);
+        tblTarget.eachCell((cell) => {
+            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0c4781' } };
+            cell.font   = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.alignment = { horizontal: 'center' };
+        });
+
+        const headerArr = ['No', 'NIM', 'Nama'];
+        data.cplInfo.forEach(c => headerArr.push(c.kode));
+        headerArr.push('Status Capaian');
+
+        const hRow = worksheet.addRow(headerArr);
+        hRow.eachCell((cell, col) => {
+            cell.font   = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: col <= 3 ? 'FF0c4781' : 'FF1565C0' } };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.alignment = { horizontal: 'center' };
+        });
+
+        data.tabel.forEach((mhs, i) => {
+            const rowArr = [mhs.no, mhs.nim, mhs.nama];
+            data.cplInfo.forEach(c => rowArr.push(mhs.nilaiCpl[c.kode] ?? '-'));
+            rowArr.push(hitungStatusCapaianCpl(mhs.nilaiCpl, data.targetCpl, data.cplInfo));
+
+            const r = worksheet.addRow(rowArr);
+            const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF5F5F5';
+            r.eachCell((cell) => {
+                cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                cell.alignment = { horizontal: 'center' };
+            });
+            r.getCell(3).alignment = { horizontal: 'left' };
+        });
+
+        const rerataArr = ['', 'Rerata', ''];
+        data.cplInfo.forEach(c => rerataArr.push(data.rerataPerolehan[c.kode] ?? '-'));
+        rerataArr.push('');
+        const rRow = worksheet.addRow(rerataArr);
+        rRow.eachCell((cell) => {
+            cell.font   = { bold: true, color: { argb: 'FF0c4781' } };
+            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFdde8f5' } };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.alignment = { horizontal: 'center' };
+        });
+
+        worksheet.columns.forEach(col => { col.width = 16; });
+        worksheet.getColumn(3).width = 30;
+
+        const filename = `Capaian_CPL_${data.header.namaKelas || kelasId}.xlsx`.replace(/\s/g, '_');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+    } catch (error) { next(error); }
+};
+
+
+// ============================================================================
+// 6. EXPORT PDF — CAPAIAN CPL PER KELAS
+// ============================================================================
+export const exportPdfCapaianCplKelas = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+        const isPakaiKop   = String(req.query.kop).toLowerCase() === 'true';
+
+        const { getCapaianCplKelas } = await import('../../services/capaian-pembelajaran.service.js');
+        const data  = await getCapaianCplKelas(kelasId);
+        const kelas = await getInfoKelas(kelasId);
+        const namaKaprodi = kelas.mataKuliah?.programStudi?.kaprodi?.nama || '-';
+
+        const doc    = new PDFDocument({ margin: 20, size: 'A4', layout: 'landscape' });
+        const boxX   = 20;
+        const PAGE_W = doc.page.width;
+        const boxW   = PAGE_W - boxX * 2;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Capaian_CPL_${data.header.namaKelas || kelasId}.pdf"`);
+        doc.pipe(res);
+
+        const logoPath = path.join(process.cwd(), 'public', 'logo', 'uika.jpg');
+
+        if (isPakaiKop) drawKopSurat(doc, logoPath, boxX, boxW);
+
+        drawInfoSection(doc, logoPath, boxX, boxW, 'CAPAIAN PEMBELAJARAN (CPL)', [
+            { key: 'Program Studi',  val: data.header.programStudi },
+            { key: 'Periode',        val: data.header.periode },
+            { key: 'Mata Kuliah',    val: data.header.mataKuliah },
+            { key: 'Nama Kelas',     val: data.header.namaKelas },
+            { key: 'Kurikulum',      val: data.header.kurikulum },
+            { key: 'Sistem Kuliah',  val: data.header.sistemKuliah },
+            { key: 'Kapasitas',      val: `${data.header.kapasitas} / ${data.header.peserta} Peserta` },
+        ]);
+
+        const cplCount  = data.cplInfo.length;
+        const colNo     = 25;
+        const colNim    = 75;
+        const colNama   = 180;
+        const colStatus = 90;
+        const fixedW    = colNo + colNim + colNama + colStatus;
+        const cplArea   = boxW - fixedW;
+        const cplW      = cplCount > 0 ? cplArea / cplCount : cplArea;
+        const cplX      = boxX + colNo + colNim + colNama;
+        const statusX   = cplX + cplArea;
+        const rowHeight = 16;
+
+        // ── [A] BARIS TARGET CPL ──
+        doc.save().rect(boxX, doc.y, boxW, rowHeight).fill('#0c4781').restore();
+        doc.save().lineWidth(0.5).strokeColor('#aaaaaa').rect(boxX, doc.y, boxW, rowHeight).stroke();
+        doc.moveTo(cplX, doc.y).lineTo(cplX, doc.y + rowHeight).stroke();
+        for (let i = 1; i < cplCount; i++) {
+            doc.moveTo(cplX + i * cplW, doc.y).lineTo(cplX + i * cplW, doc.y + rowHeight).stroke();
+        }
+        doc.moveTo(statusX, doc.y).lineTo(statusX, doc.y + rowHeight).stroke();
+
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+        const targetY = doc.y + (rowHeight / 2) - 3.5;
+        doc.text('Target CPL', boxX, targetY, { width: colNo + colNim + colNama - 10, align: 'right', lineBreak: false });
+
+        data.cplInfo.forEach((c, i) => {
+            const val = data.targetCpl[c.kode] ?? '-';
+            doc.text(String(val), cplX + i * cplW, targetY, { width: cplW, align: 'center', lineBreak: false });
+        });
+        doc.restore();
+        doc.y += rowHeight;
+
+        // ── [B] MAIN HEADER ROW ──
+        doc.save().rect(boxX, doc.y, boxW, rowHeight).fill('#1565C0').restore();
+        doc.save().lineWidth(0.5).strokeColor('#aaaaaa').rect(boxX, doc.y, boxW, rowHeight).stroke();
+        [colNo, colNim, colNama].reduce((acc, w) => {
+            doc.moveTo(boxX + acc, doc.y).lineTo(boxX + acc, doc.y + rowHeight).stroke();
+            return acc + w;
+        }, 0);
+        for (let i = 0; i < cplCount; i++) {
+            doc.moveTo(cplX + i * cplW, doc.y).lineTo(cplX + i * cplW, doc.y + rowHeight).stroke();
+        }
+        doc.moveTo(statusX, doc.y).lineTo(statusX, doc.y + rowHeight).stroke();
+
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+        const headerY = doc.y + (rowHeight / 2) - 3.5;
+        doc.text('No', boxX, headerY, { width: colNo, align: 'center', lineBreak: false });
+        doc.text('NIM', boxX + colNo, headerY, { width: colNim, align: 'center', lineBreak: false });
+        doc.text('Nama', boxX + colNo + colNim, headerY, { width: colNama, align: 'center', lineBreak: false });
+        data.cplInfo.forEach((c, i) => {
+            doc.text(c.kode, cplX + i * cplW, headerY, { width: cplW, align: 'center', lineBreak: false });
+        });
+        doc.text('Status Capaian', statusX, headerY, { width: colStatus, align: 'center', lineBreak: false });
+        doc.restore();
+        doc.y += rowHeight;
+
+        // ── [C] DATA ROWS ──
+        let rowY = doc.y;
+        data.tabel.forEach((mhs, iRow) => {
+            if (rowY + rowHeight > doc.page.height - 40) {
+                doc.addPage();
+                rowY = 30;
+            }
+            const bg = iRow % 2 === 0 ? '#ffffff' : '#f5f5f5';
+            doc.save().rect(boxX, rowY, boxW, rowHeight).fill(bg).restore();
+            doc.save().lineWidth(0.4).strokeColor('#cccccc');
+            doc.rect(boxX, rowY, boxW, rowHeight).stroke();
+            [colNo, colNim, colNama].reduce((acc, w) => {
+                doc.moveTo(boxX + acc, rowY).lineTo(boxX + acc, rowY + rowHeight).stroke();
+                return acc + w;
+            }, 0);
+            for (let i = 0; i < cplCount; i++) {
+                doc.moveTo(cplX + i * cplW, rowY).lineTo(cplX + i * cplW, rowY + rowHeight).stroke();
+            }
+            doc.moveTo(statusX, rowY).lineTo(statusX, rowY + rowHeight).stroke();
+            doc.restore();
+
+            const tY = rowY + (rowHeight / 2) - 3.5;
+            doc.font('Helvetica').fontSize(7.5).fillColor('black');
+            doc.text(String(mhs.no), boxX, tY, { width: colNo, align: 'center', lineBreak: false });
+            doc.text(mhs.nim, boxX + colNo, tY, { width: colNim, align: 'center', lineBreak: false });
+            doc.text(mhs.nama, boxX + colNo + colNim + 4, tY, { width: colNama - 4, align: 'left', lineBreak: false });
+
+            data.cplInfo.forEach((c, i) => {
+                const val = mhs.nilaiCpl[c.kode];
+                doc.text(val !== null && val !== undefined ? String(val) : '-',
+                    cplX + i * cplW, tY, { width: cplW, align: 'center', lineBreak: false });
+            });
+
+            doc.font('Helvetica-Bold');
+            doc.text(hitungStatusCapaianCpl(mhs.nilaiCpl, data.targetCpl, data.cplInfo), statusX, tY, { width: colStatus, align: 'center', lineBreak: false });
+
+            rowY += rowHeight;
+        });
+
+        // ── [D] RERATA ROW ──
+        if (rowY + rowHeight > doc.page.height - 40) {
+            doc.addPage();
+            rowY = 30;
+        }
+        doc.save().rect(boxX, rowY, boxW, rowHeight).fill('#dde8f5').restore();
+        doc.save().lineWidth(0.4).strokeColor('#aaaaaa').rect(boxX, rowY, boxW, rowHeight).stroke();
+        [colNo, colNim, colNama].reduce((acc, w) => {
+            doc.moveTo(boxX + acc, rowY).lineTo(boxX + acc, rowY + rowHeight).stroke();
+            return acc + w;
+        }, 0);
+        for (let i = 0; i < cplCount; i++) {
+            doc.moveTo(cplX + i * cplW, rowY).lineTo(cplX + i * cplW, rowY + rowHeight).stroke();
+        }
+        doc.moveTo(statusX, rowY).lineTo(statusX, rowY + rowHeight).stroke();
+
+        const avgY = rowY + (rowHeight / 2) - 3.5;
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0c4781');
+        doc.text('Rerata Perolehan', boxX, avgY, { width: colNo + colNim + colNama - 10, align: 'right', lineBreak: false });
+
+        data.cplInfo.forEach((c, i) => {
+            const val = data.rerataPerolehan[c.kode] ?? '-';
+            doc.text(String(val), cplX + i * cplW, avgY, { width: cplW, align: 'center', lineBreak: false });
+        });
+        doc.restore();
+
+        doc.y = rowY + rowHeight + 12;
+
+        drawTtdSection(doc, boxX, boxW, namaKaprodi, data.header.programStudi);
+
+        doc.moveDown(3);
+        doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y)
+            .lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
+        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(7).fillColor('#555555')
+            .text(buildFooterText(namaPencetak), boxX, doc.y);
+
+        doc.end();
+    } catch (error) { next(error); }
+};
+
+
+// ============================================================================
+// 7. EXPORT EXCEL — RAPOR OBE PER MAHASISWA (PER KELAS)
+// ============================================================================
+export const exportExcelRaporObe = async (req, res, next) => {
+    try {
+        const { krsId } = req.params;
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+
+        const rapor   = await penilaianService.getRaporOBEMahasiswa(krsId);
+        const rincian = await getInfoRapor(krsId);
+
+        const mhs   = rincian.krsMahasiswa?.mahasiswa;
+        const kelas = rincian.kelasKuliah;
+        const mk    = kelas?.mataKuliah;
+        const prodi = mk?.programStudi;
+        const namaProdi = `${prodi?.jenjang?.jenjang || 'S1'} - ${prodi?.nama || '-'}`;
+        const printDate = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'long' });
+
+        const workbook  = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Rapor OBE');
+
+        [
+            ['Program Studi',  namaProdi],
+            ['Mata Kuliah',    `${mk?.kode} - ${mk?.nama} - ${mk?.totalSks} SKS`],
+            ['Kelas',          kelas?.nama || '-'],
+            ['Periode',        kelas?.periodeAkademik?.nama || '-'],
+            ['Nama Mahasiswa', mhs?.nama || '-'],
+            ['NIM',            mhs?.npm || '-'],
+            ['Angkatan',       mhs?.angkatan || '-'],
+            ['Dicetak',        `${namaPencetak} | ${printDate}`],
+        ].forEach(([key, val]) => {
+            const r = worksheet.addRow([key, val]);
+            r.getCell(1).font = { bold: true };
+        });
+        worksheet.addRow([]);
+
+        const hRow = worksheet.addRow(['No', 'Kode CPMK', 'Deskripsi CPMK', 'Nilai Capaian']);
+        hRow.eachCell((cell) => {
+            cell.font   = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0c4781' } };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.alignment = { horizontal: 'center' };
+        });
+
+        rapor.forEach((item, i) => {
+            const r = worksheet.addRow([i + 1, item.kodeCpmk || '-', item.deskripsi || '-', item.nilaiCapaian ?? '-']);
+            const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF5F5F5';
+            r.eachCell((cell) => {
+                cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                cell.alignment = { horizontal: 'center' };
+            });
+            r.getCell(3).alignment = { horizontal: 'left' };
+        });
+
+        worksheet.columns.forEach(col => { col.width = 18; });
+        worksheet.getColumn(3).width = 50;
+
+        const filename = `Rapor_OBE_${mhs?.npm || krsId}.xlsx`.replace(/\s/g, '_');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+    } catch (error) { next(error); }
+};
+
+
+// ============================================================================
+// 8. EXPORT PDF — RAPOR OBE PER MAHASISWA (PER KELAS)
+// ============================================================================
+export const exportPdfRaporObe = async (req, res, next) => {
+    try {
+        const { krsId } = req.params;
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+        const isPakaiKop   = String(req.query.kop).toLowerCase() === 'true';
+
+        const rapor   = await penilaianService.getRaporOBEMahasiswa(krsId);
+        const rincian = await getInfoRapor(krsId);
+
+        const mhs   = rincian.krsMahasiswa?.mahasiswa;
+        const kelas = rincian.kelasKuliah;
+        const mk    = kelas?.mataKuliah;
+        const prodi = mk?.programStudi;
+        const namaProdi = `${prodi?.jenjang?.jenjang || 'S1'} - ${prodi?.nama || '-'}`;
+
+        const doc    = new PDFDocument({ margin: 30, size: 'A4' });
+        const boxX   = 30;
+        const PAGE_W = doc.page.width;
+        const boxW   = PAGE_W - boxX * 2;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Rapor_OBE_${mhs?.npm || krsId}.pdf"`);
+        doc.pipe(res);
+
+        const logoPath = path.join(process.cwd(), 'public', 'logo', 'uika.jpg');
+
+        if (isPakaiKop) drawKopSurat(doc, logoPath, boxX, boxW);
+
+        drawInfoSection(doc, logoPath, boxX, boxW, 'RAPOR CAPAIAN PEMBELAJARAN (CPMK)', [
+            { key: 'Program Studi',  val: namaProdi },
+            { key: 'Mata Kuliah',    val: `${mk?.kode} - ${mk?.nama} - ${mk?.totalSks} SKS` },
+            { key: 'Kelas',          val: kelas?.nama || '-' },
+            { key: 'Periode',        val: kelas?.periodeAkademik?.nama || '-' },
+            { key: 'Nama Mahasiswa', val: mhs?.nama || '-' },
+            { key: 'NIM',            val: mhs?.npm || '-' },
+            { key: 'Angkatan',       val: mhs?.angkatan || '-' },
+        ]);
+
+        // Tabel: No | Kode CPMK | Deskripsi CPMK | Nilai Capaian
+        const colNo    = 30;
+        const colKode  = 80;
+        const colNilai = 90;
+        const colDesk  = boxW - (colNo + colKode + colNilai);
+        const rowHeight = 20;
+        const hh = 22;
+
+        doc.save().rect(boxX, doc.y, boxW, hh).fill('#0c4781').restore();
+        doc.save().lineWidth(0.5).strokeColor('#aaaaaa').rect(boxX, doc.y, boxW, hh).stroke();
+        const headerY = doc.y;
+        let curX = boxX;
+        [colNo, colKode, colDesk].forEach((w) => {
+            curX += w;
+            doc.moveTo(curX, headerY).lineTo(curX, headerY + hh).stroke();
+        });
+        doc.restore();
+
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+        const hY = headerY + (hh / 2) - 4;
+        let tx = boxX;
+        doc.text('No', tx, hY, { width: colNo, align: 'center', lineBreak: false }); tx += colNo;
+        doc.text('Kode CPMK', tx, hY, { width: colKode, align: 'center', lineBreak: false }); tx += colKode;
+        doc.text('Deskripsi CPMK', tx, hY, { width: colDesk, align: 'center', lineBreak: false }); tx += colDesk;
+        doc.text('Nilai Capaian', tx, hY, { width: colNilai, align: 'center', lineBreak: false });
+
+        let rowY = headerY + hh;
+        rapor.forEach((item, i) => {
+            if (rowY + rowHeight > doc.page.height - 40) {
+                doc.addPage();
+                rowY = 30;
+            }
+            const bg = i % 2 === 0 ? '#ffffff' : '#f5f5f5';
+            doc.save().rect(boxX, rowY, boxW, rowHeight).fill(bg).restore();
+            doc.save().lineWidth(0.4).strokeColor('#cccccc');
+            doc.rect(boxX, rowY, boxW, rowHeight).stroke();
+            let cx = boxX;
+            [colNo, colKode, colDesk].forEach((w) => {
+                cx += w;
+                doc.moveTo(cx, rowY).lineTo(cx, rowY + rowHeight).stroke();
+            });
+            doc.restore();
+
+            const tY = rowY + (rowHeight / 2) - 3.5;
+            doc.font('Helvetica').fontSize(8).fillColor('black');
+            let dx = boxX;
+            doc.text(String(i + 1), dx, tY, { width: colNo, align: 'center', lineBreak: false }); dx += colNo;
+            doc.text(item.kodeCpmk || '-', dx, tY, { width: colKode, align: 'center', lineBreak: false }); dx += colKode;
+            doc.text(item.deskripsi || '-', dx + 4, tY, { width: colDesk - 8, align: 'left', lineBreak: false }); dx += colDesk;
+            doc.font('Helvetica-Bold').text(item.nilaiCapaian !== undefined ? String(item.nilaiCapaian) : '-', dx, tY, { width: colNilai, align: 'center', lineBreak: false });
+
+            rowY += rowHeight;
+        });
+
+        if (rapor.length === 0) {
+            doc.font('Helvetica').fontSize(9).fillColor('#777777')
+                .text('Belum ada nilai CPMK untuk mahasiswa ini.', boxX, rowY + 10, { width: boxW, align: 'center' });
+            rowY += 30;
+        }
+
+        doc.y = rowY + 12;
 
         doc.moveDown(3);
         doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y)

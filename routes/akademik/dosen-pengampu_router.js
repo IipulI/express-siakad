@@ -100,6 +100,10 @@ router.get('/kelas/:kelasId/rps', cekKepemilikanKelas, CapaianController.getRpsF
 
 // Rapor OBE per mahasiswa
 router.get('/kelas/:krsId/rapor-obe', cekKepemilikanKelas, PenilaianController.getRaporOBE);
+router.get('/kelas/:krsId/rapor-obe/export', cekKepemilikanKelas, async (req, res, next) => {
+    if (req.query.format === 'pdf') return exportExcelCapaianKelas.exportPdfRaporObe(req, res, next);
+    return exportExcelCapaianKelas.exportExcelRaporObe(req, res, next);
+});
 router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
     if (req.query.format === 'pdf') {
         if (req.query.jenis === 'daftar-nilai') {
@@ -110,7 +114,11 @@ router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
     return exportExcelCapaianKelas.exportExcelNilaiKelas(req, res, next);
 });
 router.get('/kelas/:kelasId/capaian/export', async (req, res, next) => {
-    if (req.query.format === 'pdf') return exportExcelCapaianKelas.exportPdfCapaianKelas(req, res, next);
+    if (req.query.format === 'pdf') {
+        if (req.query.jenis === 'cpl') return exportExcelCapaianKelas.exportPdfCapaianCplKelas(req, res, next);
+        return exportExcelCapaianKelas.exportPdfCapaianKelas(req, res, next);
+    }
+    if (req.query.jenis === 'cpl') return exportExcelCapaianKelas.exportExcelCapaianCplKelas(req, res, next);
     return exportExcelCapaianKelas.exportExcelCapaianKelas(req, res, next);
 });
 
