@@ -134,6 +134,64 @@ export const getFormPemetaanCpmk = async (mataKuliahId) => {
 };
 
 // =========================================================
+// HELPER: Daftar kolom CPMK untuk laporan (Monitoring Prodi,
+// Capaian CPMK per Kelas, dll).
+//
+// Setiap "kolom" adalah node leaf:
+// - Jika sebuah CPMK induk punya Sub-CPMK, leaf-nya adalah
+//   Sub-CPMK tersebut (dikelompokkan via parentKode/groupSize,
+//   target mengikuti target CPMK induk karena target Sub-CPMK
+//   selalu 0 by design).
+// - Jika tidak punya Sub-CPMK, leaf-nya adalah CPMK itu sendiri
+//   (parentKode === kode, groupSize 1) — perilaku lama tetap sama.
+// =========================================================
+export const getCpmkColumnsForMataKuliah = async (mataKuliahId) => {
+    const allCpmk = await CapaianMataKuliah.findAll({
+        where: { siakMataKuliahId: mataKuliahId },
+        order: [['kode', 'ASC']]
+    });
+
+    const parents = allCpmk.filter(c => !c.parentId);
+    const columns = [];
+    let hasSubCpmk = false;
+
+    parents.forEach(parent => {
+        const subs = allCpmk
+            .filter(c => c.parentId && String(c.parentId) === String(parent.id))
+            .sort((a, b) => String(a.kode).localeCompare(String(b.kode)));
+
+        if (subs.length > 0) {
+            hasSubCpmk = true;
+            subs.forEach((sub, idx) => {
+                columns.push({
+                    id: sub.id,
+                    kode: sub.kode,
+                    deskripsi: sub.deskripsi,
+                    target: parseFloat(parent.target || 0),
+                    parentKode: parent.kode,
+                    parentDeskripsi: parent.deskripsi,
+                    groupSize: subs.length,
+                    isGroupFirst: idx === 0
+                });
+            });
+        } else {
+            columns.push({
+                id: parent.id,
+                kode: parent.kode,
+                deskripsi: parent.deskripsi,
+                target: parseFloat(parent.target || 0),
+                parentKode: parent.kode,
+                parentDeskripsi: parent.deskripsi,
+                groupSize: 1,
+                isGroupFirst: true
+            });
+        }
+    });
+
+    return { columns, hasSubCpmk };
+};
+
+// =========================================================
 // POST: Simpan Semua Data (Dengan Validasi Ketat 100% OBE)
 // =========================================================
 // export const savePemetaanCpmk = async (mataKuliahId, payload) => {

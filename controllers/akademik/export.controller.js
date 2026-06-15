@@ -2951,9 +2951,12 @@ export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
             .text('Detail CPMK Mata Kuliah:', boxX + 10, cpmkY + 6);
 
         let listY = cpmkY + 20;
+        const seenParentCpmk = new Set();
         data.daftarCpmk.forEach(c => {
-            doc.font('Helvetica-Bold').fontSize(7).text(`•  ${c.kode}`, boxX + 15, listY, { continued: true });
-            doc.font('Helvetica').text(`  ${c.deskripsi}`, { width: boxW - 30 });
+            if (seenParentCpmk.has(c.parentKode)) return;
+            seenParentCpmk.add(c.parentKode);
+            doc.font('Helvetica-Bold').fontSize(7).text(`•  ${c.parentKode}`, boxX + 15, listY, { continued: true });
+            doc.font('Helvetica').text(`  ${c.parentDeskripsi}`, { width: boxW - 30 });
             listY = doc.y + 2;
         });
 
@@ -2995,14 +2998,34 @@ export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
         const hy = doc.y;
         const hh = 28;
         const halfHy = hy + 14;
+        const hasSubCpmk = !!data.hasSubCpmk;
 
         doc.save().rect(boxX, hy, boxW, hh).fill('#0c4781').restore();
         doc.save().lineWidth(0.5).strokeColor('#aaaaaa')
             .rect(boxX, hy, boxW, hh).stroke().restore();
 
-        drawCpmkVerticals(hy, hh, false);
+        // Garis vertikal No | NIM | Nama | (area CPMK) | Status — full height
+        doc.save().lineWidth(0.5).strokeColor('#aaaaaa');
+        doc.moveTo(boxX + colNo, hy).lineTo(boxX + colNo, hy + hh).stroke();
+        doc.moveTo(boxX + colNo + colNim, hy).lineTo(boxX + colNo + colNim, hy + hh).stroke();
+        doc.moveTo(cpmkStartX, hy).lineTo(cpmkStartX, hy + hh).stroke();
+        doc.moveTo(statusStartX, hy).lineTo(statusStartX, hy + hh).stroke();
 
-        // Garis pemisah "Nilai CPMK" dengan kode-kode CPMK di baris ke-2 header
+        // Garis vertikal antar kolom CPMK: antar grup CPMK induk = full height,
+        // antar Sub-CPMK dalam 1 grup = hanya baris bawah (supaya label CPMK
+        // induk di baris atas terlihat menyatu/merge)
+        data.daftarCpmk.forEach((c, i) => {
+            if (i === 0) return;
+            const x = cpmkStartX + (i * cpmkW);
+            if (c.isGroupFirst) {
+                doc.moveTo(x, hy).lineTo(x, hy + hh).stroke();
+            } else if (hasSubCpmk) {
+                doc.moveTo(x, halfHy).lineTo(x, hy + hh).stroke();
+            }
+        });
+        doc.restore();
+
+        // Garis pemisah baris atas (grup CPMK) dengan baris bawah (kode kolom)
         doc.save().lineWidth(0.5).strokeColor('#aaaaaa')
             .moveTo(cpmkStartX, halfHy).lineTo(statusStartX, halfHy).stroke().restore();
 
@@ -3011,8 +3034,18 @@ export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
         doc.text('NIM', boxX + colNo, hy + 10, { width: colNim, align: 'center' });
         doc.text('Nama Mahasiswa', boxX + colNo + colNim, hy + 10, { width: colNama, align: 'center' });
         doc.text('Status Capaian', statusStartX, hy + 10, { width: colStatus, align: 'center' });
-        doc.text('Nilai CPMK', cpmkStartX, hy + 4, { width: cpmkArea, align: 'center' });
 
+        if (hasSubCpmk) {
+            // Baris atas: label CPMK induk, merged sepanjang Sub-CPMK miliknya
+            data.daftarCpmk.forEach((c, i) => {
+                if (!c.isGroupFirst) return;
+                doc.text(c.parentKode, cpmkStartX + (i * cpmkW), hy + 4, { width: cpmkW * c.groupSize, align: 'center' });
+            });
+        } else {
+            doc.text('Nilai CPMK', cpmkStartX, hy + 4, { width: cpmkArea, align: 'center' });
+        }
+
+        // Baris bawah: kode kolom (Sub-CPMK jika ada, atau CPMK)
         doc.fontSize(7);
         data.daftarCpmk.forEach((c, i) => {
             doc.text(c.kode, cpmkStartX + (i * cpmkW), halfHy + 4, { width: cpmkW, align: 'center' });

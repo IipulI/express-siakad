@@ -1,6 +1,7 @@
 import models from '../models/index.js';
 import { QueryTypes } from 'sequelize';
 import * as CustomError from '../utils/custom-error.js';
+import { getCpmkColumnsForMataKuliah } from './cpmk.service.js';
 
 export const getCplPerProgramStudi = async (filters) => {
     const { tahunKurikulumId, prodiId, angkatan, metode, useKop } = filters;
@@ -1209,9 +1210,8 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
         const mkData = await sequelize.query(queryMk, { replacements: { mataKuliahId }, type: sequelize.QueryTypes.SELECT });
         const infoMk = mkData[0] || {};
 
-        // 3. AMBIL DATA CPMK
-        const queryCpmk = `SELECT id, kode, deskripsi, COALESCE(target, 0) AS target FROM siak_capaian_mata_kuliah WHERE siak_mata_kuliah_id = :mataKuliahId AND parent_id IS NULL AND deleted_at IS NULL ORDER BY kode ASC`;
-        const cpmkList = await sequelize.query(queryCpmk, { replacements: { mataKuliahId }, type: sequelize.QueryTypes.SELECT });
+        // 3. AMBIL DATA CPMK (leaf-level: Sub-CPMK jika ada, atau CPMK itu sendiri jika tidak)
+        const { columns: cpmkList, hasSubCpmk } = await getCpmkColumnsForMataKuliah(mataKuliahId);
 
         // 4. AMBIL DATA MAHASISWA
         const queryMhs = `SELECT id, npm, nama FROM siak_mahasiswa WHERE siak_program_studi_id = :prodiId AND angkatan = :angkatan ORDER BY npm ASC`;
@@ -1277,7 +1277,7 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
                     const nilaiAkhirCpmk = Math.round(persentaseAkhir * 100) / 100;
                     row.cpmk[cpmk.kode] = nilaiAkhirCpmk;
 
-                    if (nilaiAkhirCpmk < parseFloat(cpmk.target)) isMemenuhi = false;
+                    if (nilaiAkhirCpmk < cpmk.target) isMemenuhi = false;
                 } else {
                     row.cpmk[cpmk.kode] = null;
                 }
@@ -1295,12 +1295,13 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
                 angkatan: angkatan,
                 useKop: String(useKop).toLowerCase() === 'true'
             },
-            daftarCpmk: cpmkList.map(c => ({ kode: c.kode, deskripsi: c.deskripsi, target: parseFloat(c.target) })),
-            dataMahasiswa: dataMahasiswa,
-
-            // 🟢 JURUS X-RAY: Tampilkan data mentah langsung ke Postman!
-            DEBUG_cpmkList: cpmkList,
-            DEBUG_scoreData: scoreData
+            daftarCpmk: cpmkList.map(c => ({
+                kode: c.kode, deskripsi: c.deskripsi, target: c.target,
+                parentKode: c.parentKode, parentDeskripsi: c.parentDeskripsi,
+                groupSize: c.groupSize, isGroupFirst: c.isGroupFirst
+            })),
+            hasSubCpmk,
+            dataMahasiswa: dataMahasiswa
         };
     } catch (error) {
         throw new Error("Gagal menghitung CPMK per Mahasiswa: " + error.message);

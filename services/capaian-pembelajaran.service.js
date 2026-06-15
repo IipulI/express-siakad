@@ -1,5 +1,6 @@
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
+import { getCpmkColumnsForMataKuliah } from './cpmk.service.js';
 
 const {
     KelasKuliah, MataKuliah, ProgramStudi, TahunKurikulum, PeriodeAkademik, Jenjang,
@@ -36,16 +37,14 @@ export const getCapaianCpmkKelas = async (kelasId) => {
     const kelas = await getKelasHeader(kelasId);
     const mkId = kelas.siakMataKuliahId || kelas.siak_mata_kuliah_id;
 
-    // Parent CPMK saja (parent_id IS NULL)
-    const cpmkList = await CapaianMataKuliah.findAll({
-        where: { siakMataKuliahId: mkId, parentId: null },
-        order: [['kode', 'ASC']]
-    });
+    // Kolom CPMK (leaf-level: Sub-CPMK jika ada, atau CPMK itu sendiri jika tidak)
+    const { columns: cpmkColumns, hasSubCpmk } = await getCpmkColumnsForMataKuliah(mkId);
 
-    if (cpmkList.length === 0) {
+    if (cpmkColumns.length === 0) {
         return {
             header: buildHeader(kelas),
             cpmkInfo: [],
+            hasSubCpmk: false,
             targetCpmk: {},
             tabel: [],
             rerataPerolehan: {},
@@ -78,21 +77,26 @@ export const getCapaianCpmkKelas = async (kelasId) => {
     if (pesertaRaw.length === 0) {
         return {
             header: buildHeader(kelas),
-            cpmkInfo: cpmkList.map(c => ({ id: c.id, kode: c.kode, deskripsi: c.deskripsi })),
-            targetCpmk: Object.fromEntries(cpmkList.map(c => [c.kode, parseFloat(c.target || 0)])),
+            cpmkInfo: cpmkColumns.map(c => ({
+                id: c.id, kode: c.kode, deskripsi: c.deskripsi,
+                parentKode: c.parentKode, parentDeskripsi: c.parentDeskripsi,
+                groupSize: c.groupSize, isGroupFirst: c.isGroupFirst
+            })),
+            hasSubCpmk,
+            targetCpmk: Object.fromEntries(cpmkColumns.map(c => [c.kode, c.target])),
             tabel: [],
             rerataPerolehan: {},
             pesan: 'Tidak ada peserta di kelas ini'
         };
     }
 
-    // Ambil nilai CPMK, agregasi sub-CPMK ke parent CPMK via SQL JOIN.
-    // Jika CPMK punya parent_id → nilai dikompres ke parent.
-    // Jika tidak punya parent_id → pakai nilai langsung.
+    // Ambil nilai CPMK per leaf (Sub-CPMK / CPMK) — tanpa rollup, karena
+    // siak_nilai_cpmk_mahasiswa.siak_capaian_mata_kuliah_id sudah mengarah
+    // ke leaf yang dipetakan di Rencana Evaluasi.
     const nilaiCpmkRaw = await sequelize.query(`
         SELECT
             n.siak_mahasiswa_id,
-            CASE WHEN c.parent_id IS NOT NULL THEN c.parent_id ELSE c.id END AS parent_cpmk_id,
+            c.id AS cpmk_id,
             AVG(n.nilai)::FLOAT AS avg_nilai
         FROM siak_nilai_cpmk_mahasiswa n
         JOIN siak_capaian_mata_kuliah c
@@ -100,34 +104,34 @@ export const getCapaianCpmkKelas = async (kelasId) => {
            AND c.deleted_at IS NULL
         WHERE n.siak_kelas_kuliah_id = :kelasId
           AND n.deleted_at IS NULL
-        GROUP BY n.siak_mahasiswa_id, parent_cpmk_id
+        GROUP BY n.siak_mahasiswa_id, c.id
     `, {
         replacements: { kelasId },
         type: sequelize.QueryTypes.SELECT
     });
 
-    // Bangun map: { mhsId: { parentCpmkId: avg_nilai } }
+    // Bangun map: { mhsId: { cpmkId: avg_nilai } }
     const nilaiMap = {};
     nilaiCpmkRaw.forEach(row => {
         const mId = String(row.siak_mahasiswa_id);
-        const cId = String(row.parent_cpmk_id);
+        const cId = String(row.cpmk_id);
         if (!nilaiMap[mId]) nilaiMap[mId] = {};
         nilaiMap[mId][cId] = parseFloat(row.avg_nilai || 0);
     });
 
-    // Deteksi pemetaan berbeda: ada nilai tersimpan dengan parent CPMK ID
-    // yang tidak cocok dengan cpmkList saat ini
-    const currentCpmkIds = new Set(cpmkList.map(c => String(c.id)));
-    const storedParentIds = new Set(nilaiCpmkRaw.map(r => String(r.parent_cpmk_id)));
-    const pemetaanBerbeda = storedParentIds.size > 0 &&
-        [...storedParentIds].some(id => !currentCpmkIds.has(id));
+    // Deteksi pemetaan berbeda: ada nilai tersimpan dengan CPMK ID
+    // yang tidak cocok dengan kolom CPMK saat ini
+    const currentCpmkIds = new Set(cpmkColumns.map(c => String(c.id)));
+    const storedCpmkIds = new Set(nilaiCpmkRaw.map(r => String(r.cpmk_id)));
+    const pemetaanBerbeda = storedCpmkIds.size > 0 &&
+        [...storedCpmkIds].some(id => !currentCpmkIds.has(id));
 
-    // Inisialisasi target & rerata (hanya parent CPMK)
+    // Inisialisasi target & rerata
     const targetCpmk = {};
     const rerataSum = {};
     const rerataCount = {};
-    cpmkList.forEach(c => {
-        targetCpmk[c.kode] = parseFloat(c.target || 0);
+    cpmkColumns.forEach(c => {
+        targetCpmk[c.kode] = c.target;
         rerataSum[c.kode] = 0;
         rerataCount[c.kode] = 0;
     });
@@ -138,7 +142,7 @@ export const getCapaianCpmkKelas = async (kelasId) => {
         const nilaiPerCpmk = {};
         let sudahDinilai = false;
 
-        cpmkList.forEach(c => {
+        cpmkColumns.forEach(c => {
             const safeCId = String(c.id);
             const nilai = nilaiMap[safeMhsId]?.[safeCId];
 
@@ -154,7 +158,7 @@ export const getCapaianCpmkKelas = async (kelasId) => {
 
         let statusCapaian = 'Belum Dinilai';
         if (sudahDinilai) {
-            const semuaMencapai = cpmkList.every(c => {
+            const semuaMencapai = cpmkColumns.every(c => {
                 const n = nilaiPerCpmk[c.kode];
                 return n !== null && n >= targetCpmk[c.kode];
             });
@@ -173,7 +177,7 @@ export const getCapaianCpmkKelas = async (kelasId) => {
     });
 
     const rerataPerolehan = {};
-    cpmkList.forEach(c => {
+    cpmkColumns.forEach(c => {
         rerataPerolehan[c.kode] = rerataCount[c.kode] > 0
             ? parseFloat((rerataSum[c.kode] / rerataCount[c.kode]).toFixed(2))
             : null;
@@ -182,7 +186,12 @@ export const getCapaianCpmkKelas = async (kelasId) => {
     const header = buildHeader(kelas);
     return {
         header: { ...header, peserta: tabel.length },
-        cpmkInfo: cpmkList.map(c => ({ id: c.id, kode: c.kode, deskripsi: c.deskripsi })),
+        cpmkInfo: cpmkColumns.map(c => ({
+            id: c.id, kode: c.kode, deskripsi: c.deskripsi,
+            parentKode: c.parentKode, parentDeskripsi: c.parentDeskripsi,
+            groupSize: c.groupSize, isGroupFirst: c.isGroupFirst
+        })),
+        hasSubCpmk,
         targetCpmk,
         tabel,
         ...rerataPerolehan,

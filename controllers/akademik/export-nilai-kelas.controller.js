@@ -445,6 +445,28 @@ export const exportExcelCapaianKelas = async (req, res, next) => {
 
         worksheet.addRow([]);
 
+        // Baris grup CPMK induk (hanya jika MK ini punya Sub-CPMK)
+        if (data.hasSubCpmk) {
+            const groupArr = ['', '', ''];
+            data.cpmkInfo.forEach(c => groupArr.push(c.isGroupFirst ? c.parentKode : ''));
+            groupArr.push('');
+            const gRow = worksheet.addRow(groupArr);
+            gRow.eachCell((cell) => {
+                cell.font   = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0c4781' } };
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                cell.alignment = { horizontal: 'center' };
+            });
+            worksheet.mergeCells(gRow.number, 1, gRow.number, 3);
+            let colIdx = 4;
+            data.cpmkInfo.forEach(c => {
+                if (c.isGroupFirst && c.groupSize > 1) {
+                    worksheet.mergeCells(gRow.number, colIdx, gRow.number, colIdx + c.groupSize - 1);
+                }
+                colIdx++;
+            });
+        }
+
         const targetRow = ['', 'Target CPMK', ''];
         data.cpmkInfo.forEach(c => targetRow.push(data.targetCpmk[c.kode] ?? '-'));
         targetRow.push('');
@@ -567,6 +589,28 @@ export const exportPdfCapaianKelas = async (req, res, next) => {
         const cpmkX     = boxX + colNo + colNim + colNama;
         const statusX   = cpmkX + cpmkArea;
         const rowHeight = 16;
+
+        // ── [GROUP HEADER ROW] — label CPMK induk, hanya jika ada Sub-CPMK ──
+        if (data.hasSubCpmk) {
+            doc.save().rect(boxX, doc.y, boxW, rowHeight).fill('#0c4781').restore();
+            doc.save().lineWidth(0.5).strokeColor('#aaaaaa').rect(boxX, doc.y, boxW, rowHeight).stroke();
+            doc.moveTo(cpmkX, doc.y).lineTo(cpmkX, doc.y + rowHeight).stroke();
+            data.cpmkInfo.forEach((c, i) => {
+                if (i > 0 && c.isGroupFirst) {
+                    doc.moveTo(cpmkX + i * cpmkW, doc.y).lineTo(cpmkX + i * cpmkW, doc.y + rowHeight).stroke();
+                }
+            });
+            doc.moveTo(statusX, doc.y).lineTo(statusX, doc.y + rowHeight).stroke();
+
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+            const groupY = doc.y + (rowHeight / 2) - 3.5;
+            data.cpmkInfo.forEach((c, i) => {
+                if (!c.isGroupFirst) return;
+                doc.text(c.parentKode, cpmkX + i * cpmkW, groupY, { width: cpmkW * c.groupSize, align: 'center', lineBreak: false });
+            });
+            doc.restore();
+            doc.y += rowHeight;
+        }
 
         // ── [A] BARIS TARGET CPMK ──
         doc.save().rect(boxX, doc.y, boxW, rowHeight).fill('#0c4781').restore();
