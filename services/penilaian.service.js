@@ -9,7 +9,7 @@ const {
     NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi
 } = models;
 
-const DEFAULT_SKALA = [
+export const DEFAULT_SKALA = [
     { hurufMutu: 'A', angkaMutu: 4.00, nilaiMin: 81.00, nilaiMax: 100.00 },
     { hurufMutu: 'AB', angkaMutu: 3.50, nilaiMin: 76.00, nilaiMax: 80.00 },
     { hurufMutu: 'B', angkaMutu: 3.00, nilaiMin: 71.00, nilaiMax: 75.00 },
@@ -20,7 +20,7 @@ const DEFAULT_SKALA = [
     { hurufMutu: 'E', angkaMutu: 0.00, nilaiMin: 0.00, nilaiMax: 0.00 },
 ];
 
-const getGrade = (nilai, skala) => {
+export const getGrade = (nilai, skala) => {
     const sorted = [...skala].sort((a, b) => b.nilaiMin - a.nilaiMin);
     for (const s of sorted) {
         if (nilai >= s.nilaiMin) {
@@ -1046,6 +1046,7 @@ export const getDataDaftarNilai = async (kelasId) => {
         kelas: {
             id: metadata.id,
             nama: metadata.namaKelas || metadata.nama || "-",
+            sistemKuliah: metadata.sistemKuliah || "-",
         },
         mataKuliah: {
             kode: metadata.mataKuliah?.kode || "-",

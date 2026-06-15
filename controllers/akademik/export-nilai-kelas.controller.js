@@ -75,12 +75,13 @@ const hitungStatusCapaianCpl = (nilaiPerCpl, targetCpl, cplInfo) => {
 // ─────────────────────────────────────────────
 // HELPER: Footer dinamis
 // ─────────────────────────────────────────────
-const buildFooterText = (namaPencetak) => {
+const buildFooterText = (namaPencetak, repPath = '') => {
     const printDate = new Date().toLocaleString('id-ID', {
         timeZone: 'Asia/Jakarta', dateStyle: 'long', timeStyle: 'medium'
     });
     const appUrl = process.env.APP_URL || 'siakad.uika-bogor.ac.id';
-    return `Dicetak oleh: ${namaPencetak}, pada ${printDate} WIB | ${appUrl}`;
+    const suffix = repPath ? `/${repPath}` : '';
+    return `Dicetak oleh: ${namaPencetak}, pada ${printDate} WIB | ${appUrl}${suffix}`;
 };
 
 // ─────────────────────────────────────────────
@@ -1253,6 +1254,351 @@ export const exportPdfRaporObe = async (req, res, next) => {
         doc.moveDown(0.5);
         doc.font('Helvetica').fontSize(7).fillColor('#555555')
             .text(buildFooterText(namaPencetak), boxX, doc.y);
+
+        doc.end();
+    } catch (error) { next(error); }
+};
+
+
+// ============================================================================
+// 9. EXPORT PDF — LAPORAN NILAI PERKULIAHAN MAHASISWA (format SIAKAD)
+// ============================================================================
+export const exportPdfLaporanPerkuliahan = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+
+        const data = await penilaianService.getDataLaporanPerkuliahan(kelasId);
+
+        const doc    = new PDFDocument({ margin: 20, size: 'A4', layout: 'landscape' });
+        const boxX   = 20;
+        const PAGE_W = doc.page.width;
+        const boxW   = PAGE_W - boxX * 2;
+        const halfW  = boxW / 2;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Laporan_Nilai_Perkuliahan_${data.kelas.nama || kelasId}.pdf"`);
+        doc.pipe(res);
+
+        const logoPath = path.join(process.cwd(), 'public', 'logo', 'uika.jpg');
+        drawKopSurat(doc, logoPath, boxX, boxW);
+
+        // ── Judul & identitas kelas ──
+        doc.font('Helvetica-Bold').fontSize(12).fillColor('black')
+            .text('LAPORAN NILAI PERKULIAHAN MAHASISWA', boxX, doc.y, { width: boxW, align: 'center' });
+        doc.font('Helvetica').fontSize(9)
+            .text(`Program Studi ${data.programStudi.jenjang} ${data.programStudi.nama}`, boxX, doc.y + 2, { width: boxW, align: 'center' });
+        doc.text(`Periode ${data.periode.nama}`, boxX, doc.y, { width: boxW, align: 'center' });
+        doc.moveDown(0.6);
+
+        doc.fontSize(8).fillColor('black');
+        let infoY = doc.y;
+        doc.text(`Mata kuliah : ${data.mataKuliah.nama}`, boxX, infoY, { width: halfW - 10 });
+        doc.text(`Nama Kelas : ${data.kelas.nama}`, boxX + halfW, infoY, { width: halfW - 10, align: 'right' });
+
+        infoY = doc.y;
+        doc.text('Kelas / Kelompok :', boxX, infoY, { width: halfW - 10 });
+
+        infoY = doc.y;
+        doc.text(`Kode Mata kuliah : ${data.mataKuliah.kode}`, boxX, infoY, { width: halfW - 10 });
+        doc.text(`SKS : ${data.mataKuliah.sks}`, boxX + halfW, infoY, { width: halfW - 10, align: 'right' });
+
+        doc.moveDown(0.8);
+
+        // ── Tabel nilai per komponen ──
+        const cplCount   = data.komponenEvaluasi.length;
+        const colNo      = 25;
+        const colNim     = 70;
+        const colNama    = 150;
+        const colNilai   = 42;
+        const colGrade   = 32;
+        const colLulus   = 32;
+        const colSunting = 48;
+        const colInfo    = 30;
+        const fixedW     = colNo + colNim + colNama + colNilai + colGrade + colLulus + colSunting + colInfo;
+        const kompArea   = boxW - fixedW;
+        const kompW      = cplCount > 0 ? kompArea / cplCount : kompArea;
+
+        // Perkecil ukuran font nama mahasiswa yang panjang agar tidak wrap ke baris baru
+        const fitNamaFontSize = (text, maxWidth) => {
+            let size = 7;
+            doc.font('Helvetica').fontSize(size);
+            while (size > 5.5 && doc.widthOfString(text) > maxWidth) {
+                size -= 0.5;
+                doc.fontSize(size);
+            }
+            return size;
+        };
+
+        const columns = [
+            { label: 'No',             width: colNo,   align: 'center' },
+            { label: 'NIM',            width: colNim,  align: 'center' },
+            { label: 'Nama Mahasiswa', width: colNama, align: 'left' },
+            ...data.komponenEvaluasi.map(h => ({ label: h.labelKolom, width: kompW, align: 'center', komponen: h.label })),
+            { label: 'Nilai',        width: colNilai,   align: 'center' },
+            { label: 'Grade',        width: colGrade,   align: 'center' },
+            { label: 'Lulus',        width: colLulus,   align: 'center' },
+            { label: 'Sunting KRS?', width: colSunting, align: 'center' },
+            { label: 'Info',         width: colInfo,    align: 'center' },
+        ];
+
+        const rowHeight = 16;
+        const hh        = 28;
+
+        // Header
+        doc.save().rect(boxX, doc.y, boxW, hh).fill('#0c4781').restore();
+        doc.save().lineWidth(0.5).strokeColor('#aaaaaa').rect(boxX, doc.y, boxW, hh).stroke();
+        const headerY = doc.y;
+        let hx = boxX;
+        columns.forEach(col => {
+            hx += col.width;
+            doc.moveTo(hx, headerY).lineTo(hx, headerY + hh).stroke();
+        });
+        doc.restore();
+
+        doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#ffffff');
+        hx = boxX;
+        columns.forEach(col => {
+            doc.text(col.label, hx + 2, headerY + (hh / 2) - 4, { width: col.width - 4, align: col.align });
+            hx += col.width;
+        });
+
+        // Baris data per mahasiswa
+        let rowY = headerY + hh;
+        data.mahasiswa.forEach((mhs, iRow) => {
+            if (rowY + rowHeight > doc.page.height - 40) {
+                doc.addPage();
+                rowY = 30;
+            }
+            const bg = iRow % 2 === 0 ? '#ffffff' : '#f5f5f5';
+            doc.save().rect(boxX, rowY, boxW, rowHeight).fill(bg).restore();
+            doc.save().lineWidth(0.4).strokeColor('#cccccc');
+            doc.rect(boxX, rowY, boxW, rowHeight).stroke();
+            let vx = boxX;
+            columns.forEach(col => {
+                vx += col.width;
+                doc.moveTo(vx, rowY).lineTo(vx, rowY + rowHeight).stroke();
+            });
+            doc.restore();
+
+            const tY = rowY + (rowHeight / 2) - 3.5;
+            let cx = boxX;
+            columns.forEach(col => {
+                let val;
+                if (col.komponen) {
+                    const v = mhs.nilaiPerKomponen?.[col.komponen];
+                    val = (v !== null && v !== undefined) ? Number(v).toFixed(2) : '-';
+                    doc.font('Helvetica').fontSize(7);
+                } else {
+                    switch (col.label) {
+                        case 'No':             val = String(mhs.no); doc.font('Helvetica').fontSize(7); break;
+                        case 'NIM':            val = mhs.nim; doc.font('Helvetica').fontSize(7); break;
+                        case 'Nama Mahasiswa': val = mhs.nama; fitNamaFontSize(val, colNama - 3); break;
+                        case 'Nilai':          val = mhs.nilaiAkhir > 0 ? Number(mhs.nilaiAkhir).toFixed(2) : '-'; doc.font('Helvetica-Bold').fontSize(7); break;
+                        case 'Grade':          val = mhs.grade || '-'; doc.font('Helvetica-Bold').fontSize(7); break;
+                        case 'Lulus':          val = (mhs.grade && mhs.grade !== '-') ? (mhs.lulus ? 'Ya' : 'Tidak') : '-'; doc.font('Helvetica').fontSize(7); break;
+                        default:               val = '-'; doc.font('Helvetica').fontSize(7);
+                    }
+                }
+                doc.fillColor('black');
+                const padX = col.label === 'Nama Mahasiswa' ? 3 : 0;
+                doc.text(val, cx + padX, tY, { width: col.width - padX, align: col.align, lineBreak: false });
+                cx += col.width;
+            });
+
+            rowY += rowHeight;
+        });
+
+        // Baris "Rata-rata nilai kelas"
+        if (rowY + rowHeight > doc.page.height - 40) {
+            doc.addPage();
+            rowY = 30;
+        }
+        doc.save().rect(boxX, rowY, boxW, rowHeight).fill('#dde8f5').restore();
+        doc.save().lineWidth(0.4).strokeColor('#cccccc');
+        doc.rect(boxX, rowY, boxW, rowHeight).stroke();
+        let vxr = boxX;
+        columns.forEach(col => {
+            vxr += col.width;
+            doc.moveTo(vxr, rowY).lineTo(vxr, rowY + rowHeight).stroke();
+        });
+        doc.restore();
+
+        const rataGrade = data.rataRataKelas
+            ? penilaianService.getGrade(data.rataRataKelas.rataNilaiAkhir, penilaianService.DEFAULT_SKALA).hurufMutu
+            : '-';
+
+        const tYr = rowY + (rowHeight / 2) - 3.5;
+        let cxr = boxX;
+        columns.forEach(col => {
+            let val = '';
+            if (col.label === 'Nama Mahasiswa') val = 'Rata-rata nilai kelas';
+            else if (col.komponen) val = data.rataRataKelas ? Number(data.rataRataKelas.rataPerKomponen[col.komponen] ?? 0).toFixed(2) : '-';
+            else if (col.label === 'Nilai') val = data.rataRataKelas ? Number(data.rataRataKelas.rataNilaiAkhir).toFixed(2) : '-';
+            else if (col.label === 'Grade') val = rataGrade;
+
+            doc.font('Helvetica-Bold').fontSize(7).fillColor('#0c4781');
+            const padX = col.label === 'Nama Mahasiswa' ? 3 : 0;
+            doc.text(val, cxr + padX, tYr, { width: col.width - padX, align: col.label === 'Nama Mahasiswa' ? 'left' : col.align, lineBreak: false });
+            cxr += col.width;
+        });
+
+        doc.y = rowY + rowHeight + 12;
+
+        // ── Status pengisian, tanggal cetak & paraf dosen ──
+        if (doc.y > 600) { doc.addPage(); doc.y = 30; }
+
+        const semuaFinal = data.mahasiswa.length > 0
+            && data.mahasiswa.every(m => m.keterangan && m.keterangan !== 'Belum Terkunci');
+        const statusText = semuaFinal
+            ? 'Pengisian nilai untuk kelas ini sudah dikunci/final.'
+            : 'Pengisian nilai untuk kelas ini masih berjalan (belum dikunci).';
+
+        const tanggalCetak = new Date().toLocaleString('id-ID', {
+            timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+
+        doc.font('Helvetica').fontSize(8).fillColor('black')
+            .text(statusText, boxX, doc.y);
+        doc.text(`Tanggal Cetak : ${tanggalCetak}`, boxX, doc.y);
+
+        doc.moveDown(0.5);
+        const dosenStr = (data.dosen || []).map(d => d.nama).join(', ') || '-';
+        doc.text('Paraf Dosen :', boxX, doc.y);
+        doc.moveDown(2.5);
+        doc.font('Helvetica-Bold').text(dosenStr, boxX, doc.y);
+
+        doc.moveDown(2);
+        doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y)
+            .lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
+        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(7).fillColor('#555555')
+            .text(buildFooterText(namaPencetak, 'siakad/rep_nilaikuliah'), boxX, doc.y);
+
+        doc.end();
+    } catch (error) { next(error); }
+};
+
+
+// ============================================================================
+// 10. EXPORT PDF — LAPORAN DAFTAR NILAI MAHASISWA (format SIAKAD)
+// ============================================================================
+export const exportPdfLaporanDaftarNilai = async (req, res, next) => {
+    try {
+        const { kelasId } = req.params;
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+
+        const data = await penilaianService.getDataDaftarNilai(kelasId);
+
+        const doc    = new PDFDocument({ margin: 20, size: 'A4', layout: 'portrait' });
+        const boxX   = 20;
+        const PAGE_W = doc.page.width;
+        const boxW   = PAGE_W - boxX * 2;
+        const halfW  = boxW / 2;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Laporan_Daftar_Nilai_${data.kelas.nama || kelasId}.pdf"`);
+        doc.pipe(res);
+
+        const logoPath = path.join(process.cwd(), 'public', 'logo', 'uika.jpg');
+        drawKopSurat(doc, logoPath, boxX, boxW);
+
+        doc.font('Helvetica-Bold').fontSize(12).fillColor('black')
+            .text('LAPORAN DAFTAR NILAI MAHASISWA', boxX, doc.y, { width: boxW, align: 'center' });
+        doc.font('Helvetica').fontSize(9)
+            .text(`Program Studi ${data.programStudi.jenjang} ${data.programStudi.nama}`, boxX, doc.y + 2, { width: boxW, align: 'center' });
+        doc.text(`Periode ${data.periode.nama}`, boxX, doc.y, { width: boxW, align: 'center' });
+        doc.moveDown(0.6);
+
+        const dosenStr = (data.dosen || []).map(d => d.nama).join(', ') || '-';
+        const sistemKuliah = (data.kelas.sistemKuliah && data.kelas.sistemKuliah !== '-') ? data.kelas.sistemKuliah : '';
+
+        doc.fontSize(8).fillColor('black');
+        let infoY = doc.y;
+        doc.text(`Mata kuliah : ${data.mataKuliah.nama}`, boxX, infoY, { width: halfW - 10 });
+        doc.text(`Nama Kelas : ${data.kelas.nama}`, boxX + halfW, infoY, { width: halfW - 10, align: 'right' });
+
+        infoY = doc.y;
+        doc.text(`Pengajar : ${dosenStr}`, boxX, infoY, { width: halfW - 10 });
+        doc.text(`Sistem Kuliah : ${sistemKuliah}`, boxX + halfW, infoY, { width: halfW - 10, align: 'right' });
+
+        doc.moveDown(0.8);
+
+        // ── Tabel ──
+        const colNo    = 30;
+        const colNim   = 80;
+        const colNilai = 60;
+        const colAngka = 65;
+        const colHuruf = 65;
+        const colKet   = 50;
+        const colNama  = boxW - (colNo + colNim + colNilai + colAngka + colHuruf + colKet);
+
+        const rowHeight = 16;
+        const hh        = 20;
+
+        doc.save().rect(boxX, doc.y, boxW, hh).fill('#0c4781').restore();
+        doc.save().lineWidth(0.5).strokeColor('#aaaaaa').rect(boxX, doc.y, boxW, hh).stroke();
+
+        const headerY = doc.y;
+        let curX = boxX;
+        [colNo, colNim, colNama, colNilai, colAngka, colHuruf].forEach((w) => {
+            curX += w;
+            doc.moveTo(curX, headerY).lineTo(curX, headerY + hh).stroke();
+        });
+        doc.restore();
+
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+        const hY = headerY + (hh / 2) - 4;
+        let tx = boxX;
+        doc.text('No', tx, hY, { width: colNo, align: 'center', lineBreak: false }); tx += colNo;
+        doc.text('NIM', tx, hY, { width: colNim, align: 'center', lineBreak: false }); tx += colNim;
+        doc.text('NAMA', tx, hY, { width: colNama, align: 'center', lineBreak: false }); tx += colNama;
+        doc.text('NILAI', tx, hY, { width: colNilai, align: 'center', lineBreak: false }); tx += colNilai;
+        doc.text('NILAI ANGKA', tx, hY, { width: colAngka, align: 'center', lineBreak: false }); tx += colAngka;
+        doc.text('NILAI HURUF', tx, hY, { width: colHuruf, align: 'center', lineBreak: false }); tx += colHuruf;
+        doc.text('KET.', tx, hY, { width: colKet, align: 'center', lineBreak: false });
+
+        let rowY = headerY + hh;
+        data.mahasiswa.forEach((mhs, iRow) => {
+            if (rowY + rowHeight > doc.page.height - 60) {
+                doc.addPage();
+                rowY = 30;
+            }
+            const bg = iRow % 2 === 0 ? '#ffffff' : '#f5f5f5';
+            doc.save().rect(boxX, rowY, boxW, rowHeight).fill(bg).restore();
+            doc.save().lineWidth(0.4).strokeColor('#cccccc');
+            doc.rect(boxX, rowY, boxW, rowHeight).stroke();
+
+            let cx = boxX;
+            [colNo, colNim, colNama, colNilai, colAngka, colHuruf].forEach((w) => {
+                cx += w;
+                doc.moveTo(cx, rowY).lineTo(cx, rowY + rowHeight).stroke();
+            });
+            doc.restore();
+
+            const tY = rowY + (rowHeight / 2) - 3.5;
+            doc.font('Helvetica').fontSize(8).fillColor('black');
+            let dx = boxX;
+            doc.text(String(mhs.no), dx, tY, { width: colNo, align: 'center', lineBreak: false }); dx += colNo;
+            doc.text(mhs.nim, dx, tY, { width: colNim, align: 'center', lineBreak: false }); dx += colNim;
+            doc.text(mhs.nama, dx + 3, tY, { width: colNama - 6, align: 'left', lineBreak: false }); dx += colNama;
+            doc.text(mhs.nilaiAkhir > 0 ? Number(mhs.nilaiAkhir).toFixed(2) : '-', dx, tY, { width: colNilai, align: 'center', lineBreak: false }); dx += colNilai;
+            doc.text(mhs.nilaiAngka > 0 ? Number(mhs.nilaiAngka).toFixed(2) : '-', dx, tY, { width: colAngka, align: 'center', lineBreak: false }); dx += colAngka;
+            doc.text(mhs.nilaiHuruf || '-', dx, tY, { width: colHuruf, align: 'center', lineBreak: false }); dx += colHuruf;
+            const ketVal = (mhs.keterangan && mhs.keterangan !== 'Lulus' && mhs.keterangan !== '-') ? mhs.keterangan : '';
+            doc.text(ketVal, dx, tY, { width: colKet, align: 'center', lineBreak: false });
+
+            rowY += rowHeight;
+        });
+
+        doc.y = rowY + 16;
+
+        doc.save().moveTo(boxX, doc.y).lineTo(boxX + boxW, doc.y)
+            .lineWidth(0.5).strokeColor('#cccccc').stroke().restore();
+        doc.moveDown(0.5);
+        doc.font('Helvetica').fontSize(7).fillColor('#555555')
+            .text(buildFooterText(namaPencetak, 'siakad/rep_nilaimhs'), boxX, doc.y);
 
         doc.end();
     } catch (error) { next(error); }

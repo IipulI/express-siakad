@@ -122,7 +122,9 @@ router.get('/kelas/:kelasId/capaian/export', async (req, res, next) => {
     return exportExcelCapaianKelas.exportExcelCapaianKelas(req, res, next);
 });
 
-router.get("/kelas/:kelasId/laporan/perkuliahan", PenilaianController.getLaporanPerkuliahan);
-router.get("/kelas/:kelasId/laporan/daftar-nilai", PenilaianController.getLaporanDaftarNilai);
+router.get("/kelas/:kelasId/laporan/perkuliahan", cekKepemilikanKelas, PenilaianController.getLaporanPerkuliahan);
+router.get("/kelas/:kelasId/laporan/perkuliahan/export", cekKepemilikanKelas, exportExcelCapaianKelas.exportPdfLaporanPerkuliahan);
+router.get("/kelas/:kelasId/laporan/daftar-nilai", cekKepemilikanKelas, PenilaianController.getLaporanDaftarNilai);
+router.get("/kelas/:kelasId/laporan/daftar-nilai/export", cekKepemilikanKelas, exportExcelCapaianKelas.exportPdfLaporanDaftarNilai);
 
 export default router;
