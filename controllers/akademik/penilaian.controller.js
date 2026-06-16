@@ -29,26 +29,6 @@ export const getDaftarTemplate = async (req, res) => {
     }
 };
 
-export const setupKomposisiRPS = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
-    const mkId = req.params.mataKuliahId;
-    const komposisiData = req.body;
-
-    try {
-        const totalBobot = komposisiData.reduce((sum, item) => sum + parseFloat(item.persentase || 0), 0);
-        if (Math.round(totalBobot) !== 100) {
-            return responseBuilder.status('failure').code(400)
-                .message(`Total persentase harus 100%. Saat ini: ${totalBobot}%`).json();
-        }
-        const createdData = await penilaianService.createKomposisiEvaluasi(mkId, komposisiData);
-        return responseBuilder.code(201).message("Struktur Evaluasi RPS berhasil disimpan").json({
-            komposisi: createdData
-        });
-    } catch (error) {
-        return responseBuilder.status('failure').code(500).json(error.message);
-    }
-};
-
 export const getPesertaKelas = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     const kelasId = req.params.kelasId;
@@ -265,17 +245,6 @@ export const deleteCapaianMataKuliah = async (req, res) => {
         responseBuilder.code(200).json();
     } catch (error) {
         responseBuilder.status('failure').code(500).json(error.message);
-    }
-};
-
-export const getKomposisiRPS = async (req, res) => {
-    const responseBuilder = new ResponseBuilder(res);
-    const mkId = req.params.mataKuliahId;
-    try {
-        const data = await penilaianService.getKomposisiEvaluasi(mkId);
-        return responseBuilder.code(200).message("Berhasil mengambil data evaluasi RPS").json(data);
-    } catch (error) {
-        return responseBuilder.status('failure').code(500).json(error.message);
     }
 };
 

@@ -33,16 +33,6 @@ export const getGrade = (nilai, skala) => {
 // 1. SETUP RPS (DEPRECATED): komponen evaluasi + pemetaan CPMK sekarang disimpan
 // lewat RencanaEvaluasi/PemetaanEvaluasiCpmk (POST /mata-kuliah/:id/rencana-evaluasi).
 // Endpoint lama ini ditolak supaya tidak ada lagi 2 sumber data yang bisa berbeda.
-export const createKomposisiEvaluasi = async (mataKuliahId, komposisiData) => {
-    throw new Error("Endpoint ini sudah tidak digunakan. Gunakan POST /mata-kuliah/:id/rencana-evaluasi untuk mengatur komponen evaluasi & pemetaan CPMK.");
-}
-
-// DEPRECATED: data evaluasi RPS sekarang dibaca dari RencanaEvaluasi/PemetaanEvaluasiCpmk
-// (lihat GET /mata-kuliah/:id/rencana-evaluasi), bukan dari KomposisiNilaiMataKuliah lagi.
-export const getKomposisiEvaluasi = async (mataKuliahId) => {
-    throw new Error("Endpoint ini sudah tidak digunakan. Gunakan GET /mata-kuliah/:id/rencana-evaluasi untuk melihat komponen evaluasi & pemetaan CPMK.");
-}
-
 // 2. INPUT NILAI DINAMIS: Menyimpan skor mahasiswa dalam bentuk Array
 export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
     const rincian = await RincianKrsMahasiswa.findByPk(krsId, { attributes: ['id', 'status'] });
@@ -409,9 +399,6 @@ export const getTemplateEvaluasiList = async (page = 1, limit = 10, search = '')
             nama: { [Op.iLike]: `%${search}%` }
         } : {};
 
-        // Catatan: include komposisiNilai (KomposisiNilaiMataKuliah) dilepas -- tabel
-        // ini sudah tidak diupdate lagi (lihat createKomposisiEvaluasi/getKomposisiEvaluasi),
-        // datanya basi. Komponen evaluasi sekarang ada di RencanaEvaluasi per MK+periode.
         const { count, rows } = await MKModel.findAndCountAll({
             where: whereCondition,
             limit: parseInt(limit),

@@ -57,9 +57,6 @@ router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', RpsController.getR
 // [6] Rencana Evaluasi - lihat saja (ini acuan saat input nilai)
 router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.getRencanaEvaluasi);
 
-// Komposisi Nilai Kelas - lihat saja (yang sudah diset Koordinator MK)
-router.get('/mata-kuliah/:mataKuliahId/komposisi-nilai', PenilaianController.getKomposisiRPS);
-
 // ============================================================
 // SIDEBAR KELAS KULIAH (yang OBE)
 // Dosen HANYA bisa akses kelas yang DIA ampu

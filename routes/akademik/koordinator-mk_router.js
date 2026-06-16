@@ -55,10 +55,6 @@ router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.getRenca
 router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.saveRencanaEvaluasiList);
 router.delete('/rencana-evaluasi/:id', RpsController.deleteRencanaEvaluasi);
 
-// Komposisi Nilai Kelas (setup mapping komponen → CPMK + bobot)
-router.get('/mata-kuliah/:mataKuliahId/komposisi-nilai', PenilaianController.getKomposisiRPS);
-router.post('/mata-kuliah/:mataKuliahId/komposisi-nilai', PenilaianController.setupKomposisiRPS);
-
 // ============================================================
 // SIDEBAR KELAS KULIAH (yang OBE)
 // ============================================================
