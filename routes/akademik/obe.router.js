@@ -211,10 +211,10 @@ router.post('/pemetaan/pl-ke-cpl/:obeId', validateSaveMatriksPlCpl, ObeControlle
 
 // D. Pemetaan CPL -> MK
 // router.get('/pemetaan/cpl-ke-mk/:obeId', ObeController.getMatriksPemetaanCplMk);
-router.get(
-    '/pemetaan/cpl-ke-mk/:obeId', 
-    ObeController.getMatriksPemetaanCplMk
-);
+router.get('/pemetaan/cpl-ke-mk/:obeId', ObeController.getMatriksPemetaanCplMk);
+router.get('/pemetaan/cpl-ke-mk/:obeId/opsi-salin', ObeController.getOpsiSalinPemetaanCplMk);
+router.get('/pemetaan/cpl-ke-mk/:obeId/pratinjau-salin', ObeController.pratinjauSalinPemetaanCplMk);
+router.post('/pemetaan/cpl-ke-mk/:obeId/salin', ObeController.salinPemetaanCplMk);
 // router.post('/pemetaan/cpl-ke-mk/:obeId', ObeController.savePemetaanCplMk);
 router.post(
     '/pemetaan/cpl-ke-mk/:obeId', 

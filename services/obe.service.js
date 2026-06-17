@@ -1920,6 +1920,120 @@ export const salinPemetaanPlCpl = async (tujuanObeId, sumberObeId) => {
     return { jumlahDisalin: payload.length, jumlahDilewati: skip };
 };
 
+// Opsi salin pemetaan CPL→MK — dropdown + info OBE
+export const getOpsiSalinPemetaanCplMk = async (obeId) => {
+    const obe = await Obe.findByPk(obeId, {
+        attributes: ['id', 'siakProgramStudiId'],
+        include: [
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
+            { model: ProgramStudi, as: 'programStudi', attributes: ['nama'],
+              include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }] }
+        ]
+    });
+    if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
+
+    const { PemetaanCplMk } = models;
+    const candidates = await Obe.findAll({
+        where: { siakProgramStudiId: obe.siakProgramStudiId, id: { [Op.ne]: obeId } },
+        include: [{ model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] }],
+        attributes: ['id']
+    });
+
+    const opsiSumber = [];
+    for (const c of candidates) {
+        const cplIds = (await CapaianPembelajaranLulusan.findAll({ where: { siakObeId: c.id }, attributes: ['id'] })).map(x => x.id);
+        const count  = cplIds.length > 0 ? await PemetaanCplMk.count({ where: { siakCplId: cplIds } }) : 0;
+        if (count > 0) opsiSumber.push({ obeId: c.id, tahunKurikulum: c.tahunKurikulum?.tahun || '-', jumlahPemetaan: count });
+    }
+
+    return {
+        obeInfo: {
+            tahunKurikulum: obe.tahunKurikulum?.tahun || '-',
+            programStudi: `${obe.programStudi?.jenjang?.jenjang || 'S1'} - ${obe.programStudi?.nama || '-'}`
+        },
+        opsiSumber
+    };
+};
+
+// Pratinjau pemetaan CPL→MK dari OBE sumber
+export const pratinjauSalinPemetaanCplMk = async (sumberObeId) => {
+    const { PemetaanCplMk, MataKuliah } = models;
+
+    const cplList = await CapaianPembelajaranLulusan.findAll({ where: { siakObeId: sumberObeId }, attributes: ['id', 'kode'] });
+    const cplIds  = cplList.map(c => c.id);
+    const mappings = cplIds.length > 0 ? await PemetaanCplMk.findAll({ where: { siakCplId: cplIds } }) : [];
+
+    const mkIds   = [...new Set(mappings.map(m => m.siakMataKuliahId))];
+    const mkList  = mkIds.length > 0 ? await MataKuliah.findAll({ where: { id: mkIds }, attributes: ['id', 'kode', 'nama'] }) : [];
+    const mkMap   = Object.fromEntries(mkList.map(mk => [mk.id, { kode: mk.kode, nama: mk.nama }]));
+    const cplMap  = Object.fromEntries(cplList.map(c => [c.id, c.kode]));
+
+    return cplList.map(cpl => ({
+        kodeCPL: cpl.kode,
+        mataKuliah: mappings
+            .filter(m => m.siakCplId === cpl.id)
+            .map(m => ({ kodeMK: mkMap[m.siakMataKuliahId]?.kode || '-', namaMK: mkMap[m.siakMataKuliahId]?.nama || '-' }))
+    })).filter(c => c.mataKuliah.length > 0);
+};
+
+// Eksekusi salin pemetaan CPL→MK (matching by kode CPL dan kode MK)
+export const salinPemetaanCplMk = async (tujuanObeId, sumberObeId) => {
+    if (tujuanObeId === sumberObeId)
+        throw new CustomError.BadRequestError('OBE tujuan dan sumber tidak boleh sama');
+
+    const { PemetaanCplMk, MataKuliah } = models;
+
+    const [obeTujuan, obeSumber] = await Promise.all([
+        Obe.findByPk(tujuanObeId, { attributes: ['id', 'siakProgramStudiId', 'siakTahunKurikulumId'] }),
+        Obe.findByPk(sumberObeId, { attributes: ['id', 'siakProgramStudiId', 'siakTahunKurikulumId'] })
+    ]);
+    if (!obeTujuan) throw new CustomError.NotFoundError('OBE tujuan tidak ditemukan');
+    if (!obeSumber) throw new CustomError.NotFoundError('OBE sumber tidak ditemukan');
+
+    const [cplSumber, cplTujuan] = await Promise.all([
+        CapaianPembelajaranLulusan.findAll({ where: { siakObeId: sumberObeId }, attributes: ['id', 'kode'] }),
+        CapaianPembelajaranLulusan.findAll({ where: { siakObeId: tujuanObeId }, attributes: ['id', 'kode'] })
+    ]);
+    if (cplTujuan.length === 0) throw new CustomError.BadRequestError('OBE tujuan belum memiliki data CPL');
+
+    const cplSumberIds = cplSumber.map(c => c.id);
+    const mappings = cplSumberIds.length > 0 ? await PemetaanCplMk.findAll({ where: { siakCplId: cplSumberIds } }) : [];
+    if (mappings.length === 0) throw new CustomError.BadRequestError('OBE sumber belum memiliki pemetaan CPL→MK');
+
+    // MK sumber dan tujuan (per prodi+kurikulum masing-masing)
+    const [mkSumber, mkTujuan] = await Promise.all([
+        MataKuliah.findAll({ where: { siakProgramStudiId: obeSumber.siakProgramStudiId, siakTahunKurikulumId: obeSumber.siakTahunKurikulumId }, attributes: ['id', 'kode'] }),
+        MataKuliah.findAll({ where: { siakProgramStudiId: obeTujuan.siakProgramStudiId, siakTahunKurikulumId: obeTujuan.siakTahunKurikulumId }, attributes: ['id', 'kode'] })
+    ]);
+
+    const kodeCplById  = Object.fromEntries(cplSumber.map(c => [c.id, c.kode]));
+    const cplTujuanMap = Object.fromEntries(cplTujuan.map(c => [c.kode, c.id]));
+    const kodeMkById   = Object.fromEntries(mkSumber.map(m => [m.id, m.kode]));
+    const mkTujuanMap  = Object.fromEntries(mkTujuan.map(m => [m.kode, m.id]));
+
+    const payload = [];
+    let skip = 0;
+    for (const m of mappings) {
+        const kodeCpl = kodeCplById[m.siakCplId];
+        const kodeMk  = kodeMkById[m.siakMataKuliahId];
+        const cplId   = cplTujuanMap[kodeCpl];
+        const mkId    = mkTujuanMap[kodeMk];
+        if (!cplId || !mkId) { skip++; continue; }
+        payload.push({ siakCplId: cplId, siakMataKuliahId: mkId });
+    }
+
+    if (payload.length === 0)
+        throw new CustomError.BadRequestError(`Tidak ada pemetaan yang cocok (${skip} dilewati karena kode CPL/MK tidak ada di OBE tujuan)`);
+
+    const cplTujuanIds = cplTujuan.map(c => c.id);
+    await sequelize.transaction(async (trx) => {
+        await PemetaanCplMk.destroy({ where: { siakCplId: cplTujuanIds }, force: true, transaction: trx });
+        await PemetaanCplMk.bulkCreate(payload, { transaction: trx });
+    });
+
+    return { jumlahDisalin: payload.length, jumlahDilewati: skip };
+};
+
 // Ambil CPL Umum yang dipilih (dicentang) ke dalam CPL OBE
 export const ambilCplUmum = async (obeId, cplUmumIds) => {
     if (!Array.isArray(cplUmumIds) || cplUmumIds.length === 0)

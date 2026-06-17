@@ -638,6 +638,34 @@ export const exportDataPL = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const getOpsiSalinPemetaanCplMk = async (req, res, next) => {
+    try {
+        const result = await obeService.getOpsiSalinPemetaanCplMk(req.params.obeId);
+        return new ResponseBuilder(res).code(200).message('Berhasil mengambil opsi salin pemetaan CPL→MK').json(result);
+    } catch (error) { next(error); }
+};
+
+export const pratinjauSalinPemetaanCplMk = async (req, res, next) => {
+    try {
+        const { sumberObeId } = req.query;
+        if (!sumberObeId) return new ResponseBuilder(res).code(400).message('sumberObeId wajib diisi').json();
+        const result = await obeService.pratinjauSalinPemetaanCplMk(sumberObeId);
+        return new ResponseBuilder(res).code(200).message('Pratinjau pemetaan CPL→MK').json(result);
+    } catch (error) { next(error); }
+};
+
+export const salinPemetaanCplMk = async (req, res, next) => {
+    try {
+        const { sumberObeId } = req.body;
+        if (!sumberObeId) return new ResponseBuilder(res).code(400).message('sumberObeId wajib diisi').json();
+        const result = await obeService.salinPemetaanCplMk(req.params.obeId, sumberObeId);
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil menyalin ${result.jumlahDisalin} pemetaan${result.jumlahDilewati > 0 ? `, ${result.jumlahDilewati} dilewati` : ''}`)
+            .json(result);
+    } catch (error) { next(error); }
+};
+
 export const getOpsiSalinPemetaanPlCpl = async (req, res, next) => {
     try {
         const result = await obeService.getOpsiSalinPemetaanPlCpl(req.params.obeId);
