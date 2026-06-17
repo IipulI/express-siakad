@@ -2213,14 +2213,14 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
         include: [
             {
                 model: ProgramStudi, as: 'programStudi', attributes: ['nama'],
-                include: [{ model: Jenjang, as: 'jenjang', attributes: ['singkatan'] }]
+                include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }]
             },
             { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] }
         ]
     });
     if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
 
-    const jenjang = obe.programStudi?.jenjang?.singkatan || 'S1';
+    const jenjang = obe.programStudi?.jenjang?.jenjang || 'S1';
 
     const cpls = await CapaianPembelajaranLulusan.findAll({
         where: { siakObeId: obeId },
