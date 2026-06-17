@@ -1,5 +1,6 @@
 import * as obeService from "../../services/obe.service.js"
 import ResponseBuilder from "../../utils/response.js";
+import ExcelJS from 'exceljs';
 
 // export const getProfilLulusan = async (req, res) => {
 //     const responseBuilder =  new ResponseBuilder(res)
@@ -559,6 +560,95 @@ export const salinDataPL = async (req, res, next) => {
             .code(200)
             .message(`Berhasil menyalin ${result.jumlahDisalin} data PL`)
             .json(result);
+    } catch (error) { next(error); }
+};
+
+const HEADER_PL = ['Kode PL', 'Profil Lulusan', 'Deskripsi PL', 'Deskripsi PL (Inggris)', 'Profesi Lulusan'];
+const COL_WIDTHS = [12, 50, 50, 50, 40];
+const HEADER_BG  = 'FF0C4781'; // biru gelap
+const ROW_ODD    = 'FFFFFFFF';
+const ROW_EVEN   = 'FFF2F7FC';
+
+function buildPlWorksheet(workbook, rows = []) {
+    const ws = workbook.addWorksheet('Profil Lulusan');
+
+    const headerRow = ws.addRow(HEADER_PL);
+    headerRow.eachCell(cell => {
+        cell.font      = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border    = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    });
+    headerRow.height = 22;
+
+    rows.forEach((pl, i) => {
+        const row = ws.addRow([pl.kode, pl.profil, pl.deskripsi, pl.deskripsiEn || '', pl.profesi || '']);
+        const bg  = i % 2 === 0 ? ROW_ODD : ROW_EVEN;
+        row.eachCell(cell => {
+            cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+            cell.alignment = { vertical: 'middle', wrapText: true };
+            cell.border    = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
+    });
+
+    COL_WIDTHS.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    return ws;
+}
+
+// Unduh template kosong
+export const downloadTemplatePL = async (req, res, next) => {
+    try {
+        const workbook = new ExcelJS.Workbook();
+        buildPlWorksheet(workbook);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="Template_PL.xlsx"');
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+    } catch (error) { next(error); }
+};
+
+// Unduh data PL yang sudah ada
+export const exportDataPL = async (req, res, next) => {
+    try {
+        const listPL = await obeService.getProfilLulusan(req.params.obeId);
+        const workbook = new ExcelJS.Workbook();
+        buildPlWorksheet(workbook, listPL);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="Data_PL.xlsx"');
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+    } catch (error) { next(error); }
+};
+
+// Import PL dari file Excel
+export const importDataPL = async (req, res, next) => {
+    try {
+        if (!req.file) return new ResponseBuilder(res).code(400).message('File Excel wajib diunggah').json();
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+        const ws = workbook.worksheets[0];
+
+        const payload = [];
+        ws.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return; // skip header
+            const kode   = String(row.getCell(1).value || '').trim();
+            const profil = String(row.getCell(2).value || '').trim();
+            if (!kode || !profil) return; // skip baris kosong
+            payload.push({
+                kode,
+                profil,
+                deskripsi:   String(row.getCell(3).value || '').trim(),
+                deskripsiEn: String(row.getCell(4).value || '').trim(),
+                profesi:     String(row.getCell(5).value || '').trim()
+            });
+        });
+
+        if (payload.length === 0)
+            return new ResponseBuilder(res).code(400).message('Tidak ada data valid di file Excel').json();
+
+        const result = await obeService.importDataPL(req.params.obeId, payload);
+        return new ResponseBuilder(res).code(200).message(`Berhasil mengimpor ${result.jumlahDiimpor} data PL`).json(result);
     } catch (error) { next(error); }
 };
 

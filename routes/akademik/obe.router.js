@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { validateManajemenCapaian,validateStoreProfilLulusan, validateUpdateProfilLulusan, 
+import { validateManajemenCapaian,validateStoreProfilLulusan, validateUpdateProfilLulusan,
     validateStoreIK, validateSaveMatriksPlCpl, validateSaveMatriksCplMk} from "../../validators/obe.validator.js";
+import { uploadExcel } from '../../utils/upload-file.js';
 
 // Dashboard Utama
 
@@ -148,6 +149,9 @@ router.get("/manajemen-capaian", validateManajemenCapaian, ObeController.getMana
 router.get('/profil-lulusan/:obeId', ObeController.getProfilLulusan);
 router.get('/profil-lulusan/:obeId/opsi-salin', ObeController.getOpsiSalinPL);
 router.post('/profil-lulusan/:obeId/salin', ObeController.salinDataPL);
+router.get('/profil-lulusan/:obeId/template', ObeController.downloadTemplatePL);
+router.get('/profil-lulusan/:obeId/export', ObeController.exportDataPL);
+router.post('/profil-lulusan/:obeId/import', uploadExcel.single('file'), ObeController.importDataPL);
 
 // 2. POST Simpan Data
 router.post('/profil-lulusan', validateStoreProfilLulusan, ObeController.storeProfilLulusan);
@@ -216,7 +220,6 @@ router.post(
 router.get('/laporan/:obeId', ObeController.getCetakLaporanObe);
 
 
-router.get('/export/excel/manajemen-pl/:obeId', ExportController.exportExcelManajemenPL);
 router.get('/export/excel/manajemen-cpl/:obeId', ExportController.exportExcelManajemenCPL);
 router.get('/export/excel/matriks-pl-cpl/:obeId', ExportController.exportExcelMatriksPlCpl);
 router.get('/export/pdf/pemetaan-cpl-mk/:obeId', ExportController.exportPdfPemetaanCplMk);

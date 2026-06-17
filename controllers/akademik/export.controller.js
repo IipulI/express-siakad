@@ -25,57 +25,6 @@ const buildFooter = (namaPencetak) => {
 // ============================================================================
 // 1. EXPORT EXCEL - MANAJEMEN PL
 // ============================================================================
-export const exportExcelManajemenPL = async (req, res, next) => {
-    try {
-        const { obeId } = req.params;
-        const data = await obeService.getManajemenPlByObeId(obeId);
-
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Manajemen PL');
-
-        worksheet.columns = [
-            { header: 'Kode PL', key: 'kode', width: 12 },
-            { header: 'Profil Lulusan', key: 'profil', width: 50 },
-            { header: 'Deskripsi PL', key: 'deskripsi', width: 50 },
-            { header: 'Deskripsi PL (Inggris)', key: 'deskripsiEn', width: 50 },
-            { header: 'Profesi Lulusan', key: 'profesi', width: 45 },
-        ];
-
-        // Styling Header
-        const headerRow = worksheet.getRow(1);
-        headerRow.eachCell((cell, colNumber) => {
-            cell.font = { bold: true, color: { argb: 'FF000000' } };
-            cell.alignment = { vertical: 'middle', horizontal: 'center' };
-            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-
-            // Kolom 1-2 Hijau (#00a65a), Kolom 3-5 Orange (#f39c12)
-            cell.fill = {
-                type: 'pattern', pattern: 'solid',
-                fgColor: { argb: colNumber <= 2 ? 'FF00A65A' : 'FFF39C12' }
-            };
-        });
-
-        // Masukkan Data
-        data.dataPl.forEach((pl) => {
-            const row = worksheet.addRow({
-                kode: pl.kode || '-',
-                profil: pl.profil || '-',
-                deskripsi: pl.deskripsi || '-',
-                deskripsiEn: pl.deskripsiEn || '-',
-                profesi: pl.profesi || '-'
-            });
-            row.eachCell((cell) => {
-                cell.alignment = { vertical: 'top', wrapText: true };
-                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-            });
-        });
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="Manajemen_PL.xlsx"');
-        await workbook.xlsx.write(res);
-        res.status(200).end();
-    } catch (error) { next(error); }
-};
 
 export const exportExcelManajemenCPL = async (req, res, next) => {
     try {

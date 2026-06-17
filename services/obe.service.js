@@ -1814,6 +1814,28 @@ export const getOpsiSalinPL = async (obeId) => {
     };
 };
 
+// Import PL dari payload Excel (bulk create, tidak wipe yang sudah ada)
+export const importDataPL = async (obeId, payload) => {
+    const obe = await Obe.findByPk(obeId, { attributes: ['id'] });
+    if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
+
+    await sequelize.transaction(async (trx) => {
+        await ProfilLulusan.bulkCreate(
+            payload.map(pl => ({
+                siakObeId:   obeId,
+                kode:        pl.kode,
+                profil:      pl.profil,
+                deskripsi:   pl.deskripsi || null,
+                deskripsiEn: pl.deskripsiEn || null,
+                profesi:     pl.profesi || null
+            })),
+            { transaction: trx }
+        );
+    });
+
+    return { jumlahDiimpor: payload.length };
+};
+
 // Salin semua PL dari sumber OBE ke tujuan OBE
 export const salinDataPL = async (tujuanObeId, sumberObeId) => {
     if (tujuanObeId === sumberObeId)
