@@ -800,74 +800,100 @@ export const getDropdownFilter = async (req, res) => {
 export const getListManajemenCapaian = async (filters) => {
     const { limit, offset } = getPagination(filters.page, filters.limit);
 
-    // 1. Filter dinamis untuk Tabel OBE
-    const whereObe = {};
-    if (filters.tahunKurikulumId) whereObe.siakTahunKurikulumId = filters.tahunKurikulumId;
-    if (filters.prodiId) whereObe.siakProgramStudiId = filters.prodiId;
+    const conditions = [];
+    const replacements = { limit, offset };
 
-    const prodiWhere = {};
-    if (filters.jenjangId) prodiWhere.siakJenjangId = filters.jenjangId;
+    if (filters.prodiId) {
+        conditions.push('ps.id = :prodiId');
+        replacements.prodiId = filters.prodiId;
+    }
+    if (filters.jenjangId) {
+        conditions.push('j.id = :jenjangId');
+        replacements.jenjangId = filters.jenjangId;
+    }
+    if (filters.tahunKurikulumId) {
+        conditions.push('tk.id = :tahunKurikulumId');
+        replacements.tahunKurikulumId = filters.tahunKurikulumId;
+    }
+
+    const whereClause = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
+
+    const baseQuery = `
+        FROM siak_program_studi ps
+        CROSS JOIN siak_tahun_kurikulum tk
+        LEFT JOIN siak_jenjang j    ON j.id = ps.siak_jenjang_id   AND j.deleted_at IS NULL
+        LEFT JOIN siak_dosen   d    ON d.id = ps.kaprodi_id         AND d.deleted_at IS NULL
+        LEFT JOIN siak_obe     obe  ON obe.siak_program_studi_id = ps.id
+                                   AND obe.siak_tahun_kurikulum_id = tk.id
+                                   AND obe.deleted_at IS NULL
+        LEFT JOIN siak_profil_lulusan pl
+                                    ON pl.siak_obe_id = obe.id AND pl.deleted_at IS NULL
+        LEFT JOIN siak_capaian_pembelajaran_lulusan cpl
+                                    ON cpl.siak_obe_id = obe.id AND cpl.deleted_at IS NULL
+        LEFT JOIN siak_pemetaan_pl_cpl ppc
+                                    ON ppc.siak_profil_lulusan_id = pl.id AND ppc.deleted_at IS NULL
+        LEFT JOIN siak_pemetaan_cpl_cpmk pcc
+                                    ON pcc.siak_capaian_pembelajaran_lulusan_id = cpl.id AND pcc.deleted_at IS NULL
+        WHERE ps.deleted_at IS NULL AND tk.deleted_at IS NULL
+        ${whereClause}
+    `;
 
     try {
-        const { count, rows } = await Obe.findAndCountAll({
-            where: whereObe,
-            include: [
-                { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
-                { 
-                    model: ProgramStudi, as: 'programStudi', where: prodiWhere,
-                    attributes: ['id', 'nama', 'kode'],
-                    include: [
-                        { model: Jenjang, as: 'jenjang', attributes: ['jenjang'] },
-                        { model: Dosen, as: 'kaprodi', attributes: ['nama'] } // Relasi Kaprodi
-                    ]
-                }
-            ],
-            limit,
-            offset,
-            order: [[{ model: TahunKurikulum, as: 'tahunKurikulum' }, 'tahun', 'DESC']]
-        });
+        const countResult = await sequelize.query(
+            `SELECT COUNT(*) AS total FROM (
+                SELECT ps.id, tk.id AS tk_id
+                ${baseQuery}
+                GROUP BY ps.id, tk.id
+            ) sub`,
+            { replacements, type: QueryTypes.SELECT }
+        );
+        const totalCount = parseInt(countResult[0]?.total || 0, 10);
 
-        // 2. Kalkulasi Statistik per Baris OBE
-        const dataFinal = await Promise.all(rows.map(async (item) => {
-            const obeId = item.id;
+        const rows = await sequelize.query(
+            `SELECT
+                ps.id             AS prodi_id,
+                ps.kode           AS kode_prodi,
+                ps.nama           AS prodi_nama,
+                tk.id             AS kurikulum_id,
+                tk.tahun          AS tahun,
+                j.jenjang         AS jenjang,
+                d.nama            AS kaprodi_nama,
+                obe.id            AS obe_id,
+                COUNT(DISTINCT pl.id)  AS total_pl,
+                COUNT(DISTINCT cpl.id) AS total_cpl,
+                COUNT(DISTINCT ppc.siak_profil_lulusan_id)                    AS pl_terpetakan,
+                COUNT(DISTINCT pcc.siak_capaian_pembelajaran_lulusan_id)      AS cpl_terpetakan
+            ${baseQuery}
+            GROUP BY ps.id, ps.kode, ps.nama, tk.id, tk.tahun, j.jenjang, d.nama, obe.id
+            ORDER BY tk.tahun DESC, ps.nama ASC
+            LIMIT :limit OFFSET :offset`,
+            { replacements, type: QueryTypes.SELECT }
+        );
 
-            // Hitung total PL & CPL
-            const totalPL = await ProfilLulusan.count({ where: { siakObeId: obeId } });
-            const totalCPL = await CapaianPembelajaranLulusan.count({ where: { siakObeId: obeId } });
-
-            // Hitung PL yang sudah dipetakan (PL -> CPL)
-            const plTerpetakan = await PemetaanPlCpl.count({
-                distinct: true,
-                col: 'siak_profil_lulusan_id',
-                include: [{ model: ProfilLulusan, as: 'profilLulusan', where: { siakObeId: obeId } }]
-            });
-
-            // Hitung CPL yang sudah dipetakan ke MK/CPMK (CPL -> MK)
-            const cplTerpetakan = await PemetaanCplCpmk.count({
-                distinct: true,
-                col: 'siak_capaian_pembelajaran_lulusan_id',
-                include: [{ model: CapaianPembelajaranLulusan, as: 'capaianPembelajaranLulusan', where: { siakObeId: obeId } }]
-            });
+        const dataFinal = rows.map(r => {
+            const totalPL  = parseInt(r.total_pl  || 0, 10);
+            const totalCPL = parseInt(r.total_cpl || 0, 10);
+            const plTerpetakan  = parseInt(r.pl_terpetakan  || 0, 10);
+            const cplTerpetakan = parseInt(r.cpl_terpetakan || 0, 10);
 
             return {
-                idObe: obeId,
-                kurikulum: item.tahunKurikulum?.tahun || '-',
-                programStudi: `${item.programStudi?.jenjang?.jenjang || 'S1'} - ${item.programStudi?.nama || '-'}`,
-                ketuaProgramStudi: item.programStudi?.kaprodi?.nama || "-",
+                idObe: r.obe_id || null,
+                kurikulum: r.tahun || '-',
+                kodeProdi: r.kode_prodi || '-',
+                programStudi: `${r.jenjang || 'S1'} - ${r.prodi_nama || '-'}`,
+                ketuaProgramStudi: r.kaprodi_nama || '-',
                 statusPengisian: {
-                    pl: totalPL,
+                    pl:  totalPL,
                     cpl: totalCPL,
-                    persentasePlCpl: totalPL > 0 ? Math.round((plTerpetakan / totalPL) * 100) : 0,
-                    persentaseCplMk: totalCPL > 0 ? Math.round((cplTerpetakan / totalCPL) * 100) : 0
+                    persentasePlCpl:  totalPL  > 0 ? Math.round((plTerpetakan  / totalPL)  * 100) : null,
+                    persentaseCplMk:  totalCPL > 0 ? Math.round((cplTerpetakan / totalCPL) * 100) : 0
                 }
             };
-        }));
+        });
 
-        // Gunakan getPagingData Abang
-        return getPagingData({ count, rows: dataFinal }, filters.page, limit);
+        return getPagingData({ count: totalCount, rows: dataFinal }, filters.page, limit);
 
     } catch (error) {
-        // Gunakan class error Abang dengan keyword 'new'
         throw new CustomError.InternalServerError(error.message);
     }
 };
