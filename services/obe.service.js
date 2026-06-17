@@ -2256,10 +2256,21 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
 
     const mkIds = [...new Set(pemetaanMk.map(p => p.siakMataKuliahId))];
     const mataKuliahs = mkIds.length > 0
-        ? await MataKuliah.findAll({ where: { id: mkIds }, attributes: ['id', 'kode'] })
+        ? await MataKuliah.findAll({
+              where: { id: mkIds },
+              attributes: ['id', 'kode', 'nama', 'semester', ['total_sks', 'sks'], 'merupakan_mku']
+          })
         : [];
     const mkMap = {};
-    mataKuliahs.forEach(mk => { mkMap[mk.id] = mk.kode; });
+    mataKuliahs.forEach(mk => {
+        mkMap[mk.id] = {
+            kode: mk.kode,
+            nama: mk.nama,
+            semester: mk.semester || '-',
+            sks: mk.getDataValue('sks') || 0,
+            isMku: mk.merupakan_mku || false
+        };
+    });
 
     const pemetaanCpmk = await PemetaanCplCpmk.findAll({
         where: { siakCapaianPembelajaranLulusanId: cplIds }
@@ -2277,7 +2288,7 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
             pemetaanMk
                 .filter(p => cplGroup.ids.includes(p.siakCplId))
                 .map(p => p.siakMataKuliahId)
-        )].sort((a, b) => (mkMap[a] || '').localeCompare(mkMap[b] || ''));
+        )].sort((a, b) => (mkMap[a]?.kode || '').localeCompare(mkMap[b]?.kode || ''));
 
         let total = 0;
         const mks = mkIdsForCpl.map(mkId => {
@@ -2301,8 +2312,13 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
 
             cpmksForThisPair.forEach(c => { total += c.bobot; });
 
+            const mk = mkMap[mkId] || {};
             return {
-                kodeMk: mkMap[mkId] || '-',
+                kodeMk:   mk.kode     || '-',
+                namaMk:   mk.nama     || '-',
+                semester: mk.semester || '-',
+                sks:      mk.sks      || 0,
+                isMku:    mk.isMku    || false,
                 cpmks: cpmksForThisPair.length > 0 ? cpmksForThisPair : [{ kodeCpmk: '', bobot: 0 }]
             };
         });
