@@ -2211,12 +2211,16 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
     const obe = await Obe.findOne({
         where: { id: obeId },
         include: [
-            { model: ProgramStudi, as: 'programStudi', attributes: ['nama'] },
-            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
-            { model: Jenjang, as: 'jenjang', attributes: ['singkatan'] }
+            {
+                model: ProgramStudi, as: 'programStudi', attributes: ['nama'],
+                include: [{ model: Jenjang, as: 'jenjang', attributes: ['singkatan'] }]
+            },
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] }
         ]
     });
     if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
+
+    const jenjang = obe.programStudi?.jenjang?.singkatan || 'S1';
 
     const cpls = await CapaianPembelajaranLulusan.findAll({
         where: { siakObeId: obeId },
@@ -2227,7 +2231,7 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
     if (cpls.length === 0) {
         return {
             header: {
-                programStudi: `${obe.jenjang?.singkatan || 'S1'} - ${obe.programStudi?.nama || '-'}`,
+                programStudi: `${jenjang} - ${obe.programStudi?.nama || '-'}`,
                 tahunKurikulum: obe.tahunKurikulum?.tahun || '-'
             },
             data: []
@@ -2287,7 +2291,7 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
 
     return {
         header: {
-            programStudi: `${obe.jenjang?.singkatan || 'S1'} - ${obe.programStudi?.nama || '-'}`,
+            programStudi: `${jenjang} - ${obe.programStudi?.nama || '-'}`,
             tahunKurikulum: obe.tahunKurikulum?.tahun || '-'
         },
         data
