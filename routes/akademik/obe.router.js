@@ -169,6 +169,8 @@ router.delete('/profil-lulusan/:id', ObeController.destroyProfilLulusan);
 
 // 1. GET (Tembak ID OBE)
 router.get('/capaian-pembelajaran/:obeId', ObeController.getCapaianPembelajaranLulusan);
+router.get('/capaian-pembelajaran/:obeId/opsi-salin', ObeController.getOpsiSalinCPL);
+router.post('/capaian-pembelajaran/:obeId/salin', ObeController.salinDataCPL);
 router.get('/capaian-pembelajaran/:obeId/template', ObeController.downloadTemplateCPL);
 router.get('/capaian-pembelajaran/:obeId/export', ObeController.exportDataCPL);
 router.post('/capaian-pembelajaran/:obeId/import', uploadExcel.single('file'), ObeController.importDataCPL);

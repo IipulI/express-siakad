@@ -638,6 +638,23 @@ export const exportDataPL = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const getOpsiSalinCPL = async (req, res, next) => {
+    try {
+        const result = await obeService.getOpsiSalinCPL(req.params.obeId);
+        return new ResponseBuilder(res).code(200).message('Berhasil mengambil opsi salin CPL').json(result);
+    } catch (error) { next(error); }
+};
+
+export const salinDataCPL = async (req, res, next) => {
+    try {
+        const { sumberObeId } = req.body;
+        if (!sumberObeId)
+            return new ResponseBuilder(res).code(400).message('sumberObeId wajib diisi').json();
+        const result = await obeService.salinDataCPL(req.params.obeId, sumberObeId);
+        return new ResponseBuilder(res).code(200).message(`Berhasil menyalin ${result.jumlahDisalin} data CPL`).json(result);
+    } catch (error) { next(error); }
+};
+
 // Unduh template CPL kosong
 export const downloadTemplateCPL = async (req, res, next) => {
     try {

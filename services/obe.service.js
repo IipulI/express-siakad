@@ -1814,6 +1814,79 @@ export const getOpsiSalinPL = async (obeId) => {
     };
 };
 
+// Ambil info OBE tujuan + daftar OBE lain yang punya CPL — untuk form "Salin Data CPL"
+export const getOpsiSalinCPL = async (obeId) => {
+    const obe = await Obe.findByPk(obeId, {
+        attributes: ['id', 'siakProgramStudiId'],
+        include: [
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
+            { model: ProgramStudi, as: 'programStudi', attributes: ['nama'],
+              include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }] }
+        ]
+    });
+    if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
+
+    const candidates = await Obe.findAll({
+        where: { siakProgramStudiId: obe.siakProgramStudiId, id: { [Op.ne]: obeId } },
+        include: [{ model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] }],
+        attributes: ['id']
+    });
+
+    const opsiSumber = [];
+    for (const c of candidates) {
+        const count = await CapaianPembelajaranLulusan.count({ where: { siakObeId: c.id } });
+        if (count > 0) opsiSumber.push({ obeId: c.id, tahunKurikulum: c.tahunKurikulum?.tahun || '-', jumlahCPL: count });
+    }
+
+    return {
+        obeInfo: {
+            tahunKurikulum: obe.tahunKurikulum?.tahun || '-',
+            programStudi: `${obe.programStudi?.jenjang?.jenjang || 'S1'} - ${obe.programStudi?.nama || '-'}`
+        },
+        opsiSumber
+    };
+};
+
+// Salin semua CPL dari sumber OBE ke tujuan OBE
+export const salinDataCPL = async (tujuanObeId, sumberObeId) => {
+    if (tujuanObeId === sumberObeId)
+        throw new CustomError.BadRequestError('OBE tujuan dan sumber tidak boleh sama');
+
+    const [tujuan, sumber] = await Promise.all([
+        Obe.findByPk(tujuanObeId, { attributes: ['id'] }),
+        Obe.findByPk(sumberObeId, { attributes: ['id'] })
+    ]);
+    if (!tujuan) throw new CustomError.NotFoundError('OBE tujuan tidak ditemukan');
+    if (!sumber) throw new CustomError.NotFoundError('OBE sumber tidak ditemukan');
+
+    const sudahAda = await CapaianPembelajaranLulusan.count({ where: { siakObeId: tujuanObeId } });
+    if (sudahAda > 0)
+        throw new CustomError.BadRequestError(`OBE tujuan sudah memiliki ${sudahAda} data CPL. Hapus terlebih dahulu sebelum menyalin.`);
+
+    const sumberCPL = await CapaianPembelajaranLulusan.findAll({
+        where: { siakObeId: sumberObeId },
+        attributes: ['kode', 'deskripsi', 'deskripsiEn', 'targetCpl', 'kategori']
+    });
+    if (sumberCPL.length === 0)
+        throw new CustomError.BadRequestError('OBE sumber tidak memiliki data CPL');
+
+    await sequelize.transaction(async (trx) => {
+        await CapaianPembelajaranLulusan.bulkCreate(
+            sumberCPL.map(cpl => ({
+                siakObeId:   tujuanObeId,
+                kode:        cpl.kode,
+                deskripsi:   cpl.deskripsi,
+                deskripsiEn: cpl.deskripsiEn,
+                targetCpl:   cpl.targetCpl,
+                kategori:    cpl.kategori
+            })),
+            { transaction: trx }
+        );
+    });
+
+    return { jumlahDisalin: sumberCPL.length };
+};
+
 // Import PL dari payload Excel (bulk create, tidak wipe yang sudah ada)
 export const importDataPL = async (obeId, payload) => {
     const obe = await Obe.findByPk(obeId, { attributes: ['id'] });
