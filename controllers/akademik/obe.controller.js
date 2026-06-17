@@ -539,6 +539,29 @@ export const destroyProfilLulusan = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const getOpsiSalinPL = async (req, res, next) => {
+    try {
+        const result = await obeService.getOpsiSalinPL(req.params.obeId);
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Berhasil mengambil opsi salin PL")
+            .json(result);
+    } catch (error) { next(error); }
+};
+
+export const salinDataPL = async (req, res, next) => {
+    try {
+        const { sumberObeId } = req.body;
+        if (!sumberObeId)
+            return new ResponseBuilder(res).code(400).message('sumberObeId wajib diisi').json();
+        const result = await obeService.salinDataPL(req.params.obeId, sumberObeId);
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil menyalin ${result.jumlahDisalin} data PL`)
+            .json(result);
+    } catch (error) { next(error); }
+};
+
 
 // export const getCapaianPembelajaranLulusan = async (req, res) => {
 //     try {

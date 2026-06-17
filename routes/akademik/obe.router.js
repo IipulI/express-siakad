@@ -146,6 +146,8 @@ router.get("/manajemen-capaian", validateManajemenCapaian, ObeController.getMana
 // router.delete('/profil-lulusan/:id', ObeController.destroyProfilLulusan);
 
 router.get('/profil-lulusan/:obeId', ObeController.getProfilLulusan);
+router.get('/profil-lulusan/:obeId/opsi-salin', ObeController.getOpsiSalinPL);
+router.post('/profil-lulusan/:obeId/salin', ObeController.salinDataPL);
 
 // 2. POST Simpan Data
 router.post('/profil-lulusan', validateStoreProfilLulusan, ObeController.storeProfilLulusan);
