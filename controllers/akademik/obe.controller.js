@@ -638,6 +638,13 @@ export const exportDataPL = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const pratinjauPdfPemetaanCplMk = async (req, res, next) => {
+    try {
+        const result = await obeService.getLaporanPemetaanCplMk(req.params.obeId);
+        return new ResponseBuilder(res).code(200).message('Data pratinjau laporan pemetaan CPL→MK').json(result);
+    } catch (error) { next(error); }
+};
+
 export const getOpsiSalinPemetaanCplMk = async (req, res, next) => {
     try {
         const result = await obeService.getOpsiSalinPemetaanCplMk(req.params.obeId);
