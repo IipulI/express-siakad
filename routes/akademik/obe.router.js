@@ -202,6 +202,9 @@ router.delete('/indikator-kinerja/:id', ObeController.destroyIndikatorKinerja);
 // router.post('/pemetaan/pl-ke-cpl/:obeId', ObeController.createPemetaanPlCpl);
 // GET Struktur Matriks
 router.get('/pemetaan/pl-ke-cpl/:obeId', ObeController.getMatriksPemetaanPlCpl);
+router.get('/pemetaan/pl-ke-cpl/:obeId/opsi-salin', ObeController.getOpsiSalinPemetaanPlCpl);
+router.get('/pemetaan/pl-ke-cpl/:obeId/pratinjau-salin', ObeController.pratinjauSalinPemetaanPlCpl);
+router.post('/pemetaan/pl-ke-cpl/:obeId/salin', ObeController.salinPemetaanPlCpl);
 
 // POST Simpan Matriks (Bulk)
 router.post('/pemetaan/pl-ke-cpl/:obeId', validateSaveMatriksPlCpl, ObeController.createPemetaanPlCpl);

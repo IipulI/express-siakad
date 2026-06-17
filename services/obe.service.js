@@ -1814,6 +1814,112 @@ export const getOpsiSalinPL = async (obeId) => {
     };
 };
 
+// Opsi salin pemetaan PL→CPL — dropdown + info OBE
+export const getOpsiSalinPemetaanPlCpl = async (obeId) => {
+    const obe = await Obe.findByPk(obeId, {
+        attributes: ['id', 'siakProgramStudiId'],
+        include: [
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
+            { model: ProgramStudi, as: 'programStudi', attributes: ['nama'],
+              include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }] }
+        ]
+    });
+    if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
+
+    const candidates = await Obe.findAll({
+        where: { siakProgramStudiId: obe.siakProgramStudiId, id: { [Op.ne]: obeId } },
+        include: [{ model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] }],
+        attributes: ['id']
+    });
+
+    const opsiSumber = [];
+    for (const c of candidates) {
+        const plIds = (await ProfilLulusan.findAll({ where: { siakObeId: c.id }, attributes: ['id'] })).map(p => p.id);
+        const count = plIds.length > 0 ? await PemetaanPlCpl.count({ where: { siakProfilLulusanId: plIds } }) : 0;
+        if (count > 0) opsiSumber.push({ obeId: c.id, tahunKurikulum: c.tahunKurikulum?.tahun || '-', jumlahPemetaan: count });
+    }
+
+    return {
+        obeInfo: {
+            tahunKurikulum: obe.tahunKurikulum?.tahun || '-',
+            programStudi: `${obe.programStudi?.jenjang?.jenjang || 'S1'} - ${obe.programStudi?.nama || '-'}`
+        },
+        opsiSumber
+    };
+};
+
+// Pratinjau pemetaan PL→CPL dari OBE sumber (matching by kode)
+export const pratinjauSalinPemetaanPlCpl = async (sumberObeId) => {
+    const plList = await ProfilLulusan.findAll({ where: { siakObeId: sumberObeId }, attributes: ['id', 'kode', 'profil'] });
+    const cplList = await CapaianPembelajaranLulusan.findAll({ where: { siakObeId: sumberObeId }, attributes: ['id', 'kode'] });
+
+    const plIds = plList.map(p => p.id);
+    const mappings = plIds.length > 0 ? await PemetaanPlCpl.findAll({ where: { siakProfilLulusanId: plIds } }) : [];
+
+    const cplMap = Object.fromEntries(cplList.map(c => [c.id, c.kode]));
+
+    return plList.map(pl => ({
+        kodePL: pl.kode,
+        profilPL: pl.profil,
+        pemetaanCpl: mappings
+            .filter(m => m.siakProfilLulusanId === pl.id)
+            .map(m => ({ kodeCPL: cplMap[m.siakCapaianPembelajaranLulusanId] || '-', bobot: m.bobot || 0 }))
+    })).filter(pl => pl.pemetaanCpl.length > 0);
+};
+
+// Eksekusi salin pemetaan PL→CPL (matching by kode PL dan kode CPL)
+export const salinPemetaanPlCpl = async (tujuanObeId, sumberObeId) => {
+    if (tujuanObeId === sumberObeId)
+        throw new CustomError.BadRequestError('OBE tujuan dan sumber tidak boleh sama');
+
+    // Ambil PL & CPL di kedua OBE (indexed by kode)
+    const [plSumber, cplSumber, plTujuan, cplTujuan] = await Promise.all([
+        ProfilLulusan.findAll({ where: { siakObeId: sumberObeId }, attributes: ['id', 'kode'] }),
+        CapaianPembelajaranLulusan.findAll({ where: { siakObeId: sumberObeId }, attributes: ['id', 'kode'] }),
+        ProfilLulusan.findAll({ where: { siakObeId: tujuanObeId }, attributes: ['id', 'kode'] }),
+        CapaianPembelajaranLulusan.findAll({ where: { siakObeId: tujuanObeId }, attributes: ['id', 'kode'] })
+    ]);
+
+    if (plTujuan.length === 0) throw new CustomError.BadRequestError('OBE tujuan belum memiliki data PL');
+    if (cplTujuan.length === 0) throw new CustomError.BadRequestError('OBE tujuan belum memiliki data CPL');
+
+    const plSumberMap  = Object.fromEntries(plSumber.map(p => [p.kode, p.id]));
+    const cplSumberMap = Object.fromEntries(cplSumber.map(c => [c.kode, c.id]));
+    const plTujuanMap  = Object.fromEntries(plTujuan.map(p => [p.kode, p.id]));
+    const cplTujuanMap = Object.fromEntries(cplTujuan.map(c => [c.kode, c.id]));
+
+    const plSumberIds = Object.values(plSumberMap);
+    const mappings = plSumberIds.length > 0 ? await PemetaanPlCpl.findAll({ where: { siakProfilLulusanId: plSumberIds } }) : [];
+    if (mappings.length === 0) throw new CustomError.BadRequestError('OBE sumber belum memiliki pemetaan PL→CPL');
+
+    // Terjemahkan ke ID tujuan via kode
+    const kodePlById  = Object.fromEntries(plSumber.map(p => [p.id, p.kode]));
+    const kodeCplById = Object.fromEntries(cplSumber.map(c => [c.id, c.kode]));
+
+    const payload = [];
+    let skip = 0;
+    for (const m of mappings) {
+        const kodePl  = kodePlById[m.siakProfilLulusanId];
+        const kodeCpl = kodeCplById[m.siakCapaianPembelajaranLulusanId];
+        const plId    = plTujuanMap[kodePl];
+        const cplId   = cplTujuanMap[kodeCpl];
+        if (!plId || !cplId) { skip++; continue; }
+        payload.push({ siakProfilLulusanId: plId, siakCapaianPembelajaranLulusanId: cplId, bobot: m.bobot || 0 });
+    }
+
+    if (payload.length === 0)
+        throw new CustomError.BadRequestError(`Tidak ada pemetaan yang cocok (${skip} dilewati karena kode PL/CPL tidak ada di OBE tujuan)`);
+
+    // Wipe pemetaan lama di tujuan lalu insert baru
+    const plTujuanIds = plTujuan.map(p => p.id);
+    await sequelize.transaction(async (trx) => {
+        await PemetaanPlCpl.destroy({ where: { siakProfilLulusanId: plTujuanIds }, force: true, transaction: trx });
+        await PemetaanPlCpl.bulkCreate(payload, { transaction: trx });
+    });
+
+    return { jumlahDisalin: payload.length, jumlahDilewati: skip };
+};
+
 // Ambil CPL Umum yang dipilih (dicentang) ke dalam CPL OBE
 export const ambilCplUmum = async (obeId, cplUmumIds) => {
     if (!Array.isArray(cplUmumIds) || cplUmumIds.length === 0)
