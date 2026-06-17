@@ -2238,6 +2238,16 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
         };
     }
 
+    // Deduplicate CPL by kode — gabung semua ID duplikat ke satu grup
+    const cplGroupMap = new Map();
+    cpls.forEach(cpl => {
+        if (!cplGroupMap.has(cpl.kode)) {
+            cplGroupMap.set(cpl.kode, { kode: cpl.kode, ids: [cpl.id] });
+        } else {
+            cplGroupMap.get(cpl.kode).ids.push(cpl.id);
+        }
+    });
+    const uniqueCpls = Array.from(cplGroupMap.values());
     const cplIds = cpls.map(c => c.id);
 
     const pemetaanMk = await PemetaanCplMk.findAll({
@@ -2262,20 +2272,31 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
     const cpmkMap = {};
     cpmks.forEach(c => { cpmkMap[c.id] = { kode: c.kode, mkId: c.siakMataKuliahId }; });
 
-    const data = cpls.map(cpl => {
-        const mkIdsForCpl = pemetaanMk
-            .filter(p => p.siakCplId === cpl.id)
-            .map(p => p.siakMataKuliahId)
-            .sort((a, b) => (mkMap[a] || '').localeCompare(mkMap[b] || ''));
+    const data = uniqueCpls.map(cplGroup => {
+        const mkIdsForCpl = [...new Set(
+            pemetaanMk
+                .filter(p => cplGroup.ids.includes(p.siakCplId))
+                .map(p => p.siakMataKuliahId)
+        )].sort((a, b) => (mkMap[a] || '').localeCompare(mkMap[b] || ''));
 
         let total = 0;
         const mks = mkIdsForCpl.map(mkId => {
+            // Kumpulkan CPMK dari semua ID duplikat CPL ini, deduplicate by kodeCpmk
+            const cpmkSeenKode = new Set();
             const cpmksForThisPair = pemetaanCpmk
-                .filter(p => p.siakCapaianPembelajaranLulusanId === cpl.id && cpmkMap[p.siakCapaianMataKuliahId]?.mkId === mkId)
+                .filter(p =>
+                    cplGroup.ids.includes(p.siakCapaianPembelajaranLulusanId) &&
+                    cpmkMap[p.siakCapaianMataKuliahId]?.mkId === mkId
+                )
                 .map(p => ({
                     kodeCpmk: cpmkMap[p.siakCapaianMataKuliahId]?.kode || '',
                     bobot: parseFloat(p.bobotCpl || 0)
                 }))
+                .filter(item => {
+                    if (cpmkSeenKode.has(item.kodeCpmk)) return false;
+                    cpmkSeenKode.add(item.kodeCpmk);
+                    return true;
+                })
                 .sort((a, b) => a.kodeCpmk.localeCompare(b.kodeCpmk));
 
             cpmksForThisPair.forEach(c => { total += c.bobot; });
@@ -2286,7 +2307,7 @@ export const getLaporanPemetaanCplMk = async (obeId) => {
             };
         });
 
-        return { kodeCpl: cpl.kode, total, mks };
+        return { kodeCpl: cplGroup.kode, total, mks };
     });
 
     return {
