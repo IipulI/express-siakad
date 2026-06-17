@@ -2201,3 +2201,95 @@ export const salinDataPL = async (tujuanObeId, sumberObeId) => {
 
     return { jumlahDisalin: sumberPL.length };
 };
+
+// ============================================================================
+// LAPORAN PEMETAAN CPL → MK (untuk export PDF)
+// ============================================================================
+export const getLaporanPemetaanCplMk = async (obeId) => {
+    const { Obe, ProgramStudi, TahunKurikulum, CapaianPembelajaranLulusan, MataKuliah, PemetaanCplMk, Jenjang } = models;
+
+    const obe = await Obe.findOne({
+        where: { id: obeId },
+        include: [
+            { model: ProgramStudi, as: 'programStudi', attributes: ['nama'] },
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
+            { model: Jenjang, as: 'jenjang', attributes: ['singkatan'] }
+        ]
+    });
+    if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
+
+    const cpls = await CapaianPembelajaranLulusan.findAll({
+        where: { siakObeId: obeId },
+        attributes: ['id', 'kode'],
+        order: [['kode', 'ASC']]
+    });
+
+    if (cpls.length === 0) {
+        return {
+            header: {
+                programStudi: `${obe.jenjang?.singkatan || 'S1'} - ${obe.programStudi?.nama || '-'}`,
+                tahunKurikulum: obe.tahunKurikulum?.tahun || '-'
+            },
+            data: []
+        };
+    }
+
+    const cplIds = cpls.map(c => c.id);
+
+    const pemetaanMk = await PemetaanCplMk.findAll({
+        where: { siakCplId: cplIds }
+    });
+
+    const mkIds = [...new Set(pemetaanMk.map(p => p.siakMataKuliahId))];
+    const mataKuliahs = mkIds.length > 0
+        ? await MataKuliah.findAll({ where: { id: mkIds }, attributes: ['id', 'kode'] })
+        : [];
+    const mkMap = {};
+    mataKuliahs.forEach(mk => { mkMap[mk.id] = mk.kode; });
+
+    const pemetaanCpmk = await PemetaanCplCpmk.findAll({
+        where: { siakCapaianPembelajaranLulusanId: cplIds }
+    });
+
+    const cpmkIds = [...new Set(pemetaanCpmk.map(p => p.siakCapaianMataKuliahId))];
+    const cpmks = cpmkIds.length > 0
+        ? await CapaianMataKuliah.findAll({ where: { id: cpmkIds }, attributes: ['id', 'kode', 'siakMataKuliahId'] })
+        : [];
+    const cpmkMap = {};
+    cpmks.forEach(c => { cpmkMap[c.id] = { kode: c.kode, mkId: c.siakMataKuliahId }; });
+
+    const data = cpls.map(cpl => {
+        const mkIdsForCpl = pemetaanMk
+            .filter(p => p.siakCplId === cpl.id)
+            .map(p => p.siakMataKuliahId)
+            .sort((a, b) => (mkMap[a] || '').localeCompare(mkMap[b] || ''));
+
+        let total = 0;
+        const mks = mkIdsForCpl.map(mkId => {
+            const cpmksForThisPair = pemetaanCpmk
+                .filter(p => p.siakCapaianPembelajaranLulusanId === cpl.id && cpmkMap[p.siakCapaianMataKuliahId]?.mkId === mkId)
+                .map(p => ({
+                    kodeCpmk: cpmkMap[p.siakCapaianMataKuliahId]?.kode || '',
+                    bobot: parseFloat(p.bobotCpl || 0)
+                }))
+                .sort((a, b) => a.kodeCpmk.localeCompare(b.kodeCpmk));
+
+            cpmksForThisPair.forEach(c => { total += c.bobot; });
+
+            return {
+                kodeMk: mkMap[mkId] || '-',
+                cpmks: cpmksForThisPair.length > 0 ? cpmksForThisPair : [{ kodeCpmk: '', bobot: 0 }]
+            };
+        });
+
+        return { kodeCpl: cpl.kode, total, mks };
+    });
+
+    return {
+        header: {
+            programStudi: `${obe.jenjang?.singkatan || 'S1'} - ${obe.programStudi?.nama || '-'}`,
+            tahunKurikulum: obe.tahunKurikulum?.tahun || '-'
+        },
+        data
+    };
+};

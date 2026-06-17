@@ -91,84 +91,26 @@ export const exportExcelMatriksPlCpl = async (req, res, next) => {
 export const exportPdfPemetaanCplMk = async (req, res, next) => {
     try {
         const { obeId } = req.params;
-        // const obeData = await obeService.getHeaderObe(obeId); // Nanti pakai ini buat dinamis
+        const laporan = await obeService.getLaporanPemetaanCplMk(obeId);
+        const { header, data: dataLaporan } = laporan;
 
-        // Kertas A4 mode PORTRAIT
         const doc = new PDFDocument({ margin: 40, size: 'A4' });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'attachment; filename="Laporan_Pemetaan_CPL_MK.pdf"');
         doc.pipe(res);
 
-        // =========================================================
-        // A. KOP LAPORAN
-        // =========================================================
-        doc.font('Helvetica-Bold').fontSize(12).text('Laporan Pemetaan CPL -> MK', { align: 'center', underline: true });
-        doc.moveDown(2);
+        // A. KOP
+        doc.font('Helvetica-Bold').fontSize(12).text('Laporan Pemetaan CPL → MK', { align: 'center', underline: true });
+        doc.moveDown(1);
 
         doc.font('Helvetica').fontSize(10);
-        // Baris 1: Prodi & Tahun Kurikulum
-        doc.text(`Program Studi:  S1 - Teknik Informatika`, 40, doc.y, { continued: true });
-        doc.text(`Tahun Kurikulum:  2025`, { align: 'right' });
+        doc.text(`Program Studi:`, 40, doc.y, { continued: true, width: 100 });
+        doc.text(header.programStudi, { continued: true });
+        doc.text(`   Tahun Kurikulum: ${header.tahunKurikulum}`, { align: 'right' });
         doc.moveDown(1.5);
 
-        // =========================================================
-        // B. STRUKTUR DATA (DIBUAT MIRIP GAMBAR KARENA RUMUS DOSPEM BELUM ADA)
-        // =========================================================
-        // Nanti kalau rumusnya udah ada, Abang tinggal tarik dari database 
-        // lalu bentuk Array of Object-nya persis seperti 'dataLaporan' ini:
-        const dataLaporan = [
-            {
-                cpl: "CPL01",
-                total: "87,86",
-                mks: [
-                    {
-                        mk: "RPB137",
-                        cpmks: [{ cpmk: "", bobot: "0,00" }]
-                    },
-                    {
-                        mk: "TIK103",
-                        cpmks: [
-                            { cpmk: "CPMK011", bobot: "11,44" },
-                            { cpmk: "CPMK012", bobot: "7,38" },
-                            { cpmk: "CPMK013", bobot: "36,90" },
-                            { cpmk: "CPMK014", bobot: "22,14" }
-                        ]
-                    },
-                    {
-                        mk: "TIK301",
-                        cpmks: [{ cpmk: "CPMK015", bobot: "10,00" }]
-                    },
-                    {
-                        mk: "TIK411",
-                        cpmks: [{ cpmk: "", bobot: "0,00" }]
-                    }
-                ]
-            },
-            {
-                cpl: "CPL02",
-                total: "68,30",
-                mks: [
-                    { mk: "FTS411", cpmks: [{ cpmk: "", bobot: "0,00" }] },
-                    { mk: "TIK113", cpmks: [{ cpmk: "CPMK021", bobot: "11,44" }] },
-                    { mk: "TIK116", cpmks: [{ cpmk: "", bobot: "0,00" }] },
-                    { mk: "TIK117", cpmks: [{ cpmk: "CPMK021", bobot: "20,00" }] },
-                    {
-                        mk: "TIK215",
-                        cpmks: [
-                            { cpmk: "CPMK021", bobot: "10,00" },
-                            { cpmk: "CPMK103", bobot: "15,00" }
-                        ]
-                    },
-                    { mk: "TIK217", cpmks: [{ cpmk: "CPMK021", bobot: "7,80" }] },
-                    { mk: "TIK312", cpmks: [{ cpmk: "CPMK021", bobot: "4,06" }] }
-                ]
-            }
-        ];
-
-        // =========================================================
-        // C. LOGIKA PARSING ROW (Trik agar sel yang sama jadi Kosong/Rowspan)
-        // =========================================================
+        // B. BARIS TABEL (rowspan-simulasi lewat teks kosong)
         const tableRows = [];
         let no = 1;
 
@@ -180,45 +122,48 @@ export const exportPdfPemetaanCplMk = async (req, res, next) => {
 
                 grupMk.cpmks.forEach(itemCpmk => {
                     tableRows.push({
-                        // Jika ini baris pertama CPL, cetak teksnya. Jika bukan, kosongkan.
-                        no: isFirstCpl ? `${no}.` : "",
-                        cpl: isFirstCpl ? grupCpl.cpl : "",
-                        // Jika ini baris pertama MK, cetak teksnya. Jika bukan, kosongkan.
-                        mk: isFirstMk ? grupMk.mk : "",
-
-                        cpmk: itemCpmk.cpmk,
-                        bobot: itemCpmk.bobot,
-                        total: isFirstCpl ? grupCpl.total : ""
+                        no:    isFirstCpl ? `${no}.` : '',
+                        cpl:   isFirstCpl ? grupCpl.kodeCpl : '',
+                        mk:    isFirstMk  ? grupMk.kodeMk   : '',
+                        cpmk:  itemCpmk.kodeCpmk,
+                        bobot: itemCpmk.bobot > 0
+                            ? itemCpmk.bobot.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : '0,00',
+                        total: isFirstCpl
+                            ? (grupCpl.total > 0
+                                ? grupCpl.total.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                : '0,00')
+                            : ''
                     });
-
                     isFirstCpl = false;
-                    isFirstMk = false;
+                    isFirstMk  = false;
                 });
             });
             no++;
         });
 
-        // =========================================================
-        // D. SETUP TABEL PDFKIT
-        // =========================================================
+        if (tableRows.length === 0) {
+            doc.font('Helvetica').fontSize(10).text('Belum ada data pemetaan.', { align: 'center' });
+            doc.end();
+            return;
+        }
+
+        // C. RENDER TABEL
         const table = {
             headers: [
-                { label: "No.", property: "no", width: 30, align: "center" },
-                { label: "Kode CPL", property: "cpl", width: 80 },
-                { label: "Kode MK", property: "mk", width: 100 },
-                { label: "Kode CPMK", property: "cpmk", width: 100 },
-                { label: "Bobot", property: "bobot", width: 100, align: "right" },
-                { label: "Total", property: "total", width: 100, align: "right" },
+                { label: 'No.',       property: 'no',    width: 30,  align: 'center' },
+                { label: 'Kode CPL',  property: 'cpl',   width: 65  },
+                { label: 'Kode MK',   property: 'mk',    width: 80  },
+                { label: 'Kode CPMK', property: 'cpmk',  width: 100 },
+                { label: 'Bobot',     property: 'bobot', width: 80,  align: 'right' },
+                { label: 'Total',     property: 'total', width: 80,  align: 'right' }
             ],
             datas: tableRows
         };
 
-        // Render Tabel
         await doc.table(table, {
-            prepareHeader: () => doc.font("Helvetica-Bold").fontSize(10),
-            prepareRow: (row, indexColumn, indexRow, rectRow) => {
-                doc.font("Helvetica").fontSize(10);
-            },
+            prepareHeader: () => doc.font('Helvetica-Bold').fontSize(9),
+            prepareRow:    () => doc.font('Helvetica').fontSize(9)
         });
 
         doc.end();
