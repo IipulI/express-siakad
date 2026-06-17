@@ -638,6 +638,14 @@ export const exportDataPL = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const ambilCplUmum = async (req, res, next) => {
+    try {
+        const { cplUmumIds } = req.body;
+        const result = await obeService.ambilCplUmum(req.params.obeId, cplUmumIds);
+        return new ResponseBuilder(res).code(200).message(`Berhasil mengambil ${result.jumlahDiambil} CPL dari CPL Umum`).json(result);
+    } catch (error) { next(error); }
+};
+
 export const getOpsiSalinCPL = async (req, res, next) => {
     try {
         const result = await obeService.getOpsiSalinCPL(req.params.obeId);

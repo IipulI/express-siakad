@@ -1814,6 +1814,39 @@ export const getOpsiSalinPL = async (obeId) => {
     };
 };
 
+// Ambil CPL Umum yang dipilih (dicentang) ke dalam CPL OBE
+export const ambilCplUmum = async (obeId, cplUmumIds) => {
+    if (!Array.isArray(cplUmumIds) || cplUmumIds.length === 0)
+        throw new CustomError.BadRequestError('Pilih minimal satu CPL Umum');
+
+    const obe = await Obe.findByPk(obeId, { attributes: ['id'] });
+    if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
+
+    const { CplUmum } = models;
+    const sumberList = await CplUmum.findAll({
+        where: { id: cplUmumIds },
+        attributes: ['kode', 'deskripsiInd', 'deskripsiEng', 'targetCpl', 'kategori']
+    });
+    if (sumberList.length === 0)
+        throw new CustomError.NotFoundError('CPL Umum yang dipilih tidak ditemukan');
+
+    await sequelize.transaction(async (trx) => {
+        await CapaianPembelajaranLulusan.bulkCreate(
+            sumberList.map(cpl => ({
+                siakObeId:   obeId,
+                kode:        cpl.kode,
+                deskripsi:   cpl.deskripsiInd,
+                deskripsiEn: cpl.deskripsiEng,
+                targetCpl:   cpl.targetCpl,
+                kategori:    cpl.kategori
+            })),
+            { transaction: trx }
+        );
+    });
+
+    return { jumlahDiambil: sumberList.length };
+};
+
 // Ambil info OBE tujuan + daftar OBE lain yang punya CPL — untuk form "Salin Data CPL"
 export const getOpsiSalinCPL = async (obeId) => {
     const obe = await Obe.findByPk(obeId, {
