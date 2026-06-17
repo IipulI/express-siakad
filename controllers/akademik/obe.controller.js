@@ -603,13 +603,13 @@ function buildPlWorksheet(workbook, rows = []) {
     );
 }
 
-const HEADER_CPL    = ['Kode CPL', 'Deskripsi CPL', 'Deskripsi CPL (Inggris)', 'Target CPL (%)', 'Kategori'];
-const COL_WIDTH_CPL = [12, 60, 60, 15, 20];
+const HEADER_CPL    = ['Kode CPL', 'Deskripsi CPL', 'Deskripsi CPL (Inggris)', 'Target CPL (%)', 'Kategori', 'Kode CPL Parent'];
+const COL_WIDTH_CPL = [12, 60, 60, 15, 20, 18];
 
 function buildCplWorksheet(workbook, rows = []) {
     return buildWorksheet(
         workbook, 'Capaian Pembelajaran Lulusan', HEADER_CPL, COL_WIDTH_CPL,
-        rows.map(cpl => [cpl.kode, cpl.deskripsi, cpl.deskripsiEn || '', cpl.targetCpl || '', cpl.kategori || ''])
+        rows.map(cpl => [cpl.kode, cpl.deskripsi, cpl.deskripsiEn || '', cpl.targetCpl || '', cpl.kategori || '', ''])
     );
 }
 
@@ -675,7 +675,7 @@ export const importDataCPL = async (req, res, next) => {
         const payload = [];
         ws.eachRow((row, rowNumber) => {
             if (rowNumber === 1) return;
-            const kode     = String(row.getCell(1).value || '').trim();
+            const kode      = String(row.getCell(1).value || '').trim();
             const deskripsi = String(row.getCell(2).value || '').trim();
             if (!kode || !deskripsi) return;
             payload.push({
@@ -684,6 +684,7 @@ export const importDataCPL = async (req, res, next) => {
                 deskripsiEn: String(row.getCell(3).value || '').trim(),
                 targetCpl:   parseFloat(row.getCell(4).value) || 0,
                 kategori:    String(row.getCell(5).value || '').trim()
+                // kolom 6 (Kode CPL Parent) diabaikan — tidak didukung sistem
             });
         });
 
