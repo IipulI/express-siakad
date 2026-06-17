@@ -563,16 +563,14 @@ export const salinDataPL = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-const HEADER_PL = ['Kode PL', 'Profil Lulusan', 'Deskripsi PL', 'Deskripsi PL (Inggris)', 'Profesi Lulusan'];
-const COL_WIDTHS = [12, 50, 50, 50, 40];
-const HEADER_BG  = 'FF0C4781'; // biru gelap
-const ROW_ODD    = 'FFFFFFFF';
-const ROW_EVEN   = 'FFF2F7FC';
+const HEADER_BG = 'FF0C4781';
+const ROW_ODD   = 'FFFFFFFF';
+const ROW_EVEN  = 'FFF2F7FC';
 
-function buildPlWorksheet(workbook, rows = []) {
-    const ws = workbook.addWorksheet('Profil Lulusan');
+function buildWorksheet(workbook, sheetName, headers, colWidths, rows = []) {
+    const ws = workbook.addWorksheet(sheetName);
 
-    const headerRow = ws.addRow(HEADER_PL);
+    const headerRow = ws.addRow(headers);
     headerRow.eachCell(cell => {
         cell.font      = { bold: true, color: { argb: 'FFFFFFFF' } };
         cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
@@ -581,8 +579,8 @@ function buildPlWorksheet(workbook, rows = []) {
     });
     headerRow.height = 22;
 
-    rows.forEach((pl, i) => {
-        const row = ws.addRow([pl.kode, pl.profil, pl.deskripsi, pl.deskripsiEn || '', pl.profesi || '']);
+    rows.forEach((rowData, i) => {
+        const row = ws.addRow(rowData);
         const bg  = i % 2 === 0 ? ROW_ODD : ROW_EVEN;
         row.eachCell(cell => {
             cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
@@ -591,8 +589,28 @@ function buildPlWorksheet(workbook, rows = []) {
         });
     });
 
-    COL_WIDTHS.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
     return ws;
+}
+
+const HEADER_PL    = ['Kode PL', 'Profil Lulusan', 'Deskripsi PL', 'Deskripsi PL (Inggris)', 'Profesi Lulusan'];
+const COL_WIDTH_PL = [12, 50, 50, 50, 40];
+
+function buildPlWorksheet(workbook, rows = []) {
+    return buildWorksheet(
+        workbook, 'Profil Lulusan', HEADER_PL, COL_WIDTH_PL,
+        rows.map(pl => [pl.kode, pl.profil, pl.deskripsi, pl.deskripsiEn || '', pl.profesi || ''])
+    );
+}
+
+const HEADER_CPL    = ['Kode CPL', 'Deskripsi CPL', 'Deskripsi CPL (Inggris)', 'Target CPL (%)', 'Kategori'];
+const COL_WIDTH_CPL = [12, 60, 60, 15, 20];
+
+function buildCplWorksheet(workbook, rows = []) {
+    return buildWorksheet(
+        workbook, 'Capaian Pembelajaran Lulusan', HEADER_CPL, COL_WIDTH_CPL,
+        rows.map(cpl => [cpl.kode, cpl.deskripsi, cpl.deskripsiEn || '', cpl.targetCpl || '', cpl.kategori || ''])
+    );
 }
 
 // Unduh template kosong
@@ -617,6 +635,63 @@ export const exportDataPL = async (req, res, next) => {
         res.setHeader('Content-Disposition', 'attachment; filename="Data_PL.xlsx"');
         await workbook.xlsx.write(res);
         res.status(200).end();
+    } catch (error) { next(error); }
+};
+
+// Unduh template CPL kosong
+export const downloadTemplateCPL = async (req, res, next) => {
+    try {
+        const workbook = new ExcelJS.Workbook();
+        buildCplWorksheet(workbook);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="Template_CPL.xlsx"');
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+    } catch (error) { next(error); }
+};
+
+// Unduh data CPL yang sudah ada
+export const exportDataCPL = async (req, res, next) => {
+    try {
+        const data = await obeService.getManajemenCplByObeId(req.params.obeId);
+        const workbook = new ExcelJS.Workbook();
+        buildCplWorksheet(workbook, data.dataCpl || []);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="Data_CPL.xlsx"');
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+    } catch (error) { next(error); }
+};
+
+// Import CPL dari file Excel
+export const importDataCPL = async (req, res, next) => {
+    try {
+        if (!req.file) return new ResponseBuilder(res).code(400).message('File Excel wajib diunggah').json();
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+        const ws = workbook.worksheets[0];
+
+        const payload = [];
+        ws.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const kode     = String(row.getCell(1).value || '').trim();
+            const deskripsi = String(row.getCell(2).value || '').trim();
+            if (!kode || !deskripsi) return;
+            payload.push({
+                kode,
+                deskripsi,
+                deskripsiEn: String(row.getCell(3).value || '').trim(),
+                targetCpl:   parseFloat(row.getCell(4).value) || 0,
+                kategori:    String(row.getCell(5).value || '').trim()
+            });
+        });
+
+        if (payload.length === 0)
+            return new ResponseBuilder(res).code(400).message('Tidak ada data valid di file Excel').json();
+
+        await obeService.createCplBulk(req.params.obeId, payload);
+        return new ResponseBuilder(res).code(200).message(`Berhasil mengimpor ${payload.length} data CPL`).json({ jumlahDiimpor: payload.length });
     } catch (error) { next(error); }
 };
 

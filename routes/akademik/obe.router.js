@@ -169,6 +169,9 @@ router.delete('/profil-lulusan/:id', ObeController.destroyProfilLulusan);
 
 // 1. GET (Tembak ID OBE)
 router.get('/capaian-pembelajaran/:obeId', ObeController.getCapaianPembelajaranLulusan);
+router.get('/capaian-pembelajaran/:obeId/template', ObeController.downloadTemplateCPL);
+router.get('/capaian-pembelajaran/:obeId/export', ObeController.exportDataCPL);
+router.post('/capaian-pembelajaran/:obeId/import', uploadExcel.single('file'), ObeController.importDataCPL);
 
 // 2. POST (Tembak ID OBE) -> INI YANG TADI ERROR CANNOT POST
 router.post('/capaian-pembelajaran/:obeId', ObeController.createCapaianPembelajaranLulusan);
@@ -220,7 +223,6 @@ router.post(
 router.get('/laporan/:obeId', ObeController.getCetakLaporanObe);
 
 
-router.get('/export/excel/manajemen-cpl/:obeId', ExportController.exportExcelManajemenCPL);
 router.get('/export/excel/matriks-pl-cpl/:obeId', ExportController.exportExcelMatriksPlCpl);
 router.get('/export/pdf/pemetaan-cpl-mk/:obeId', ExportController.exportPdfPemetaanCplMk);
 router.get('/export/pdf/laporan-lengkap', ExportController.exportPdfLaporanLengkap);
