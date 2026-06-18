@@ -3,6 +3,7 @@ import { getPagination } from "../utils/pagination.js";
 import * as CustomError from "../utils/custom-error.js";
 import { Op } from "sequelize";
 import { hitungNilaiAkhir } from "./penilaian.service.js";
+import { getCpmkColumnsForMataKuliah } from "./cpmk.service.js";
 
 const { 
     sequelize, Rps, MataKuliah, ProgramStudi, TahunKurikulum, 
@@ -850,4 +851,129 @@ export const deleteRencanaEvaluasi = async (id) => {
         const deleted = await models.RencanaEvaluasi.destroy({ where: { id } });
         return deleted > 0;
     } catch (error) { throw new Error(error.message); }
+};
+
+// ============================================================================
+// LAPORAN CETAK RPS LENGKAP (Kop + CP + Deskripsi + Rencana Pembelajaran + Rencana Evaluasi)
+// Menggabungkan data dari getFormDetailRps, getRencanaPembelajaran, getRencanaEvaluasi,
+// dan pemetaan CPL -- supaya FE bisa render 1 halaman cetak utuh seperti Laporan RPS SEVIMA.
+// ============================================================================
+export const getLaporanRpsCetak = async (mkId, periodeId = null) => {
+    const { Dosen, CapaianPembelajaranLulusan, PemetaanCplMk } = models;
+
+    const mk = await MataKuliah.findByPk(mkId, {
+        attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis', 'semester'],
+        include: [
+            { model: ProgramStudi, as: 'programStudi', attributes: ['nama', 'siakJenjangId', 'kaprodiId'] },
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
+            { model: Dosen, as: 'koordinatorMk', attributes: ['nama', 'nidn'] }
+        ]
+    });
+    if (!mk) throw new CustomError.NotFoundError("Mata Kuliah tidak ditemukan");
+
+    let namaJenjang = 'S1';
+    if (mk.programStudi?.siakJenjangId) {
+        const j = await Jenjang.findByPk(mk.programStudi.siakJenjangId);
+        if (j) namaJenjang = j.jenjang;
+    }
+
+    let ketuaProdi = null;
+    if (mk.programStudi?.kaprodiId) {
+        ketuaProdi = await Dosen.findByPk(mk.programStudi.kaprodiId, { attributes: ['nama', 'nidn'] });
+    }
+
+    // 1. Detail RPS (deskripsi, tujuan, bahan kajian, pustaka, media, tgl penyusunan, periode)
+    const detail = await getFormDetailRps(mkId, periodeId);
+    const periodeTerpilih = detail.daftarPeriode.find(p =>
+        periodeId ? p.id === periodeId : (p.adaDataRps && (!detail.daftarPeriode.some(x => x.status === 'Aktif' && x.adaDataRps) || p.status === 'Aktif'))
+    ) || detail.daftarPeriode.find(p => p.id === detail.rpsData?.siakPeriodeAkademikId);
+
+    // 2. CPL-Prodi yang dibebankan pada MK ini (via PemetaanCplMk)
+    const cplList = await CapaianPembelajaranLulusan.findAll({
+        include: [{
+            model: MataKuliah, as: 'mataKuliahPemeta',
+            where: { id: mkId }, attributes: [], through: { attributes: [] }
+        }],
+        attributes: ['kode', 'deskripsi'],
+        order: [['kode', 'ASC']]
+    });
+
+    // 3. CPMK Induk (untuk seksi "Capaian Pembelajaran Mata Kuliah (CPMK)")
+    const cpmkIndukList = await CapaianMataKuliah.findAll({
+        where: { siakMataKuliahId: mkId, parentId: null },
+        attributes: ['kode', 'deskripsi'],
+        order: [['kode', 'ASC']]
+    });
+
+    // 4. Rencana Pembelajaran (tabel per sesi/minggu)
+    const rencanaPembelajaran = await getRencanaPembelajaran(mkId, periodeId || detail.rpsData?.siakPeriodeAkademikId);
+    const sesiList = rencanaPembelajaran.rencanaData.map(r => ({
+        sesi: r.sesi,
+        cpmkSubCpmk: r.cpmkTerpilih.map(parent => ({
+            kode: parent.kode,
+            deskripsi: parent.deskripsi,
+            subCpmk: (parent.subCpmk || []).map(s => ({ kode: s.kode, deskripsi: s.deskripsi }))
+        })),
+        indikatorPenilaian: r.indikatorPenilaian,
+        kriteriaPenilaian: r.kriteriaPenilaian,
+        bentukLuring: r.metodePembelajaranLuring,
+        bentukDaring: r.metodePembelajaranDaring,
+        materiPembelajaran: r.materiPembelajaran,
+        bobotPenilaian: r.bobotPenilaian
+    }));
+
+    // 5. Rencana Evaluasi (tabel Unsur Nilai x kolom CPMK/Sub-CPMK leaf)
+    const { columns: kolomCpmk } = await getCpmkColumnsForMataKuliah(mkId);
+    const rencanaEvaluasi = await getRencanaEvaluasi(mkId, periodeId || detail.rpsData?.siakPeriodeAkademikId);
+    const baris = rencanaEvaluasi.rencanaEvaluasi.map(e => ({
+        metodeEvaluasi: e.metodeEvaluasi,
+        jenisEvaluasi: e.jenisEvaluasi,
+        bobotPerKolom: kolomCpmk.map(k => e.mappingBobotCpmk[k.id] ?? 0),
+        total: e.bobotEvaluasi
+    }));
+    const totalPerKolom = kolomCpmk.map((_, idx) => baris.reduce((sum, b) => sum + (b.bobotPerKolom[idx] || 0), 0));
+    const totalKeseluruhan = baris.reduce((sum, b) => sum + b.total, 0);
+
+    return {
+        kop: {
+            programStudi: `${namaJenjang} - ${mk.programStudi?.nama || '-'}`
+        },
+        mataKuliah: {
+            kode: mk.kode,
+            nama: mk.nama,
+            rumpunMk: '-',
+            bobotSks: mk.totalSks,
+            semester: mk.semester || '-',
+            tanggalPenyusunan: detail.rpsData?.tanggalPenyusunan || null
+        },
+        periodeAkademik: periodeTerpilih?.nama || '-',
+        otorisasi: {
+            koordinatorRmk: mk.koordinatorMk ? `${mk.koordinatorMk.nidn || ''} - ${mk.koordinatorMk.nama}`.replace(/^- /, '') : '-',
+            ketuaProdi: ketuaProdi ? `${ketuaProdi.nidn || ''} - ${ketuaProdi.nama}`.replace(/^- /, '') : '-'
+        },
+        capaianPembelajaran: {
+            cplProdi: cplList.map(c => ({ kode: c.kode, deskripsi: c.deskripsi })),
+            cpmk: cpmkIndukList.map(c => ({ kode: c.kode, deskripsi: c.deskripsi }))
+        },
+        deskripsiSingkat: detail.rpsData?.deskripsiMataKuliah || '-',
+        deskripsiSingkatEng: detail.rpsData?.deskripsiMataKuliahEng || '-',
+        tujuanMataKuliah: detail.rpsData?.tujuanMataKuliah || '-',
+        bahanKajian: detail.rpsData?.materiPembelajaran || '-',
+        pustakaUtama: detail.rpsData?.pustakaUtama || '-',
+        pustakaPendukung: detail.rpsData?.pustakaPendukung || '-',
+        mediaPerangkatLunak: detail.rpsData?.mediaPerangkatLunak || '-',
+        mediaPerangkatKeras: detail.rpsData?.mediaPerangkatKeras || '-',
+        dosenPengampu: mk.koordinatorMk ? `${mk.koordinatorMk.nidn || ''} - ${mk.koordinatorMk.nama}`.replace(/^- /, '') : '-',
+        matakuliahSyarat: '-',
+        rencanaPembelajaran: sesiList,
+        rencanaEvaluasi: {
+            kolomCpmk: kolomCpmk.map(k => ({
+                id: k.id, kode: k.kode, parentKode: k.parentKode,
+                groupSize: k.groupSize, isGroupFirst: k.isGroupFirst
+            })),
+            baris,
+            totalPerKolom,
+            totalKeseluruhan
+        }
+    };
 };

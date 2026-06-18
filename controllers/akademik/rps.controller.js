@@ -214,3 +214,18 @@ export const deleteRencanaEvaluasi = async (req, res) => {
         return responseBuilder.status("failure").code(500).message(error.message).json();
     }
 };
+
+export const getLaporanRpsCetak = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeId } = req.query;
+        const data = await rpsService.getLaporanRpsCetak(mataKuliahId, periodeId || null);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Berhasil mengambil data laporan cetak RPS")
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};

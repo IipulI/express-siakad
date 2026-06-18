@@ -55,6 +55,9 @@ router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.getRenca
 router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.saveRencanaEvaluasiList);
 router.delete('/rencana-evaluasi/:id', RpsController.deleteRencanaEvaluasi);
 
+// Laporan Cetak RPS Lengkap (Kop + CP + Deskripsi + Rencana Pembelajaran + Rencana Evaluasi)
+router.get('/mata-kuliah/:mataKuliahId/rps/cetak', RpsController.getLaporanRpsCetak);
+
 // ============================================================
 // SIDEBAR KELAS KULIAH (yang OBE)
 // ============================================================
