@@ -957,15 +957,35 @@ export const getLaporanRpsCetak = async (mkId, periodeId = null) => {
         periodeId ? p.id === periodeId : (p.adaDataRps && (!detail.daftarPeriode.some(x => x.status === 'Aktif' && x.adaDataRps) || p.status === 'Aktif'))
     ) || detail.daftarPeriode.find(p => p.id === detail.rpsData?.siakPeriodeAkademikId);
 
-    // 2. CPL-Prodi yang dibebankan pada MK ini (via PemetaanCplMk)
-    const cplList = await CapaianPembelajaranLulusan.findAll({
+    // 2. CPL-Prodi yang dibebankan pada MK ini (via PemetaanCplMk -- pemetaan CPL ke MK langsung)
+    let cplList = await CapaianPembelajaranLulusan.findAll({
         include: [{
             model: MataKuliah, as: 'mataKuliahPemeta',
             where: { id: mkId }, attributes: [], through: { attributes: [] }
         }],
-        attributes: ['kode', 'deskripsi'],
+        attributes: ['id', 'kode', 'deskripsi'],
         order: [['kode', 'ASC']]
     });
+
+    // Fallback: kalau PemetaanCplMk belum diisi, derive CPL dari pemetaan CPMK->CPL
+    // (siak_pemetaan_cpl_cpmk) -- supaya seksi CPL tidak kosong padahal sebenarnya
+    // sudah ada hubungan CPL lewat CPMK MK ini.
+    if (cplList.length === 0) {
+        const rawCplViaCpmk = await CapaianPembelajaranLulusan.findAll({
+            include: [{
+                model: CapaianMataKuliah, as: 'cpmkPemeta',
+                where: { siakMataKuliahId: mkId }, attributes: [], through: { attributes: [] }
+            }],
+            attributes: ['id', 'kode', 'deskripsi'],
+            order: [['kode', 'ASC']]
+        });
+        const seenId = new Set();
+        cplList = rawCplViaCpmk.filter(c => {
+            if (seenId.has(c.id)) return false;
+            seenId.add(c.id);
+            return true;
+        });
+    }
 
     // 3. CPMK Induk (untuk seksi "Capaian Pembelajaran Mata Kuliah (CPMK)")
     const cpmkIndukList = await CapaianMataKuliah.findAll({
