@@ -301,24 +301,32 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
 
     let totalBobotVertikal = 0;
 
-    // 🚨 1. VALIDASI DOUBLE 100%
-    // Pemetaan CPL divalidasi di level Sub-CPMK kalau levelPemetaan = 'Sub-CPMK',
-    // selain itu (default 'CPMK') divalidasi di level CPMK Induk.
+    // 🚨 1. VALIDASI PEMETAAN CPL == BOBOT CPMK BARIS ITU SENDIRI
+    // bobotCpl di sini BUKAN persentase 0-100, melainkan satuan poin yang sama
+    // dengan "Bobot CPMK" baris itu (sesuai tampilan FE: nilai di kolom CPL ==
+    // nilai Target/Bobot CPMK kalau cuma dipetakan ke 1 CPL). Kalau dipetakan ke
+    // beberapa CPL, total poin di semua kolom CPL harus persis = Bobot CPMK baris itu.
+    //
+    // Untuk levelPemetaan = 'Sub-CPMK': Sub-CPMK selalu bobot=0 (bukan pemilik bobot
+    // sendiri), jadi totalnya divalidasi gabungan dari SEMUA sub dalam 1 induk harus
+    // = Bobot CPMK Induk-nya.
     cpmkList.forEach((parent) => {
         totalBobotVertikal += parseFloat(parent.bobot || 0);
 
-        const validasiBobotCpl = (item) => {
-            if (!item.cplPemetaan || item.cplPemetaan.length === 0) return;
-            const totalBobotHorizontal = item.cplPemetaan.reduce((sum, cpl) => sum + parseFloat(cpl.bobotCpl || 0), 0);
-            if (Math.round(totalBobotHorizontal) !== 100) {
-                throw new CustomError.BadRequestError(`Total bobot pemetaan CPL pada ${item.kode} adalah ${totalBobotHorizontal}%. Wajib 100%!`);
-            }
-        };
+        const hitungTotalCpl = (item) => (item.cplPemetaan || [])
+            .reduce((sum, cpl) => sum + parseFloat(cpl.bobotCpl || 0), 0);
 
         if (isSubLevel) {
-            (parent.subCpmk || []).forEach(validasiBobotCpl);
+            const totalSubCpl = (parent.subCpmk || []).reduce((sum, sub) => sum + hitungTotalCpl(sub), 0);
+            const adaPemetaan = (parent.subCpmk || []).some(sub => sub.cplPemetaan?.length > 0);
+            if (adaPemetaan && Math.round(totalSubCpl) !== Math.round(parseFloat(parent.bobot || 0))) {
+                throw new CustomError.BadRequestError(`Total bobot pemetaan CPL pada Sub-CPMK milik ${parent.kode} adalah ${totalSubCpl}, wajib sama dengan Bobot CPMK Induk (${parent.bobot})!`);
+            }
         } else {
-            validasiBobotCpl(parent);
+            const totalBobotHorizontal = hitungTotalCpl(parent);
+            if (parent.cplPemetaan?.length > 0 && Math.round(totalBobotHorizontal) !== Math.round(parseFloat(parent.bobot || 0))) {
+                throw new CustomError.BadRequestError(`Total bobot pemetaan CPL pada ${parent.kode} adalah ${totalBobotHorizontal}, wajib sama dengan Bobot CPMK (${parent.bobot})!`);
+            }
         }
     });
 
