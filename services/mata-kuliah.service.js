@@ -453,10 +453,10 @@ const validatePrasyarat = async (mataKuliahData, transaction) => {
  */
 export const getCplForMapping = async (mataKuliahId) => {
     // 👇 KUNCI: Panggil semua model di sini
-    const { MataKuliah, ProgramStudi, TahunKurikulum, CapaianPembelajaranLulusan } = models;
+    const { MataKuliah, ProgramStudi, TahunKurikulum, CapaianPembelajaranLulusan, Obe } = models;
 
     const mk = await MataKuliah.findByPk(mataKuliahId, {
-        attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis'],
+        attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis', 'siakProgramStudiId', 'siakTahunKurikulumId'],
         include: [
             { model: ProgramStudi, as: 'programStudi', attributes: ['nama'] },
             { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
@@ -471,6 +471,39 @@ export const getCplForMapping = async (mataKuliahId) => {
 
     if (!mk) throw new CustomError.NotFoundError(`Mata Kuliah tidak ditemukan.`);
 
+    // Ambil SEMUA CPL milik OBE (prodi + kurikulum) MK ini, untuk opsi checkbox
+    const obe = await Obe.findOne({
+        where: { siakProgramStudiId: mk.siakProgramStudiId, siakTahunKurikulumId: mk.siakTahunKurikulumId }
+    });
+
+    const idCplTerpilih = new Set((mk.cplDipetakan || []).map(c => c.id));
+    let daftarCpl = [];
+
+    if (obe) {
+        const semuaCpl = await CapaianPembelajaranLulusan.findAll({
+            where: { siakObeId: obe.id },
+            attributes: ['id', 'kode', 'deskripsi'],
+            order: [['kode', 'ASC']]
+        });
+
+        // Deduplicate by kode (data lama bisa punya CPL kode sama dengan id berbeda)
+        const cplByKode = new Map();
+        semuaCpl.forEach(cpl => {
+            if (!cplByKode.has(cpl.kode)) {
+                cplByKode.set(cpl.kode, { id: cpl.id, kode: cpl.kode, deskripsi: cpl.deskripsi, ids: [cpl.id] });
+            } else {
+                cplByKode.get(cpl.kode).ids.push(cpl.id);
+            }
+        });
+
+        daftarCpl = Array.from(cplByKode.values()).map(item => ({
+            id: item.id,
+            kode: item.kode,
+            deskripsi: item.deskripsi,
+            isMapped: item.ids.some(id => idCplTerpilih.has(id))
+        }));
+    }
+
     return {
         header: {
             id: mk.id,
@@ -481,6 +514,7 @@ export const getCplForMapping = async (mataKuliahId) => {
             prodi: mk.programStudi?.nama || '-',
             kurikulum: mk.tahunKurikulum?.tahun || '-'
         },
+        daftarCpl,
         cplTerpilih: mk.cplDipetakan || []
     };
 };
