@@ -628,6 +628,41 @@ export const saveRencanaEvaluasi = async (mkId, payload) => {
     let totalBobotKeseluruhan = 0;
 
     // ----------------------------------------------------------------
+    // 🚨 BLOK VALIDASI LEVEL CPMK (Konsistensi dengan form Pemetaan CPMK)
+    // Kolom CPMK yang dipilih di sini (untuk diisi bobotCpmk) harus sama
+    // levelnya dengan `levelPemetaan` yang diset di form Pemetaan CPMK MK
+    // ini -- supaya monitoring CPL (yang JOIN ke siak_pemetaan_cpl_cpmk
+    // berdasarkan level itu) tidak kehilangan data secara senyap.
+    // ----------------------------------------------------------------
+    const semuaCpmkIdDipakai = [...new Set(
+        evaluasiList.flatMap(row => (row.cpmkData || []).map(c => c.siakCpmkId || c.cpmkId).filter(Boolean))
+    )];
+
+    if (semuaCpmkIdDipakai.length > 0) {
+        const mk = await MataKuliah.findByPk(mkId, { attributes: ['levelPemetaan'] });
+        const levelPemetaan = mk?.levelPemetaan || 'CPMK';
+
+        const cpmkRows = await CapaianMataKuliah.findAll({
+            where: { id: semuaCpmkIdDipakai },
+            attributes: ['id', 'kode', 'parentId']
+        });
+        const cpmkMap = new Map(cpmkRows.map(c => [c.id, c]));
+
+        for (const cpmkId of semuaCpmkIdDipakai) {
+            const cpmk = cpmkMap.get(cpmkId);
+            if (!cpmk) continue; // biarkan lolos kalau memang tidak ditemukan (kasus lain yang sudah ditangani terpisah)
+
+            const adalahSub = !!cpmk.parentId;
+            if (levelPemetaan === 'Sub-CPMK' && !adalahSub) {
+                throw new CustomError.BadRequestError(`Mata kuliah ini memetakan CPL di level Sub-CPMK, tapi kolom "${cpmk.kode}" yang dipilih di Rencana Evaluasi adalah CPMK Induk. Pilih Sub-CPMK-nya, atau ubah Level Pemetaan di form Pemetaan CPMK.`);
+            }
+            if (levelPemetaan !== 'Sub-CPMK' && adalahSub) {
+                throw new CustomError.BadRequestError(`Mata kuliah ini memetakan CPL di level CPMK Induk, tapi kolom "${cpmk.kode}" yang dipilih di Rencana Evaluasi adalah Sub-CPMK. Pilih CPMK Induknya, atau ubah Level Pemetaan ke 'Sub-CPMK' di form Pemetaan CPMK.`);
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------
     // 🚨 BLOK VALIDASI MATEMATIKA (Sesuai UI)
     // ----------------------------------------------------------------
     evaluasiList.forEach((row, index) => {
