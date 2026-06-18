@@ -303,6 +303,13 @@ export const getRencanaPembelajaran = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const getDetailRencanaPembelajaran = async (req, res, next) => {
+    try {
+        const data = await rpsService.getDetailRencanaPembelajaran(req.params.id);
+        return new ResponseBuilder(res).code(200).message("Berhasil mengambil detail sesi Rencana Pembelajaran").json(data);
+    } catch (error) { next(error); }
+};
+
 // export const createRencanaPembelajaran = async (req, res) => {
 //     const responseBuilder = new ResponseBuilder(res);
 //     try {

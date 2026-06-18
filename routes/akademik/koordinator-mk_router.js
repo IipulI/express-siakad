@@ -54,6 +54,7 @@ router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/import', uploadExce
 router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/pratinjau-salin', RpsController.pratinjauSalinRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/salin', RpsController.salinRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', RpsController.createRencanaPembelajaran);
+router.get('/rencana-pembelajaran/:id', RpsController.getDetailRencanaPembelajaran);
 router.put('/rencana-pembelajaran/:id', RpsController.updateRencanaPembelajaran);
 router.delete('/rencana-pembelajaran/:id', RpsController.deleteRencanaPembelajaran);
 

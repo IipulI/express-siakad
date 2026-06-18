@@ -537,6 +537,62 @@ export const createRencanaPembelajaran = async (mkId, payload) => {
     });
 };
 
+// =========================================================
+// DETAIL 1 Sesi Rencana Pembelajaran (by ID)
+// =========================================================
+export const getDetailRencanaPembelajaran = async (id) => {
+    const sesi = await RencanaPembelajaran.findByPk(id, {
+        include: [
+            { model: MataKuliah, as: 'mataKuliah', attributes: ['id', 'kode', 'nama'] },
+            { model: PeriodeAkademik, as: 'periode', attributes: ['id', 'nama'] },
+            {
+                model: models.PemetaanPembelajaranCpmk, as: 'pemetaanCpmk',
+                include: [{ model: CapaianMataKuliah, as: 'cpmk', attributes: ['id', 'kode', 'deskripsi', 'parent_id'] }]
+            }
+        ]
+    });
+    if (!sesi) throw new CustomError.NotFoundError("Data sesi tidak ditemukan");
+
+    const sesiJson = sesi.toJSON();
+    const listCpmk = (sesiJson.pemetaanCpmk || []).map(p => p.cpmk).filter(Boolean);
+    const cpmkTerpilihIds = listCpmk.map(c => c.id);
+
+    // Susun hirarki Induk -> Sub (mirip format di list), supaya FE bisa render checkbox terisi
+    const allCpmkMk = await CapaianMataKuliah.findAll({
+        where: { siakMataKuliahId: sesi.siakMataKuliahId },
+        attributes: ['id', 'kode', 'deskripsi', 'parent_id']
+    });
+    const cpmkItems = allCpmkMk.map(c => c.toJSON());
+    const cpmkTerpilih = cpmkItems.filter(c => !c.parent_id && cpmkTerpilihIds.includes(c.id)).map(parent => ({
+        ...parent,
+        subCpmk: cpmkItems.filter(sub => sub.parent_id === parent.id && cpmkTerpilihIds.includes(sub.id))
+    }));
+    listCpmk.filter(c => c.parent_id).forEach(sub => {
+        const isParentAlreadyIncluded = cpmkTerpilih.find(p => p.id === sub.parent_id);
+        if (!isParentAlreadyIncluded) {
+            const theParent = cpmkItems.find(c => c.id === sub.parent_id);
+            if (theParent) cpmkTerpilih.push({ ...theParent, subCpmk: [sub] });
+        }
+    });
+
+    return {
+        id: sesi.id,
+        mataKuliah: sesi.mataKuliah,
+        periode: sesi.periode,
+        sesi: sesi.sesi,
+        jenisPertemuan: sesi.jenisPertemuan,
+        materiPembelajaran: sesi.materiPembelajaran,
+        materiPembelajaranEng: sesi.materiPembelajaranEng,
+        indikatorPenilaian: sesi.indikatorPenilaian,
+        kriteriaPenilaian: sesi.kriteriaPenilaian,
+        metodePembelajaranLuring: sesi.metodePembelajaranLuring,
+        metodePembelajaranDaring: sesi.metodePembelajaranDaring,
+        bobotPenilaian: parseFloat(sesi.bobotPenilaian || 0),
+        cpmkTerpilih,
+        cpmkIdsFlat: cpmkTerpilihIds
+    };
+};
+
 export const updateRencanaPembelajaran = async (id, payload, mkId) => {
     return await sequelize.transaction(async (t) => {
         const sesi = await RencanaPembelajaran.findByPk(id, { transaction: t });
