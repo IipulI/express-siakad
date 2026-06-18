@@ -44,9 +44,11 @@ export const getCplPerProgramStudi = async (filters) => {
                     deskripsi: cpl.deskripsi,
                     kategori: cpl.kategori,
                     target: cpl.target_cpl || 0,
-                    sumNilai: 0,
-                    countData: 0,
-                    mhsRecord: {}
+                    // mhsData: { [mahasiswaId]: { sum, count, max } } -- diagregasi PER MAHASISWA dulu
+                    // supaya robust terhadap data KRS duplikat (1 mahasiswa kebetulan punya >1 baris
+                    // enrollment untuk MK yang sama) -- tanpa ini, mahasiswa yang punya KRS dobel akan
+                    // tertimbang 2x lipat di rata-rata prodi.
+                    mhsData: {}
                 };
             }
         });
@@ -110,13 +112,13 @@ export const getCplPerProgramStudi = async (filters) => {
             const nilai = parseFloat(row.sum_weighted) / sumBobot;
 
             if (kodeCpl && cplScores[kodeCpl]) {
-                // Untuk Rerata
-                cplScores[kodeCpl].sumNilai += nilai;
-                cplScores[kodeCpl].countData += 1;
-
-                // Untuk Progresif
-                const currMax = cplScores[kodeCpl].mhsRecord[mhsId] || 0;
-                cplScores[kodeCpl].mhsRecord[mhsId] = Math.max(currMax, nilai);
+                if (!cplScores[kodeCpl].mhsData[mhsId]) {
+                    cplScores[kodeCpl].mhsData[mhsId] = { sum: 0, count: 0, max: 0 };
+                }
+                const m = cplScores[kodeCpl].mhsData[mhsId];
+                m.sum += nilai;
+                m.count += 1;
+                if (nilai > m.max) m.max = nilai;
             }
         });
 
@@ -134,16 +136,20 @@ export const getCplPerProgramStudi = async (filters) => {
 
         Object.values(cplScores).forEach(stats => {
             let capaianAkhir = 0;
+            const mhsIdsYangPunyaNilai = Object.keys(stats.mhsData);
 
-            if (metode === 'progresif') {
-                const mhsIdsYangPunyaNilai = Object.keys(stats.mhsRecord);
-                if (mhsIdsYangPunyaNilai.length > 0) {
-                    const sumMax = mhsIdsYangPunyaNilai.reduce((sum, id) => sum + stats.mhsRecord[id], 0);
+            if (mhsIdsYangPunyaNilai.length > 0) {
+                if (metode === 'progresif') {
+                    const sumMax = mhsIdsYangPunyaNilai.reduce((sum, id) => sum + stats.mhsData[id].max, 0);
                     capaianAkhir = sumMax / mhsIdsYangPunyaNilai.length;
-                }
-            } else {
-                if (stats.countData > 0) {
-                    capaianAkhir = stats.sumNilai / stats.countData;
+                } else {
+                    // Rerata PER MAHASISWA dulu (handle kalau ada >1 baris kontribusi per mahasiswa,
+                    // misal KRS duplikat), baru dirata-rata ANTAR mahasiswa dengan bobot yang sama.
+                    const sumRerataPerMhs = mhsIdsYangPunyaNilai.reduce((sum, id) => {
+                        const m = stats.mhsData[id];
+                        return sum + (m.count > 0 ? m.sum / m.count : 0);
+                    }, 0);
+                    capaianAkhir = sumRerataPerMhs / mhsIdsYangPunyaNilai.length;
                 }
             }
 
@@ -154,7 +160,7 @@ export const getCplPerProgramStudi = async (filters) => {
             const targetAsli = parseFloat(stats.target) || 0;
             const targetBatas = targetAsli > 0 ? targetAsli : 60;
 
-            const mhsSudah = Object.keys(stats.mhsRecord).length;
+            const mhsSudah = mhsIdsYangPunyaNilai.length;
             const mhsBelum = totalMahasiswa > 0 ? (totalMahasiswa - mhsSudah) : 0;
 
             chartLabels.push(stats.kode);
