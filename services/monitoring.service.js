@@ -449,11 +449,14 @@ export const getLaporanCplPerMataKuliah = async (filters) => {
 
         const dataNilai = await sequelize.query(queryNilai, { replacements: { prodiId, angkatan, tahunKurikulumId }, type: QueryTypes.SELECT });
 
+        // mhsDataPerMk: { [mk_id]: { [cpl.kode]: { [mahasiswa_id]: { sum, count, max } } } }
+        // Diagregasi PER MAHASISWA dulu supaya robust terhadap KRS duplikat (mahasiswa yang
+        // kebetulan punya >1 baris enrollment untuk MK yang sama tidak tertimbang 2x lipat).
         const mkScores = {};
         dataNilai.forEach(row => {
             if (!mkScores[row.mk_id]) {
                 mkScores[row.mk_id] = { semester: row.semester, nama: row.nama_mk, sks: row.sks, cpl: {} };
-                uniqueCpls.forEach(c => { mkScores[row.mk_id].cpl[c.kode] = { sum: 0, max: 0, count: 0 }; });
+                uniqueCpls.forEach(c => { mkScores[row.mk_id].cpl[c.kode] = {}; });
             }
 
             const kodeCpl = cplMap[row.cpl_id];
@@ -461,10 +464,12 @@ export const getLaporanCplPerMataKuliah = async (filters) => {
             if (!kodeCpl || sumBobot <= 0 || !mkScores[row.mk_id].cpl[kodeCpl]) return;
             const nilai = parseFloat(row.sum_weighted) / sumBobot;
 
-            const target = mkScores[row.mk_id].cpl[kodeCpl];
-            target.sum += nilai;
-            target.count += 1;
-            if (nilai > target.max) target.max = nilai;
+            const mhsMap = mkScores[row.mk_id].cpl[kodeCpl];
+            if (!mhsMap[row.mahasiswa_id]) mhsMap[row.mahasiswa_id] = { sum: 0, count: 0, max: 0 };
+            const m = mhsMap[row.mahasiswa_id];
+            m.sum += nilai;
+            m.count += 1;
+            if (nilai > m.max) m.max = nilai;
         });
 
         // 3. Kalkulasi Rerata / Progresif
@@ -476,10 +481,19 @@ export const getLaporanCplPerMataKuliah = async (filters) => {
         Object.values(mkScores).forEach(mk => {
             const rowMk = { semester: mk.semester, nama: mk.nama, sks: mk.sks };
             uniqueCpls.forEach(cpl => {
-                const stats = mk.cpl[cpl.kode];
+                const mhsMap = mk.cpl[cpl.kode];
+                const mhsIds = Object.keys(mhsMap);
                 let nilaiAkhir = null;
-                if (stats.count > 0) {
-                    nilaiAkhir = metode === 'progresif' ? stats.max : (stats.sum / stats.count);
+                if (mhsIds.length > 0) {
+                    if (metode === 'progresif') {
+                        nilaiAkhir = mhsIds.reduce((sum, id) => sum + mhsMap[id].max, 0) / mhsIds.length;
+                    } else {
+                        const sumRerataPerMhs = mhsIds.reduce((sum, id) => {
+                            const m = mhsMap[id];
+                            return sum + (m.count > 0 ? m.sum / m.count : 0);
+                        }, 0);
+                        nilaiAkhir = sumRerataPerMhs / mhsIds.length;
+                    }
                     grandSum += nilaiAkhir; grandCount += 1;
                     if (nilaiAkhir > cplTertinggi.nilai) { cplTertinggi.nilai = nilaiAkhir; cplTertinggi.kode = cpl.kode; }
                     if (nilaiAkhir < cplTerendah.nilai) { cplTerendah.nilai = nilaiAkhir; cplTerendah.kode = cpl.kode; }
@@ -832,10 +846,13 @@ export const getTranskripObeMahasiswa = async (filters) => {
         // 5. TARIK NILAI CPMK BERBOBOT MAHASISWA (bukan nilai_akhir MK keseluruhan,
         //    supaya 1 MK yang berkontribusi ke beberapa CPL tidak disamakan nilainya)
         // 🟢 FIX MUTLAK: TAMBAHKAN `deleted_at IS NULL` AGAR DATA KRS HANTU TIDAK IKUT KEHITUNG!
+        // GROUP BY kk.id (kelas), BUKAN rkm.id (baris KRS) -- supaya kalau mahasiswa kebetulan
+        // punya >1 baris KRS untuk kelas yang sama (data KRS duplikat), kontribusinya tetap
+        // dihitung 1x saja, bukan tertimbang 2x lipat ke rerata CPL.
         const queryScores = `
             SELECT
                 pcc.siak_capaian_pembelajaran_lulusan_id AS cpl_id,
-                rkm.id AS rincian_krs_id,
+                kk.id AS kelas_id,
                 SUM(ncm.nilai * pcc.bobot_cpl) AS sum_weighted,
                 SUM(pcc.bobot_cpl) AS sum_bobot
             FROM siak_krs_mahasiswa km
@@ -849,7 +866,7 @@ export const getTranskripObeMahasiswa = async (filters) => {
             WHERE km.siak_mahasiswa_id = :mahasiswaId
               AND km.deleted_at IS NULL
               AND ncm.nilai IS NOT NULL
-            GROUP BY pcc.siak_capaian_pembelajaran_lulusan_id, rkm.id
+            GROUP BY pcc.siak_capaian_pembelajaran_lulusan_id, kk.id
         `;
         const scoreDataRaw = await sequelize.query(queryScores, { replacements: { mahasiswaId: infoMhs.id }, type: QueryTypes.SELECT });
         const scoreData = scoreDataRaw
