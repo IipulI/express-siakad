@@ -601,6 +601,93 @@ export const getDaftarCpmkUntukTemplate = async (mkId) => {
 };
 
 // =========================================================
+// PRATINJAU SALIN Rencana Pembelajaran (lihat isi periode asal sebelum disalin)
+// =========================================================
+export const pratinjauSalinRencanaPembelajaran = async (mkId, periodeAsalId) => {
+    const rencana = await RencanaPembelajaran.findAll({
+        where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeAsalId },
+        include: [{
+            model: models.PemetaanPembelajaranCpmk, as: 'pemetaanCpmk',
+            include: [{ model: CapaianMataKuliah, as: 'cpmk', attributes: ['kode'] }]
+        }],
+        order: [['sesi', 'ASC']]
+    });
+    if (rencana.length === 0) throw new CustomError.NotFoundError("Rencana Pembelajaran pada periode asal belum diisi");
+
+    const periodeAsal = await PeriodeAkademik.findByPk(periodeAsalId, { attributes: ['nama'] });
+
+    return {
+        periodeAsal: periodeAsal?.nama || '-',
+        jumlahSesi: rencana.length,
+        sesi: rencana.map(r => ({
+            sesi: r.sesi,
+            jenisPertemuan: r.jenisPertemuan,
+            materiPembelajaran: r.materiPembelajaran,
+            bobotPenilaian: parseFloat(r.bobotPenilaian || 0),
+            cpmk: (r.pemetaanCpmk || []).map(p => p.cpmk?.kode).filter(Boolean)
+        }))
+    };
+};
+
+// =========================================================
+// SALIN Rencana Pembelajaran antar Periode (wipe & replace periode tujuan)
+// CPMK id tetap sama (milik MK, bukan milik periode), jadi pemetaan CPMK
+// ikut tersalin langsung tanpa perlu translasi kode->id.
+// =========================================================
+export const salinRencanaPembelajaran = async (mkId, periodeAsalId, periodeTujuanId) => {
+    if (periodeAsalId === periodeTujuanId) {
+        throw new CustomError.BadRequestError("Periode asal dan tujuan tidak boleh sama");
+    }
+
+    const rencanaAsal = await RencanaPembelajaran.findAll({
+        where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeAsalId },
+        include: [{ model: models.PemetaanPembelajaranCpmk, as: 'pemetaanCpmk', attributes: ['siakCpmkId'] }],
+        order: [['sesi', 'ASC']]
+    });
+    if (rencanaAsal.length === 0) throw new CustomError.NotFoundError("Rencana Pembelajaran pada periode asal belum diisi");
+
+    return await sequelize.transaction(async (t) => {
+        // Wipe data lama di periode tujuan
+        const existingTujuan = await RencanaPembelajaran.findAll({
+            where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeTujuanId },
+            attributes: ['id'], transaction: t
+        });
+        const existingIds = existingTujuan.map(e => e.id);
+        if (existingIds.length > 0) {
+            await models.PemetaanPembelajaranCpmk.destroy({ where: { siakRencanaPembelajaranId: existingIds }, force: true, transaction: t });
+            await RencanaPembelajaran.destroy({ where: { id: existingIds }, force: true, transaction: t });
+        }
+
+        // Insert ulang dari periode asal
+        for (const sesiAsal of rencanaAsal) {
+            const sesiBaru = await RencanaPembelajaran.create({
+                siakMataKuliahId: mkId,
+                siakPeriodeAkademikId: periodeTujuanId,
+                sesi: sesiAsal.sesi,
+                jenisPertemuan: sesiAsal.jenisPertemuan,
+                materiPembelajaran: sesiAsal.materiPembelajaran,
+                materiPembelajaranEng: sesiAsal.materiPembelajaranEng,
+                indikatorPenilaian: sesiAsal.indikatorPenilaian,
+                kriteriaPenilaian: sesiAsal.kriteriaPenilaian,
+                metodePembelajaranLuring: sesiAsal.metodePembelajaranLuring,
+                metodePembelajaranDaring: sesiAsal.metodePembelajaranDaring,
+                bobotPenilaian: sesiAsal.bobotPenilaian
+            }, { transaction: t });
+
+            const cpmkIds = (sesiAsal.pemetaanCpmk || []).map(p => p.siakCpmkId);
+            if (cpmkIds.length > 0) {
+                await models.PemetaanPembelajaranCpmk.bulkCreate(
+                    cpmkIds.map(id => ({ siakRencanaPembelajaranId: sesiBaru.id, siakCpmkId: id })),
+                    { transaction: t }
+                );
+            }
+        }
+
+        return { jumlahDisalin: rencanaAsal.length };
+    });
+};
+
+// =========================================================
 // IMPORT EXCEL: Tambah banyak data Rencana Pembelajaran sekaligus
 // (APPEND -- tidak menghapus data sesi yang sudah ada, sesuai keterangan
 // modal "Gunakan template ini untuk MENAMBAHKAN banyak data sekaligus")

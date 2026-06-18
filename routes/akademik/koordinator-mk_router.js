@@ -51,6 +51,8 @@ router.delete('/detail-rps/:id', RpsController.deleteDetailRps);
 router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', RpsController.getRencanaPembelajaran);
 router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/template', RpsController.downloadTemplateRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/import', uploadExcel.single('file'), RpsController.importRencanaPembelajaran);
+router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/pratinjau-salin', RpsController.pratinjauSalinRencanaPembelajaran);
+router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/salin', RpsController.salinRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', RpsController.createRencanaPembelajaran);
 router.put('/rencana-pembelajaran/:id', RpsController.updateRencanaPembelajaran);
 router.delete('/rencana-pembelajaran/:id', RpsController.deleteRencanaPembelajaran);

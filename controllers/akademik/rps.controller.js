@@ -168,6 +168,42 @@ export const salinDetailRps = async (req, res, next) => {
 };
 
 // =========================================================
+// CONTROLLER: Pratinjau Salin Rencana Pembelajaran
+// =========================================================
+export const pratinjauSalinRencanaPembelajaran = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeAsalId } = req.query;
+        const data = await rpsService.pratinjauSalinRencanaPembelajaran(mataKuliahId, periodeAsalId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Pratinjau Rencana Pembelajaran periode asal")
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =========================================================
+// CONTROLLER: Salin Rencana Pembelajaran antar Periode
+// =========================================================
+export const salinRencanaPembelajaran = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeAsalId, periodeTujuanId } = req.body;
+        const data = await rpsService.salinRencanaPembelajaran(mataKuliahId, periodeAsalId, periodeTujuanId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil menyalin ${data.jumlahDisalin} sesi Rencana Pembelajaran`)
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =========================================================
 // CONTROLLER: Ambil Data UI Detail RPS (Dengan fitur copy periode)
 // =========================================================
 export const getFormDetailRps = async (req, res) => {
