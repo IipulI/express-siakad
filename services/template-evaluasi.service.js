@@ -398,3 +398,105 @@ export const deleteTemplate = async (kurikulumId, prodiId, jenisMk) => {
     if (!deleted) throw new CustomError.NotFoundError("Template tidak ditemukan untuk dihapus");
     return true;
 };
+
+/**
+ * Pratinjau Salin: tampilkan komponen evaluasi dari data asal sebelum disalin
+ */
+export const pratinjauSalinTemplate = async (prodiAsalId, kurikulumAsalId, jenisMkAsal) => {
+    const list = await TemplateEvaluasi.findAll({
+        where: {
+            siakProgramStudiId: prodiAsalId,
+            siakTahunKurikulumId: kurikulumAsalId,
+            jenisMataKuliah: jenisMkAsal
+        },
+        include: [
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
+            { model: ProgramStudi, as: 'programStudi', attributes: ['nama', 'siakJenjangId'] }
+        ],
+        order: [['createdAt', 'ASC']]
+    });
+
+    if (list.length === 0) throw new CustomError.NotFoundError("Data template asal tidak ditemukan");
+
+    let jenjangLabel = 'S1';
+    if (list[0].programStudi?.siakJenjangId) {
+        const j = await Jenjang.findByPk(list[0].programStudi.siakJenjangId);
+        if (j) jenjangLabel = j.jenjang;
+    }
+
+    return {
+        header: {
+            tahunKurikulum: list[0].tahunKurikulum?.tahun,
+            programStudi: `${jenjangLabel} - ${list[0].programStudi?.nama}`,
+            jenisMataKuliah: list[0].jenisMataKuliah
+        },
+        komponen: list.map(item => ({
+            komponenEvaluasi: item.metodeEvaluasi,
+            metodeEvaluasi: item.jenisEvaluasi,
+            bobot: parseFloat(item.bobot),
+            syaratLulus: item.syaratLulus
+        }))
+    };
+};
+
+/**
+ * Salin Data: wipe data tujuan, lalu copy seluruh komponen dari data asal
+ */
+export const salinTemplate = async (payload) => {
+    const {
+        prodiAsalId, kurikulumAsalId, jenisMkAsal,
+        prodiTujuanId, kurikulumTujuanId, jenisMkTujuan
+    } = payload;
+
+    if (
+        prodiAsalId === prodiTujuanId &&
+        kurikulumAsalId === kurikulumTujuanId &&
+        jenisMkAsal === jenisMkTujuan
+    ) {
+        throw new CustomError.BadRequestError("Data asal dan tujuan tidak boleh sama");
+    }
+
+    const sumberList = await TemplateEvaluasi.findAll({
+        where: {
+            siakProgramStudiId: prodiAsalId,
+            siakTahunKurikulumId: kurikulumAsalId,
+            jenisMataKuliah: jenisMkAsal
+        },
+        attributes: ['metodeEvaluasi', 'jenisEvaluasi', 'bobot', 'syaratLulus', 'deskripsi', 'deskripsiInggris']
+    });
+
+    if (sumberList.length === 0) throw new CustomError.NotFoundError("Data template asal tidak ditemukan");
+
+    const trx = await sequelize.transaction();
+    try {
+        await TemplateEvaluasi.destroy({
+            where: {
+                siakProgramStudiId: prodiTujuanId,
+                siakTahunKurikulumId: kurikulumTujuanId,
+                jenisMataKuliah: jenisMkTujuan
+            },
+            transaction: trx,
+            force: true
+        });
+
+        const dataToInsert = sumberList.map(item => ({
+            siakTahunKurikulumId: kurikulumTujuanId,
+            siakProgramStudiId: prodiTujuanId,
+            jenisMataKuliah: jenisMkTujuan,
+            metodeEvaluasi: item.metodeEvaluasi,
+            jenisEvaluasi: item.jenisEvaluasi,
+            bobot: item.bobot,
+            syaratLulus: item.syaratLulus,
+            deskripsi: item.deskripsi,
+            deskripsiInggris: item.deskripsiInggris
+        }));
+
+        await TemplateEvaluasi.bulkCreate(dataToInsert, { transaction: trx });
+        await trx.commit();
+
+        return { jumlahDisalin: dataToInsert.length };
+    } catch (error) {
+        await trx.rollback();
+        throw error;
+    }
+};

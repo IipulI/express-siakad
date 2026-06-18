@@ -47,6 +47,25 @@ export const validateDetailKurikulum = [
     validate
 ];
 
+// --- 4. VALIDATOR PRATINJAU SALIN ---
+export const validateGetPratinjauSalinTemplate = [
+    query('prodiAsalId').isUUID().withMessage('ID Prodi asal wajib ada'),
+    query('kurikulumAsalId').isUUID().withMessage('ID Kurikulum asal wajib ada'),
+    query('jenisMkAsal').notEmpty().withMessage('Jenis MK asal wajib ada'),
+    validate
+];
+
+// --- 5. VALIDATOR SALIN DATA ---
+export const validateSalinTemplate = [
+    body('prodiAsalId').isUUID().withMessage('ID Prodi asal wajib ada'),
+    body('kurikulumAsalId').isUUID().withMessage('ID Kurikulum asal wajib ada'),
+    body('jenisMkAsal').notEmpty().withMessage('Jenis MK asal wajib ada'),
+    body('prodiTujuanId').isUUID().withMessage('ID Prodi tujuan wajib ada'),
+    body('kurikulumTujuanId').isUUID().withMessage('ID Kurikulum tujuan wajib ada'),
+    body('jenisMkTujuan').notEmpty().withMessage('Jenis MK tujuan wajib ada'),
+    validate
+];
+
 export const validateUpdateObeBulk = [
     body('tahunKurikulumId').isUUID().withMessage('ID Tahun Kurikulum wajib valid'),
     body('prodiSettings').isArray().withMessage('Data prodi harus berupa array'),

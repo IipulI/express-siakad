@@ -163,12 +163,45 @@ export const deleteTemplate = async (req, res, next) => {
     try {
         const { kurikulumId, prodiId, jenisMk } = req.query;
         await TemplateService.deleteTemplate(kurikulumId, prodiId, jenisMk);
-        
+
         return new ResponseBuilder(res)
             .code(200)
             .message("Berhasil menghapus template evaluasi")
             .json();
-    } catch (error) { 
-        next(error); 
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Pratinjau data asal sebelum disalin
+ */
+export const pratinjauSalinTemplate = async (req, res, next) => {
+    try {
+        const { prodiAsalId, kurikulumAsalId, jenisMkAsal } = req.query;
+        const data = await TemplateService.pratinjauSalinTemplate(prodiAsalId, kurikulumAsalId, jenisMkAsal);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Pratinjau template evaluasi")
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Salin Data: copy komponen evaluasi dari asal ke tujuan (wipe & replace tujuan)
+ */
+export const salinTemplate = async (req, res, next) => {
+    try {
+        const result = await TemplateService.salinTemplate(req.body);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil menyalin ${result.jumlahDisalin} komponen evaluasi`)
+            .json(result);
+    } catch (error) {
+        next(error);
     }
 };

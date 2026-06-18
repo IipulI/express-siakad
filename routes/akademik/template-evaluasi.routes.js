@@ -17,10 +17,12 @@
 
 import express from 'express';
 import * as TemplateController from '../../controllers/akademik/template-evaluasi.controller.js';
-import { 
-    validateGetListTemplate, 
-    validateGetDetailTemplate, 
-    validateSaveTemplate 
+import {
+    validateGetListTemplate,
+    validateGetDetailTemplate,
+    validateSaveTemplate,
+    validateGetPratinjauSalinTemplate,
+    validateSalinTemplate
 } from '../../validators/template-evaluasi.validator.js';
 
 const router = express.Router();
@@ -64,9 +66,31 @@ router.post(
  * @access  Private
  */
 router.delete(
-    '/', 
+    '/',
     validateGetDetailTemplate, // Pakai validator yang sama dengan detail karena query param-nya identik
     TemplateController.deleteTemplate
+);
+
+/**
+ * @route   GET /api/akademik/template-evaluasi/pratinjau-salin
+ * @desc    Pratinjau komponen evaluasi dari data asal sebelum disalin
+ * @access  Private
+ */
+router.get(
+    '/pratinjau-salin',
+    validateGetPratinjauSalinTemplate,
+    TemplateController.pratinjauSalinTemplate
+);
+
+/**
+ * @route   POST /api/akademik/template-evaluasi/salin
+ * @desc    Salin data template evaluasi dari asal ke tujuan (wipe & replace tujuan)
+ * @access  Private
+ */
+router.post(
+    '/salin',
+    validateSalinTemplate,
+    TemplateController.salinTemplate
 );
 
 export default router;
