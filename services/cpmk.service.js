@@ -285,19 +285,40 @@ export const getCpmkColumnsForMataKuliah = async (mataKuliahId) => {
 //     }
 // }
 export const savePemetaanCpmk = async (mataKuliahId, payload) => {
-    const { cpmkList } = payload;
+    const { cpmkList, levelPemetaan, metodePembobotan } = payload;
+    const isSubLevel = levelPemetaan === 'Sub-CPMK';
+
+    // 🚀 0. METODE OTOMATIS: bobot CPMK induk dibagi rata 100%, override input manual
+    if (metodePembobotan === 'Otomatis' && cpmkList.length > 0) {
+        const rata = parseFloat((100 / cpmkList.length).toFixed(2));
+        cpmkList.forEach((parent, idx) => {
+            // Sisa pembagian dibebankan ke baris terakhir biar totalnya pas 100
+            parent.bobot = idx === cpmkList.length - 1
+                ? parseFloat((100 - rata * (cpmkList.length - 1)).toFixed(2))
+                : rata;
+        });
+    }
+
     let totalBobotVertikal = 0;
 
     // 🚨 1. VALIDASI DOUBLE 100%
+    // Pemetaan CPL divalidasi di level Sub-CPMK kalau levelPemetaan = 'Sub-CPMK',
+    // selain itu (default 'CPMK') divalidasi di level CPMK Induk.
     cpmkList.forEach((parent) => {
         totalBobotVertikal += parseFloat(parent.bobot || 0);
 
-        let totalBobotHorizontal = 0;
-        if (parent.cplPemetaan && parent.cplPemetaan.length > 0) {
-            parent.cplPemetaan.forEach((cpl) => totalBobotHorizontal += parseFloat(cpl.bobotCpl || 0));
+        const validasiBobotCpl = (item) => {
+            if (!item.cplPemetaan || item.cplPemetaan.length === 0) return;
+            const totalBobotHorizontal = item.cplPemetaan.reduce((sum, cpl) => sum + parseFloat(cpl.bobotCpl || 0), 0);
             if (Math.round(totalBobotHorizontal) !== 100) {
-                throw new CustomError.BadRequestError(`Total bobot pemetaan CPL pada ${parent.kode} adalah ${totalBobotHorizontal}%. Wajib 100%!`);
+                throw new CustomError.BadRequestError(`Total bobot pemetaan CPL pada ${item.kode} adalah ${totalBobotHorizontal}%. Wajib 100%!`);
             }
+        };
+
+        if (isSubLevel) {
+            (parent.subCpmk || []).forEach(validasiBobotCpl);
+        } else {
+            validasiBobotCpl(parent);
         }
     });
 
@@ -319,6 +340,12 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
     // supaya referensi siak_pemetaan_evaluasi_cpmk.siak_cpmk_id (dari Rencana
     // Evaluasi) tidak jadi yatim setiap kali form pemetaan CPMK ini disimpan ulang.
     return await sequelize.transaction(async (t) => {
+        // Simpan pengaturan Level Pemetaan & Metode Pembobotan
+        await MataKuliah.update(
+            { levelPemetaan: levelPemetaan || null, metodePembobotan: metodePembobotan || null },
+            { where: { id: mataKuliahId }, transaction: t }
+        );
+
         const existingList = await CapaianMataKuliah.findAll({
             where: { siakMataKuliahId: mataKuliahId },
             attributes: ['id', 'kode'],
@@ -354,28 +381,36 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
             return created.id;
         };
 
-        for (const parent of cpmkList) {
-            const parentCpmkId = await upsertCpmk(parent, null);
-
-            // Pivot ke CPL (hanya di level Induk sesuai UI) -- replace
+        // Replace pemetaan CPL untuk satu baris CPMK/Sub-CPMK (wipe & insert)
+        const savePivotCpl = async (cpmkId, cplPemetaan) => {
             await PemetaanCplCpmk.destroy({
-                where: { siakCapaianMataKuliahId: parentCpmkId },
+                where: { siakCapaianMataKuliahId: cpmkId },
                 force: true,
                 transaction: t
             });
-            if (parent.cplPemetaan?.length > 0) {
-                const pivotData = parent.cplPemetaan.map((p) => ({
-                    siakCapaianMataKuliahId: parentCpmkId,
+            if (cplPemetaan?.length > 0) {
+                const pivotData = cplPemetaan.map((p) => ({
+                    siakCapaianMataKuliahId: cpmkId,
                     siakCapaianPembelajaranLulusanId: p.idCpl,
                     bobotCpl: p.bobotCpl
                 }));
                 await PemetaanCplCpmk.bulkCreate(pivotData, { transaction: t });
             }
+        };
+
+        for (const parent of cpmkList) {
+            const parentCpmkId = await upsertCpmk(parent, null);
+
+            // Pemetaan ke CPL di level CPMK Induk -- HANYA kalau levelPemetaan bukan 'Sub-CPMK'
+            await savePivotCpl(parentCpmkId, isSubLevel ? [] : parent.cplPemetaan);
 
             // Anak-anaknya (Sub-CPMK) -- upsert juga, bobot/target tetap 0
             if (parent.subCpmk?.length > 0) {
                 for (const sub of parent.subCpmk) {
-                    await upsertCpmk({ ...sub, bobot: 0, target: 0 }, parentCpmkId);
+                    const subCpmkId = await upsertCpmk({ ...sub, bobot: 0, target: 0 }, parentCpmkId);
+
+                    // Pemetaan ke CPL di level Sub-CPMK -- HANYA kalau levelPemetaan = 'Sub-CPMK'
+                    await savePivotCpl(subCpmkId, isSubLevel ? sub.cplPemetaan : []);
                 }
             }
         }

@@ -3,7 +3,11 @@ import * as CustomError from '../utils/custom-error.js';
 
 export const validateSaveCpmk = [
     param('id').isUUID().withMessage('ID Mata Kuliah tidak valid'),
-    
+
+    // 0. Pengaturan Level Pemetaan & Metode Pembobotan
+    body('levelPemetaan').optional().isIn(['CPMK', 'Sub-CPMK']).withMessage("Level Pemetaan harus 'CPMK' atau 'Sub-CPMK'"),
+    body('metodePembobotan').optional().isIn(['Manual', 'Otomatis']).withMessage("Metode Pembobotan harus 'Manual' atau 'Otomatis'"),
+
     // 1. Validasi Baris Induk (Parent CPMK)
     body('cpmkList').isArray({ min: 1 }).withMessage('Daftar CPMK tidak boleh kosong'),
     body('cpmkList.*.kode').notEmpty().withMessage('Setiap kode CPMK wajib diisi'),
