@@ -255,8 +255,11 @@ export const getCapaianCplKelas = async (kelasId) => {
     });
     const peserta = Object.values(pesertaMap);
 
+    // Ambil SEMUA CPMK (Induk + Sub) beserta pemetaan CPL-nya -- pemetaan CPL bisa
+    // ada di level Induk ATAU Sub-CPMK (sesuai levelPemetaan MK), jadi tidak boleh
+    // difilter parentId:null saja, supaya MK yang levelPemetaan='Sub-CPMK' tetap terbaca.
     const cpmkList = await CapaianMataKuliah.findAll({
-        where: { siakMataKuliahId: mkId, parentId: null },
+        where: { siakMataKuliahId: mkId },
         include: [{
             model: CapaianPembelajaranLulusan, as: 'cplDiCPMK',
             attributes: ['id', 'kode'],
@@ -264,20 +267,17 @@ export const getCapaianCplKelas = async (kelasId) => {
         }]
     });
 
-    // Ambil nilai CPMK, agregasi sub-CPMK ke parent CPMK (sama seperti getCapaianCpmkKelas)
-    // agar Rencana Evaluasi yang memetakan ke Sub-CPMK tetap terbaca di tab CPL.
+    // Nilai per CPMK AKTUAL (Induk atau Sub) -- TIDAK dikolapskan ke Induk, karena
+    // tiap Sub-CPMK bisa punya pemetaan CPL berbeda-beda dan nilai sendiri-sendiri.
     const nilaiCpmkRaw = await sequelize.query(`
         SELECT
             n.siak_mahasiswa_id,
-            CASE WHEN c.parent_id IS NOT NULL THEN c.parent_id ELSE c.id END AS parent_cpmk_id,
+            n.siak_capaian_mata_kuliah_id AS cpmk_id,
             AVG(n.nilai)::FLOAT AS avg_nilai
         FROM siak_nilai_cpmk_mahasiswa n
-        JOIN siak_capaian_mata_kuliah c
-            ON c.id = n.siak_capaian_mata_kuliah_id
-           AND c.deleted_at IS NULL
         WHERE n.siak_kelas_kuliah_id = :kelasId
           AND n.deleted_at IS NULL
-        GROUP BY n.siak_mahasiswa_id, parent_cpmk_id
+        GROUP BY n.siak_mahasiswa_id, n.siak_capaian_mata_kuliah_id
     `, {
         replacements: { kelasId },
         type: sequelize.QueryTypes.SELECT
@@ -286,7 +286,7 @@ export const getCapaianCplKelas = async (kelasId) => {
     const nilaiCpmkMap = {};
     nilaiCpmkRaw.forEach(row => {
         const mId = String(row.siak_mahasiswa_id);
-        const cId = String(row.parent_cpmk_id);
+        const cId = String(row.cpmk_id);
         if (!nilaiCpmkMap[mId]) nilaiCpmkMap[mId] = {};
         nilaiCpmkMap[mId][cId] = parseFloat(row.avg_nilai || 0);
     });
@@ -310,20 +310,21 @@ export const getCapaianCplKelas = async (kelasId) => {
                 return;
             }
 
+            // CPL = rata-rata berbobot: Σ(nilaiCPMK × bobotCpl) / Σ(bobotCpl)
+            // bobotCpl di sini sudah berupa POIN (bukan persentase), jadi tidak perlu
+            // dikalikan ulang dengan bobot CPMK -- lihat services/cpmk.service.js
             let totalBobot = 0, totalNilai = 0;
             cpmkList.forEach(cpmk => {
                 const pemetaan = cpmk.cplDiCPMK?.find(c => c.id === cpl.id);
                 if (pemetaan) {
                     const bobotCpl = parseFloat(pemetaan.PemetaanCplCpmk?.bobotCpl || 0);
-                    const bobotCpmk = parseFloat(cpmk.bobot || 0);
-                    const kontribusi = bobotCpmk * (bobotCpl / 100);
                     const safeCId = String(cpmk.id || cpmk.getDataValue?.('id'));
-                    const nilaiCpmk = nilaiCpmkMap[safeMhsId]?.[safeCId] || 0;
-                    totalNilai += nilaiCpmk * kontribusi;
-                    totalBobot += kontribusi;
+                    const nilaiCpmk = nilaiCpmkMap[safeMhsId]?.[safeCId];
+                    if (nilaiCpmk === undefined || bobotCpl <= 0) return;
+                    totalNilai += nilaiCpmk * bobotCpl;
+                    totalBobot += bobotCpl;
                 }
             });
-            // CPL = weighted average: Σ(nilaiCPMK × bobotCPMK × bobotCpl) / Σ(bobotCPMK × bobotCpl)
             const nilaiCpl = totalBobot > 0
                 ? parseFloat((totalNilai / totalBobot).toFixed(2))
                 : null;
