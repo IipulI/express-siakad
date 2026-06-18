@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit-table';
 import axios from 'axios';
 import * as obeService from '../../services/obe.service.js';
 import * as MonitoringService from '../../services/monitoring.service.js';
+import * as rpsService from '../../services/rps.service.js';
 
 import path from 'path';
 
@@ -2688,6 +2689,181 @@ export const exportPdfTranskripObeMahasiswa = async (req, res, next) => {
 //         next(error);
 //     }
 // };
+
+// ============================================================================
+// EXPORT PDF — LAPORAN CETAK RPS LENGKAP
+// ============================================================================
+export const exportPdfLaporanRps = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeId } = req.query;
+        const data = await rpsService.getLaporanRpsCetak(mataKuliahId, periodeId || null);
+
+        const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="RPS_${data.mataKuliah.kode}.pdf"`);
+        doc.pipe(res);
+
+        // =========================================================
+        // A. KOP
+        // =========================================================
+        doc.font('Helvetica-Bold').fontSize(12).text(ENV_NAMA_UNIV(), { align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(11).text(data.kop.programStudi, { align: 'center' });
+        doc.moveDown(0.5);
+        doc.font('Helvetica-Bold').fontSize(12).text('RENCANA PEMBELAJARAN SEMESTER', { align: 'center', underline: true });
+        doc.moveDown(1);
+
+        // =========================================================
+        // B. INFO MATA KULIAH
+        // =========================================================
+        doc.font('Helvetica').fontSize(9);
+        const infoLines = [
+            [`Mata Kuliah: ${data.mataKuliah.nama}`, `Kode: ${data.mataKuliah.kode}`, `SKS: ${data.mataKuliah.bobotSks}`, `Semester: ${data.mataKuliah.semester}`],
+            [`Periode Akademik: ${data.periodeAkademik}`, `Tgl Penyusunan: ${data.mataKuliah.tanggalPenyusunan || '-'}`]
+        ];
+        infoLines.forEach(row => doc.text(row.join('    |    ')));
+        doc.moveDown(0.5);
+
+        doc.font('Helvetica-Bold').text('OTORISASI', { continued: true }).font('Helvetica')
+            .text(`     Koordinator RMK: ${data.otorisasi.koordinatorRmk}     Ketua Prodi: ${data.otorisasi.ketuaProdi}`);
+        doc.moveDown(0.8);
+
+        // =========================================================
+        // C. CAPAIAN PEMBELAJARAN
+        // =========================================================
+        doc.font('Helvetica-Bold').fontSize(10).text('Capaian Pembelajaran (CP)');
+        doc.font('Helvetica-Bold').fontSize(9).text('CPL-Prodi yang dibebankan pada MK', { underline: true });
+        doc.font('Helvetica').fontSize(9);
+        if (data.capaianPembelajaran.cplProdi.length > 0) {
+            data.capaianPembelajaran.cplProdi.forEach(c => doc.text(`${c.kode} - ${c.deskripsi}`));
+        } else {
+            doc.text('-');
+        }
+        doc.moveDown(0.3);
+        doc.font('Helvetica-Bold').fontSize(9).text('Capaian Pembelajaran Mata Kuliah (CPMK)', { underline: true });
+        doc.font('Helvetica').fontSize(9);
+        if (data.capaianPembelajaran.cpmk.length > 0) {
+            data.capaianPembelajaran.cpmk.forEach(c => doc.text(`${c.kode} - ${c.deskripsi}`));
+        } else {
+            doc.text('-');
+        }
+        doc.moveDown(0.5);
+
+        // =========================================================
+        // D. DESKRIPSI, TUJUAN, BAHAN KAJIAN, PUSTAKA, MEDIA
+        // =========================================================
+        const textSection = (label, value) => {
+            doc.font('Helvetica-Bold').fontSize(9).text(label, { underline: true });
+            doc.font('Helvetica').fontSize(9).text(value || '-');
+            doc.moveDown(0.4);
+        };
+        textSection('Deskripsi Singkat', data.deskripsiSingkat);
+        textSection('Tujuan Mata Kuliah', data.tujuanMataKuliah);
+        textSection('Bahan Kajian', data.bahanKajian);
+        textSection('Pustaka Utama', data.pustakaUtama);
+        textSection('Pustaka Pendukung', data.pustakaPendukung);
+        textSection('Media Pembelajaran (Perangkat Lunak)', data.mediaPerangkatLunak);
+        textSection('Media Pembelajaran (Perangkat Keras)', data.mediaPerangkatKeras);
+        textSection('Dosen Pengampu', data.dosenPengampu);
+        textSection('Matakuliah Syarat', data.matakuliahSyarat);
+
+        // =========================================================
+        // E. TABEL RENCANA PEMBELAJARAN
+        // =========================================================
+        doc.addPage();
+        doc.font('Helvetica-Bold').fontSize(11).text('Rencana Pembelajaran', { underline: true });
+        doc.moveDown(0.5);
+
+        const rpRows = data.rencanaPembelajaran.map(r => ({
+            sesi: String(r.sesi),
+            cpmk: r.cpmkSubCpmk.map(p => {
+                const subText = (p.subCpmk || []).map(s => `${s.kode}: ${s.deskripsi}`).join('\n');
+                return `${p.kode}: ${p.deskripsi}${subText ? '\n' + subText : ''}`;
+            }).join('\n\n'),
+            indikator: r.indikatorPenilaian || '-',
+            kriteria: r.kriteriaPenilaian || '-',
+            luring: r.bentukLuring || '-',
+            daring: r.bentukDaring || '-',
+            materi: r.materiPembelajaran || '-',
+            bobot: r.bobotPenilaian ? `${r.bobotPenilaian}%` : '-'
+        }));
+
+        if (rpRows.length > 0) {
+            await doc.table({
+                headers: [
+                    { label: 'Mg', property: 'sesi', width: 25, align: 'center' },
+                    { label: 'CPMK / Sub-CPMK', property: 'cpmk', width: 140 },
+                    { label: 'Indikator', property: 'indikator', width: 110 },
+                    { label: 'Kriteria & Bentuk', property: 'kriteria', width: 90 },
+                    { label: 'Luring', property: 'luring', width: 80 },
+                    { label: 'Daring', property: 'daring', width: 70 },
+                    { label: 'Materi Pembelajaran', property: 'materi', width: 110 },
+                    { label: 'Bobot (%)', property: 'bobot', width: 50, align: 'center' }
+                ],
+                datas: rpRows
+            }, {
+                prepareHeader: () => doc.font('Helvetica-Bold').fontSize(8),
+                prepareRow: () => doc.font('Helvetica').fontSize(7)
+            });
+        } else {
+            doc.font('Helvetica').fontSize(9).text('Belum ada data Rencana Pembelajaran.');
+        }
+
+        // =========================================================
+        // F. TABEL RENCANA EVALUASI
+        // =========================================================
+        doc.addPage();
+        doc.font('Helvetica-Bold').fontSize(11).text('Rencana Evaluasi', { underline: true });
+        doc.moveDown(0.5);
+
+        const kolomCpmk = data.rencanaEvaluasi.kolomCpmk;
+        const reRows = data.rencanaEvaluasi.baris.map(b => {
+            const row = { unsur: b.metodeEvaluasi, metode: b.jenisEvaluasi, total: b.total.toFixed(2) };
+            kolomCpmk.forEach((k, idx) => { row[`k${idx}`] = b.bobotPerKolom[idx] ? b.bobotPerKolom[idx].toFixed(2) : '-'; });
+            return row;
+        });
+        const totalRow = { unsur: '', metode: 'Total', total: data.rencanaEvaluasi.totalKeseluruhan.toFixed(2) };
+        kolomCpmk.forEach((k, idx) => { totalRow[`k${idx}`] = data.rencanaEvaluasi.totalPerKolom[idx].toFixed(2); });
+        reRows.push(totalRow);
+
+        if (kolomCpmk.length > 0) {
+            // Hitung lebar kolom dinamis berdasarkan lebar halaman SEBENARNYA (landscape A4,
+            // dikurangi margin kiri+kanan) -- supaya tabel tidak meluber ke luar halaman
+            // kalau jumlah kolom CPMK/Sub-CPMK banyak (misal 10+).
+            const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+            const unsurW = 70, metodeW = 85, totalW = 40;
+            const sisaWidth = usableWidth - unsurW - metodeW - totalW;
+            const colWidth = Math.max(20, Math.floor(sisaWidth / kolomCpmk.length));
+            const fontSize = colWidth < 28 ? 6 : 7;
+
+            await doc.table({
+                headers: [
+                    { label: 'Unsur Nilai', property: 'unsur', width: unsurW },
+                    { label: 'Metode Evaluasi', property: 'metode', width: metodeW },
+                    ...kolomCpmk.map((k, idx) => ({ label: k.kode, property: `k${idx}`, width: colWidth, align: 'center' })),
+                    { label: 'Total', property: 'total', width: totalW, align: 'center' }
+                ],
+                datas: reRows
+            }, {
+                prepareHeader: () => doc.font('Helvetica-Bold').fontSize(fontSize),
+                prepareRow: () => doc.font('Helvetica').fontSize(fontSize)
+            });
+        } else {
+            doc.font('Helvetica').fontSize(9).text('Belum ada data Rencana Evaluasi.');
+        }
+
+        // =========================================================
+        // G. FOOTER
+        // =========================================================
+        doc.moveDown(1);
+        doc.font('Helvetica').fontSize(7).fillColor('#555555')
+            .text(buildFooter(req.user?.nama || req.user?.name || 'Sistem'));
+
+        doc.end();
+    } catch (error) {
+        next(error);
+    }
+};
 
 export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
     try {

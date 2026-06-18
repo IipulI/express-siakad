@@ -6,6 +6,7 @@ import * as PenilaianController from '../../controllers/akademik/penilaian.contr
 import * as KelasKuliahController from '../../controllers/akademik/kelas-kuliah.controller.js';
 import * as CapaianController from '../../controllers/akademik/capaian-pembelajaran.controller.js';
 import * as ExportNilaiKelasController from '../../controllers/akademik/export-nilai-kelas.controller.js';
+import * as ExportController from '../../controllers/akademik/export.controller.js';
 import { normalizeFilePath, upload } from '../../utils/upload-file.js';
 
 /**
@@ -40,6 +41,8 @@ router.post('/mata-kuliah/:id/pemetaan-cpmk', CpmkController.savePemetaanCpmk);
 
 // [4] Detail RPS
 router.get('/mata-kuliah/:mataKuliahId/detail-rps', RpsController.getFormDetailRps);
+router.get('/mata-kuliah/:mataKuliahId/detail-rps/pratinjau-salin', RpsController.pratinjauSalinDetailRps);
+router.post('/mata-kuliah/:mataKuliahId/detail-rps/salin', RpsController.salinDetailRps);
 router.post('/mata-kuliah/:mataKuliahId/detail-rps',
     upload.single('dokumenRps'), normalizeFilePath, RpsController.saveDetailRps);
 router.delete('/detail-rps/:id', RpsController.deleteDetailRps);
@@ -57,6 +60,7 @@ router.delete('/rencana-evaluasi/:id', RpsController.deleteRencanaEvaluasi);
 
 // Laporan Cetak RPS Lengkap (Kop + CP + Deskripsi + Rencana Pembelajaran + Rencana Evaluasi)
 router.get('/mata-kuliah/:mataKuliahId/rps/cetak', RpsController.getLaporanRpsCetak);
+router.get('/mata-kuliah/:mataKuliahId/rps/cetak/pdf', ExportController.exportPdfLaporanRps);
 
 // ============================================================
 // SIDEBAR KELAS KULIAH (yang OBE)

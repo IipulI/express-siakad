@@ -2,6 +2,42 @@ import * as rpsService from "../../services/rps.service.js";
 import ResponseBuilder from "../../utils/response.js";
 
 // =========================================================
+// CONTROLLER: Pratinjau Salin Detail RPS
+// =========================================================
+export const pratinjauSalinDetailRps = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeAsalId } = req.query;
+        const data = await rpsService.pratinjauSalinDetailRps(mataKuliahId, periodeAsalId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Pratinjau Detail RPS periode asal")
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =========================================================
+// CONTROLLER: Salin Detail RPS antar Periode
+// =========================================================
+export const salinDetailRps = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeAsalId, periodeTujuanId } = req.body;
+        const data = await rpsService.salinDetailRps(mataKuliahId, periodeAsalId, periodeTujuanId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Detail RPS berhasil disalin")
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =========================================================
 // CONTROLLER: Ambil Data UI Detail RPS (Dengan fitur copy periode)
 // =========================================================
 export const getFormDetailRps = async (req, res) => {

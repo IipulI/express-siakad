@@ -131,6 +131,75 @@ export const getFormDetailRps = async (mataKuliahId, periodeId = null) => {
     }
 };
 // =========================================================
+// PRATINJAU SALIN Detail RPS (lihat isi RPS periode asal sebelum disalin)
+// =========================================================
+export const pratinjauSalinDetailRps = async (mataKuliahId, periodeAsalId) => {
+    const rpsAsal = await Rps.findOne({
+        where: { siakMataKuliahId: mataKuliahId, siakPeriodeAkademikId: periodeAsalId },
+        include: [{ model: PeriodeAkademik, as: 'periode', attributes: ['nama'] }]
+    });
+    if (!rpsAsal) throw new CustomError.NotFoundError("Detail RPS pada periode asal belum diisi");
+
+    return {
+        periodeAsal: rpsAsal.periode?.nama || '-',
+        tanggalPenyusunan: rpsAsal.tanggalPenyusunan,
+        deskripsiMataKuliah: rpsAsal.deskripsiMataKuliah,
+        deskripsiMataKuliahEng: rpsAsal.deskripsiMataKuliahEng,
+        tujuanMataKuliah: rpsAsal.tujuanMataKuliah,
+        materiPembelajaran: rpsAsal.materiPembelajaran,
+        pustakaUtama: rpsAsal.pustakaUtama,
+        pustakaPendukung: rpsAsal.pustakaPendukung,
+        mediaPerangkatLunak: rpsAsal.mediaPerangkatLunak,
+        mediaPerangkatKeras: rpsAsal.mediaPerangkatKeras
+    };
+};
+
+// =========================================================
+// SALIN Detail RPS antar Periode (wipe & replace periode tujuan)
+// =========================================================
+export const salinDetailRps = async (mataKuliahId, periodeAsalId, periodeTujuanId) => {
+    if (periodeAsalId === periodeTujuanId) {
+        throw new CustomError.BadRequestError("Periode asal dan tujuan tidak boleh sama");
+    }
+
+    const rpsAsal = await Rps.findOne({
+        where: { siakMataKuliahId: mataKuliahId, siakPeriodeAkademikId: periodeAsalId }
+    });
+    if (!rpsAsal) throw new CustomError.NotFoundError("Detail RPS pada periode asal belum diisi");
+
+    return await sequelize.transaction(async (trx) => {
+        await _cekMK(mataKuliahId, trx);
+
+        const rpsTujuan = await Rps.findOne({
+            where: { siakMataKuliahId: mataKuliahId, siakPeriodeAkademikId: periodeTujuanId },
+            transaction: trx
+        });
+
+        const payload = {
+            siakMataKuliahId: mataKuliahId,
+            siakPeriodeAkademikId: periodeTujuanId,
+            tanggalPenyusunan: rpsAsal.tanggalPenyusunan,
+            deskripsiMataKuliah: rpsAsal.deskripsiMataKuliah,
+            deskripsiMataKuliahEng: rpsAsal.deskripsiMataKuliahEng,
+            tujuanMataKuliah: rpsAsal.tujuanMataKuliah,
+            materiPembelajaran: rpsAsal.materiPembelajaran,
+            pustakaUtama: rpsAsal.pustakaUtama,
+            pustakaPendukung: rpsAsal.pustakaPendukung,
+            mediaPerangkatLunak: rpsAsal.mediaPerangkatLunak,
+            mediaPerangkatKeras: rpsAsal.mediaPerangkatKeras,
+            dokumenRps: rpsAsal.dokumenRps
+        };
+
+        if (rpsTujuan) {
+            await Rps.update(payload, { where: { id: rpsTujuan.id }, transaction: trx });
+        } else {
+            await Rps.create(payload, { transaction: trx });
+        }
+    }).then(() => getFormDetailRps(mataKuliahId, periodeTujuanId));
+    // ☝️ getFormDetailRps dipanggil SETELAH transaksi commit, supaya baca data yang baru disimpan
+};
+
+// =========================================================
 // POST/PUT: Simpan Data Detail RPS
 // =========================================================
 export const upsertDetailRps = async (mataKuliahId, rpsData, file) => {
