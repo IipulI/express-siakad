@@ -590,6 +590,90 @@ export const deleteRencanaPembelajaran = async (id) => {
     });
 };
 
+// Daftar kode+deskripsi CPMK (Induk & Sub) milik 1 MK -- untuk sheet referensi di template Excel
+export const getDaftarCpmkUntukTemplate = async (mkId) => {
+    const list = await CapaianMataKuliah.findAll({
+        where: { siakMataKuliahId: mkId },
+        attributes: ['kode', 'deskripsi'],
+        order: [['kode', 'ASC']]
+    });
+    return list.map(c => ({ kode: c.kode, deskripsi: c.deskripsi }));
+};
+
+// =========================================================
+// IMPORT EXCEL: Tambah banyak data Rencana Pembelajaran sekaligus
+// (APPEND -- tidak menghapus data sesi yang sudah ada, sesuai keterangan
+// modal "Gunakan template ini untuk MENAMBAHKAN banyak data sekaligus")
+// =========================================================
+export const importRencanaPembelajaran = async (mkId, periodeId, rows) => {
+    if (!rows || rows.length === 0) throw new CustomError.BadRequestError("Tidak ada baris data pada file yang diunggah");
+
+    // 1. Validasi total bobot (data lama + data baru) tidak boleh lebih dari 100%
+    const existingSesi = await RencanaPembelajaran.findAll({
+        where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeId },
+        attributes: ['bobotPenilaian']
+    });
+    const totalBobotLama = existingSesi.reduce((sum, s) => sum + parseFloat(s.bobotPenilaian || 0), 0);
+    const totalBobotBaru = rows.reduce((sum, r) => sum + parseFloat(r.bobotPenilaian || 0), 0);
+    const totalKeseluruhan = totalBobotLama + totalBobotBaru;
+    if (totalKeseluruhan > 100) {
+        throw new CustomError.BadRequestError(
+            `Total bobot akan menjadi ${totalKeseluruhan}% (data lama ${totalBobotLama}% + data baru ${totalBobotBaru}%). Tidak boleh lebih dari 100%!`
+        );
+    }
+
+    // 2. Siapkan kamus kode CPMK -> id (Induk + Sub) milik MK ini, untuk resolve kolom "CPMK & Sub-CPMK"
+    const allCpmk = await CapaianMataKuliah.findAll({
+        where: { siakMataKuliahId: mkId },
+        attributes: ['id', 'kode']
+    });
+    const cpmkIdByKode = new Map(allCpmk.map(c => [String(c.kode).trim().toUpperCase(), c.id]));
+
+    return await sequelize.transaction(async (t) => {
+        const detailImport = [];
+
+        for (const row of rows) {
+            const kodeCpmkList = (row.cpmkKodeList || []).map(k => String(k).trim()).filter(Boolean);
+            const cpmkIds = [];
+            const kodeTidakDitemukan = [];
+            kodeCpmkList.forEach(kode => {
+                const id = cpmkIdByKode.get(kode.toUpperCase());
+                if (id) cpmkIds.push(id);
+                else kodeTidakDitemukan.push(kode);
+            });
+
+            const sesiBaru = await RencanaPembelajaran.create({
+                siakMataKuliahId: mkId,
+                siakPeriodeAkademikId: periodeId,
+                sesi: row.sesi,
+                jenisPertemuan: row.jenisPertemuan,
+                materiPembelajaran: row.materiPembelajaran,
+                materiPembelajaranEng: row.materiPembelajaranEng,
+                indikatorPenilaian: row.indikatorPenilaian,
+                kriteriaPenilaian: row.kriteriaPenilaian,
+                metodePembelajaranLuring: row.metodePembelajaranLuring,
+                metodePembelajaranDaring: row.metodePembelajaranDaring,
+                bobotPenilaian: row.bobotPenilaian || 0
+            }, { transaction: t });
+
+            if (cpmkIds.length > 0) {
+                await models.PemetaanPembelajaranCpmk.bulkCreate(
+                    cpmkIds.map(id => ({ siakRencanaPembelajaranId: sesiBaru.id, siakCpmkId: id })),
+                    { transaction: t }
+                );
+            }
+
+            detailImport.push({
+                sesi: row.sesi,
+                jumlahCpmkDipetakan: cpmkIds.length,
+                kodeCpmkTidakDitemukan: kodeTidakDitemukan
+            });
+        }
+
+        return { jumlahDiimport: rows.length, detail: detailImport };
+    });
+};
+
 
 // export const deleteRencanaPembelajaran = async (id) => {
 //     try {

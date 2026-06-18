@@ -7,7 +7,7 @@ import * as KelasKuliahController from '../../controllers/akademik/kelas-kuliah.
 import * as CapaianController from '../../controllers/akademik/capaian-pembelajaran.controller.js';
 import * as ExportNilaiKelasController from '../../controllers/akademik/export-nilai-kelas.controller.js';
 import * as ExportController from '../../controllers/akademik/export.controller.js';
-import { normalizeFilePath, upload } from '../../utils/upload-file.js';
+import { normalizeFilePath, upload, uploadExcel } from '../../utils/upload-file.js';
 
 /**
  * MIDDLEWARE PLACEHOLDER - KOORDINATOR MK
@@ -49,6 +49,8 @@ router.delete('/detail-rps/:id', RpsController.deleteDetailRps);
 
 // [5] Rencana Pembelajaran
 router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', RpsController.getRencanaPembelajaran);
+router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/template', RpsController.downloadTemplateRencanaPembelajaran);
+router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/import', uploadExcel.single('file'), RpsController.importRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', RpsController.createRencanaPembelajaran);
 router.put('/rencana-pembelajaran/:id', RpsController.updateRencanaPembelajaran);
 router.delete('/rencana-pembelajaran/:id', RpsController.deleteRencanaPembelajaran);

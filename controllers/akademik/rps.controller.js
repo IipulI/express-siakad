@@ -1,5 +1,135 @@
+import ExcelJS from 'exceljs';
 import * as rpsService from "../../services/rps.service.js";
 import ResponseBuilder from "../../utils/response.js";
+
+// =========================================================
+// TEMPLATE / IMPORT EXCEL: Rencana Pembelajaran
+// =========================================================
+const HEADER_RENCANA_PEMBELAJARAN = [
+    'Pertemuan Ke-',
+    'CPMK & Sub-CPMK',
+    'ID Jenis Pertemuan (Lihat Daftar Jenis Pertemuan)',
+    'Materi Pembelajaran (IND)',
+    'Materi Pembelajaran (EN)',
+    'Indikator Penilaian',
+    'Bentuk & Kriteria Penilaian',
+    'Metode Pembelajaran Luring',
+    'Metode Pembelajaran Daring',
+    'Bobot Penilaian (%)'
+];
+const COL_WIDTH_RENCANA_PEMBELAJARAN = [12, 30, 25, 40, 40, 30, 30, 25, 25, 14];
+
+const HEADER_BG = 'FF0C4781';
+
+function buildRencanaPembelajaranSheet(workbook, rows = []) {
+    const ws = workbook.addWorksheet('Rencana Pembelajaran');
+    const headerRow = ws.addRow(HEADER_RENCANA_PEMBELAJARAN);
+    headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    });
+    headerRow.height = 30;
+
+    rows.forEach(r => {
+        ws.addRow([
+            r.sesi, r.cpmk, r.jenisPertemuan, r.materiIndo, r.materiEng,
+            r.indikator, r.kriteria, r.luring, r.daring, r.bobot
+        ]);
+    });
+
+    COL_WIDTH_RENCANA_PEMBELAJARAN.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    return ws;
+}
+
+function buildDaftarJenisPertemuanSheet(workbook) {
+    const ws = workbook.addWorksheet('Daftar Jenis Pertemuan');
+    const header = ws.addRow(['Jenis Pertemuan']);
+    header.font = { bold: true };
+    ['Kuliah', 'Blok', 'Kuliah Kerja Lapangan', 'Kuliah Kerja Nyata (KKN)', 'Kerja Praktik',
+     'Magang Kerja', 'Praktikum', 'Praktik Kerja Lapangan', 'Proposal Skripsi', 'Skripsi',
+     'Stase (Kedokteran)'].forEach(j => ws.addRow([j]));
+    ws.getColumn(1).width = 30;
+    return ws;
+}
+
+function buildDaftarCpmkSheet(workbook, cpmkList = []) {
+    const ws = workbook.addWorksheet('Daftar CPMK & Sub-CPMK');
+    const header = ws.addRow(['Kode', 'Deskripsi']);
+    header.font = { bold: true };
+    cpmkList.forEach(c => ws.addRow([c.kode, c.deskripsi]));
+    ws.getColumn(1).width = 20;
+    ws.getColumn(2).width = 60;
+    return ws;
+}
+
+export const downloadTemplateRencanaPembelajaran = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const cpmkList = await rpsService.getDaftarCpmkUntukTemplate(mataKuliahId);
+
+        const workbook = new ExcelJS.Workbook();
+        buildRencanaPembelajaranSheet(workbook);
+        buildDaftarJenisPertemuanSheet(workbook);
+        buildDaftarCpmkSheet(workbook, cpmkList);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="Template_Rencana_Pembelajaran.xlsx"');
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const importRencanaPembelajaran = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { siakPeriodeAkademikId } = req.body;
+        if (!siakPeriodeAkademikId) {
+            return new ResponseBuilder(res).code(400).message('siakPeriodeAkademikId wajib diisi').json();
+        }
+        if (!req.file) {
+            return new ResponseBuilder(res).code(400).message('File Excel wajib diunggah').json();
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+        const sheet = workbook.getWorksheet('Rencana Pembelajaran') || workbook.worksheets[0];
+
+        const rows = [];
+        sheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return; // skip header
+            const [, sesi, cpmk, jenisPertemuan, materiIndo, materiEng, indikator, kriteria, luring, daring, bobot] =
+                row.values; // row.values[0] kosong (ExcelJS 1-indexed)
+
+            if (!sesi) return; // baris kosong dilewati
+
+            rows.push({
+                sesi: parseInt(sesi, 10),
+                cpmkKodeList: cpmk ? String(cpmk).split(/[,;\n]/) : [],
+                jenisPertemuan: jenisPertemuan || null,
+                materiPembelajaran: materiIndo || null,
+                materiPembelajaranEng: materiEng || null,
+                indikatorPenilaian: indikator || null,
+                kriteriaPenilaian: kriteria || null,
+                metodePembelajaranLuring: luring || null,
+                metodePembelajaranDaring: daring || null,
+                bobotPenilaian: parseFloat(bobot || 0)
+            });
+        });
+
+        const result = await rpsService.importRencanaPembelajaran(mataKuliahId, siakPeriodeAkademikId, rows);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil import ${result.jumlahDiimport} sesi Rencana Pembelajaran`)
+            .json(result);
+    } catch (error) {
+        next(error);
+    }
+};
 
 // =========================================================
 // CONTROLLER: Pratinjau Salin Detail RPS
