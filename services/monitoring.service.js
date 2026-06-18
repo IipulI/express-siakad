@@ -63,23 +63,33 @@ export const getCplPerProgramStudi = async (filters) => {
         const totalMahasiswa = parseInt(totalMhsQuery[0].total) || 0;
 
         // =================================================================
-        // 4. (RAW SQL) Tarik Nilai Akhir & Cocokkan ke CPL
+        // 4. (RAW SQL) Tarik Nilai CPMK Berbobot per (Mahasiswa, Kelas, CPL)
+        //    Capaian CPL dihitung dari nilai CPMK × bobot_cpl, BUKAN dari
+        //    nilai_akhir MK secara keseluruhan — supaya 1 MK yang berkontribusi
+        //    ke beberapa CPL berbeda tidak disamakan nilainya.
         // =================================================================
         const queryNilai = `
-            SELECT 
+            SELECT
                 m.id AS mahasiswa_id,
-                rkm.nilai_akhir,
-                pcm.siak_capaian_pembelajaran_lulusan_id AS cpl_id
+                rkm.id AS rincian_krs_id,
+                pcc.siak_capaian_pembelajaran_lulusan_id AS cpl_id,
+                SUM(ncm.nilai * pcc.bobot_cpl) AS sum_weighted,
+                SUM(pcc.bobot_cpl) AS sum_bobot
             FROM siak_mahasiswa m
             JOIN siak_krs_mahasiswa km ON m.id = km.siak_mahasiswa_id AND km.deleted_at IS NULL
             JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
             JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
             JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id AND mk.deleted_at IS NULL
-            JOIN siak_pemetaan_cpl_mata_kuliah pcm ON mk.id = pcm.siak_mata_kuliah_id
-            WHERE m.siak_program_studi_id = :prodiId 
+            JOIN siak_nilai_cpmk_mahasiswa ncm ON ncm.siak_kelas_kuliah_id = kk.id
+                                               AND ncm.siak_mahasiswa_id = m.id
+                                               AND ncm.deleted_at IS NULL
+            JOIN siak_pemetaan_cpl_cpmk pcc ON pcc.siak_capaian_mata_kuliah_id = ncm.siak_capaian_mata_kuliah_id
+                                            AND pcc.deleted_at IS NULL
+            WHERE m.siak_program_studi_id = :prodiId
               AND m.angkatan = :angkatan
               AND mk.siak_tahun_kurikulum_id = :tahunKurikulumId
-              AND rkm.nilai_akhir IS NOT NULL
+              AND ncm.nilai IS NOT NULL
+            GROUP BY m.id, rkm.id, pcc.siak_capaian_pembelajaran_lulusan_id
         `;
 
         const dataNilai = await sequelize.query(queryNilai, {
@@ -89,11 +99,15 @@ export const getCplPerProgramStudi = async (filters) => {
 
         // =================================================================
         // 5. EKSEKUSI PENILAIAN (Ke dalam keranjang Kode CPL)
+        //    Setiap baris = capaian CPL mahasiswa untuk 1 kelas/enrollment
+        //    (gabungan beberapa CPMK yang berbobot ke CPL ini)
         // =================================================================
         dataNilai.forEach(row => {
             const kodeCpl = uuidToKodeMap[row.cpl_id]; // Terjemahkan UUID jadi "CPL01"
             const mhsId = row.mahasiswa_id;
-            const nilai = parseFloat(row.nilai_akhir) || 0;
+            const sumBobot = parseFloat(row.sum_bobot) || 0;
+            if (sumBobot <= 0) return;
+            const nilai = parseFloat(row.sum_weighted) / sumBobot;
 
             if (kodeCpl && cplScores[kodeCpl]) {
                 // Untuk Rerata
@@ -241,32 +255,44 @@ export const getLaporanCplPerMahasiswa = async (filters) => {
             uniqueCpls.forEach(c => { mhsScores[m.id].cpl[c.kode] = { sum: 0, max: 0, count: 0 }; });
         });
 
-        // 3. Tarik Nilai dari Database (Anti-Hantu Mode)
+        // 3. Tarik Nilai CPMK Berbobot per (Mahasiswa, Kelas, CPL) — bukan nilai_akhir MK,
+        //    supaya 1 MK yang berkontribusi ke beberapa CPL tidak disamakan nilainya.
         const queryNilai = `
-            SELECT m.id AS mahasiswa_id, rkm.nilai_akhir, pcm.siak_capaian_pembelajaran_lulusan_id AS cpl_id
+            SELECT
+                m.id AS mahasiswa_id,
+                rkm.id AS rincian_krs_id,
+                pcc.siak_capaian_pembelajaran_lulusan_id AS cpl_id,
+                SUM(ncm.nilai * pcc.bobot_cpl) AS sum_weighted,
+                SUM(pcc.bobot_cpl) AS sum_bobot
             FROM siak_mahasiswa m
             JOIN siak_krs_mahasiswa km ON m.id = km.siak_mahasiswa_id AND km.deleted_at IS NULL
             JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
             JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
             JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id AND mk.deleted_at IS NULL
-            JOIN siak_pemetaan_cpl_mata_kuliah pcm ON mk.id = pcm.siak_mata_kuliah_id
-            WHERE m.siak_program_studi_id = :prodiId 
-              AND m.angkatan = :angkatan 
+            JOIN siak_nilai_cpmk_mahasiswa ncm ON ncm.siak_kelas_kuliah_id = kk.id
+                                               AND ncm.siak_mahasiswa_id = m.id
+                                               AND ncm.deleted_at IS NULL
+            JOIN siak_pemetaan_cpl_cpmk pcc ON pcc.siak_capaian_mata_kuliah_id = ncm.siak_capaian_mata_kuliah_id
+                                            AND pcc.deleted_at IS NULL
+            WHERE m.siak_program_studi_id = :prodiId
+              AND m.angkatan = :angkatan
               AND mk.siak_tahun_kurikulum_id = :tahunKurikulumId
-              AND rkm.nilai_akhir IS NOT NULL
+              AND ncm.nilai IS NOT NULL
+            GROUP BY m.id, rkm.id, pcc.siak_capaian_pembelajaran_lulusan_id
         `;
 
         const dataNilai = await sequelize.query(queryNilai, { replacements: { prodiId, angkatan, tahunKurikulumId }, type: QueryTypes.SELECT });
 
         dataNilai.forEach(row => {
             const kodeCpl = cplMap[row.cpl_id];
-            const nilai = parseFloat(row.nilai_akhir) || 0;
-            if (kodeCpl && mhsScores[row.mahasiswa_id]) {
-                const target = mhsScores[row.mahasiswa_id].cpl[kodeCpl];
-                target.sum += nilai;
-                target.count += 1;
-                if (nilai > target.max) target.max = nilai;
-            }
+            const sumBobot = parseFloat(row.sum_bobot) || 0;
+            if (!kodeCpl || sumBobot <= 0 || !mhsScores[row.mahasiswa_id]) return;
+            const nilai = parseFloat(row.sum_weighted) / sumBobot;
+
+            const target = mhsScores[row.mahasiswa_id].cpl[kodeCpl];
+            target.sum += nilai;
+            target.count += 1;
+            if (nilai > target.max) target.max = nilai;
         });
 
         // 4. Kalkulasi Rerata / Progresif
@@ -388,23 +414,31 @@ export const getLaporanCplPerMataKuliah = async (filters) => {
             }
         });
 
-        // 2. Tarik Nilai dari Database (Dikelompokkan Berdasarkan Mata Kuliah)
+        // 2. Tarik Nilai CPMK Berbobot (Dikelompokkan per Mahasiswa, Kelas, MK, CPL) — bukan
+        //    nilai_akhir MK, supaya 1 MK yang berkontribusi ke beberapa CPL tidak disamakan nilainya.
         const queryNilai = `
-            SELECT 
-            mk.id AS mk_id, mk.nama AS nama_mk, mk.semester, mk.total_sks AS sks, 
-            pcm.siak_capaian_pembelajaran_lulusan_id AS cpl_id,
-            rkm.nilai_akhir
+            SELECT
+                mk.id AS mk_id, mk.nama AS nama_mk, mk.semester, mk.total_sks AS sks,
+                m.id AS mahasiswa_id, rkm.id AS rincian_krs_id,
+                pcc.siak_capaian_pembelajaran_lulusan_id AS cpl_id,
+                SUM(ncm.nilai * pcc.bobot_cpl) AS sum_weighted,
+                SUM(pcc.bobot_cpl) AS sum_bobot
             FROM siak_mata_kuliah mk
             JOIN siak_kelas_kuliah kk ON mk.id = kk.siak_mata_kuliah_id AND kk.deleted_at IS NULL
-            JOIN siak_pemetaan_cpl_mata_kuliah pcm ON mk.id = pcm.siak_mata_kuliah_id
             JOIN siak_rincian_krs_mahasiswa rkm ON kk.id = rkm.siak_kelas_kuliah_id AND rkm.deleted_at IS NULL
             JOIN siak_krs_mahasiswa km ON rkm.siak_krs_mahasiswa_id = km.id AND km.deleted_at IS NULL
             JOIN siak_mahasiswa m ON km.siak_mahasiswa_id = m.id AND m.deleted_at IS NULL
-            WHERE m.siak_program_studi_id = :prodiId 
-              AND m.angkatan = :angkatan 
+            JOIN siak_nilai_cpmk_mahasiswa ncm ON ncm.siak_kelas_kuliah_id = kk.id
+                                               AND ncm.siak_mahasiswa_id = m.id
+                                               AND ncm.deleted_at IS NULL
+            JOIN siak_pemetaan_cpl_cpmk pcc ON pcc.siak_capaian_mata_kuliah_id = ncm.siak_capaian_mata_kuliah_id
+                                            AND pcc.deleted_at IS NULL
+            WHERE m.siak_program_studi_id = :prodiId
+              AND m.angkatan = :angkatan
               AND mk.siak_tahun_kurikulum_id = :tahunKurikulumId
               AND mk.deleted_at IS NULL
-              AND rkm.nilai_akhir IS NOT NULL
+              AND ncm.nilai IS NOT NULL
+            GROUP BY mk.id, mk.nama, mk.semester, mk.total_sks, m.id, rkm.id, pcc.siak_capaian_pembelajaran_lulusan_id
         `;
 
         const dataNilai = await sequelize.query(queryNilai, { replacements: { prodiId, angkatan, tahunKurikulumId }, type: QueryTypes.SELECT });
@@ -417,13 +451,14 @@ export const getLaporanCplPerMataKuliah = async (filters) => {
             }
 
             const kodeCpl = cplMap[row.cpl_id];
-            const nilai = parseFloat(row.nilai_akhir) || 0;
-            if (kodeCpl && mkScores[row.mk_id].cpl[kodeCpl]) {
-                const target = mkScores[row.mk_id].cpl[kodeCpl];
-                target.sum += nilai;
-                target.count += 1;
-                if (nilai > target.max) target.max = nilai;
-            }
+            const sumBobot = parseFloat(row.sum_bobot) || 0;
+            if (!kodeCpl || sumBobot <= 0 || !mkScores[row.mk_id].cpl[kodeCpl]) return;
+            const nilai = parseFloat(row.sum_weighted) / sumBobot;
+
+            const target = mkScores[row.mk_id].cpl[kodeCpl];
+            target.sum += nilai;
+            target.count += 1;
+            if (nilai > target.max) target.max = nilai;
         });
 
         // 3. Kalkulasi Rerata / Progresif
