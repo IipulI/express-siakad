@@ -823,19 +823,35 @@ export const getTranskripObeMahasiswa = async (filters) => {
         const mappedMap = {};
         totalMappedData.forEach(row => { mappedMap[row.cpl_id] = parseInt(row.total_mk); });
 
-        // 5. TARIK NILAI ASLI MAHASISWA 
+        // 5. TARIK NILAI CPMK BERBOBOT MAHASISWA (bukan nilai_akhir MK keseluruhan,
+        //    supaya 1 MK yang berkontribusi ke beberapa CPL tidak disamakan nilainya)
         // 🟢 FIX MUTLAK: TAMBAHKAN `deleted_at IS NULL` AGAR DATA KRS HANTU TIDAK IKUT KEHITUNG!
         const queryScores = `
-            SELECT pcm.siak_capaian_pembelajaran_lulusan_id AS cpl_id, rkm.nilai_akhir
+            SELECT
+                pcc.siak_capaian_pembelajaran_lulusan_id AS cpl_id,
+                rkm.id AS rincian_krs_id,
+                SUM(ncm.nilai * pcc.bobot_cpl) AS sum_weighted,
+                SUM(pcc.bobot_cpl) AS sum_bobot
             FROM siak_krs_mahasiswa km
             JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
             JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
-            JOIN siak_pemetaan_cpl_mata_kuliah pcm ON kk.siak_mata_kuliah_id = pcm.siak_mata_kuliah_id
-            WHERE km.siak_mahasiswa_id = :mahasiswaId 
-              AND km.deleted_at IS NULL 
-              AND rkm.nilai_akhir IS NOT NULL
+            JOIN siak_nilai_cpmk_mahasiswa ncm ON ncm.siak_kelas_kuliah_id = kk.id
+                                               AND ncm.siak_mahasiswa_id = km.siak_mahasiswa_id
+                                               AND ncm.deleted_at IS NULL
+            JOIN siak_pemetaan_cpl_cpmk pcc ON pcc.siak_capaian_mata_kuliah_id = ncm.siak_capaian_mata_kuliah_id
+                                            AND pcc.deleted_at IS NULL
+            WHERE km.siak_mahasiswa_id = :mahasiswaId
+              AND km.deleted_at IS NULL
+              AND ncm.nilai IS NOT NULL
+            GROUP BY pcc.siak_capaian_pembelajaran_lulusan_id, rkm.id
         `;
-        const scoreData = await sequelize.query(queryScores, { replacements: { mahasiswaId: infoMhs.id }, type: QueryTypes.SELECT });
+        const scoreDataRaw = await sequelize.query(queryScores, { replacements: { mahasiswaId: infoMhs.id }, type: QueryTypes.SELECT });
+        const scoreData = scoreDataRaw
+            .filter(row => parseFloat(row.sum_bobot) > 0)
+            .map(row => ({
+                cpl_id: row.cpl_id,
+                nilai_akhir: parseFloat(row.sum_weighted) / parseFloat(row.sum_bobot)
+            }));
 
         // 6. KALKULASI HASIL
         const cplResults = [];
