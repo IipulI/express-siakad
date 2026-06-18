@@ -865,7 +865,7 @@ export const getListManajemenCapaian = async (filters) => {
                 COUNT(DISTINCT pcc.siak_capaian_pembelajaran_lulusan_id)      AS cpl_terpetakan
             ${baseQuery}
             GROUP BY ps.id, ps.kode, ps.nama, tk.id, tk.tahun, j.jenjang, d.nama, obe.id
-            ORDER BY tk.tahun DESC, ps.nama ASC
+            ORDER BY (obe.id IS NOT NULL) DESC, tk.tahun DESC, ps.nama ASC
             LIMIT :limit OFFSET :offset`,
             { replacements, type: QueryTypes.SELECT }
         );
