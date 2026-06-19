@@ -2065,16 +2065,38 @@ export const ambilCplUmum = async (obeId, cplUmumIds) => {
     if (!Array.isArray(cplUmumIds) || cplUmumIds.length === 0)
         throw new CustomError.BadRequestError('Pilih minimal satu CPL Umum');
 
-    const obe = await Obe.findByPk(obeId, { attributes: ['id'] });
+    const obe = await Obe.findByPk(obeId, {
+        attributes: ['id', 'siakTahunKurikulumId'],
+        include: [{ model: ProgramStudi, as: 'programStudi', attributes: ['id', 'siakFakultasId'] }]
+    });
     if (!obe) throw new CustomError.NotFoundError('OBE tidak ditemukan');
 
     const { CplUmum } = models;
     const sumberList = await CplUmum.findAll({
         where: { id: cplUmumIds },
-        attributes: ['kode', 'deskripsiInd', 'deskripsiEng', 'targetCpl', 'kategori']
+        attributes: ['id', 'kode', 'deskripsiInd', 'deskripsiEng', 'targetCpl', 'kategori', 'siakTahunKurikulumId', 'siakFakultasId']
     });
     if (sumberList.length === 0)
         throw new CustomError.NotFoundError('CPL Umum yang dipilih tidak ditemukan');
+
+    // Validasi 1: CPL Umum hanya bisa diambil untuk Tahun Kurikulum yang sama
+    const bedaKurikulum = sumberList.filter(c => c.siakTahunKurikulumId !== obe.siakTahunKurikulumId);
+    if (bedaKurikulum.length > 0) {
+        throw new CustomError.BadRequestError(
+            `CPL Umum "${bedaKurikulum.map(c => c.kode).join(', ')}" berasal dari Tahun Kurikulum yang berbeda dengan OBE ini`
+        );
+    }
+
+    // Validasi 2: Tingkat CPL (scoping Fakultas) -- null berarti berlaku
+    // se-Universitas (boleh diambil prodi mana pun); kalau diisi Fakultas
+    // tertentu, hanya prodi di bawah Fakultas itu yang boleh mengambilnya.
+    const fakultasProdi = obe.programStudi?.siakFakultasId || null;
+    const tidakBerhak = sumberList.filter(c => c.siakFakultasId && c.siakFakultasId !== fakultasProdi);
+    if (tidakBerhak.length > 0) {
+        throw new CustomError.BadRequestError(
+            `CPL Umum "${tidakBerhak.map(c => c.kode).join(', ')}" dibatasi untuk Fakultas lain, Program Studi ini tidak berhak mengambilnya`
+        );
+    }
 
     await sequelize.transaction(async (trx) => {
         await CapaianPembelajaranLulusan.bulkCreate(
