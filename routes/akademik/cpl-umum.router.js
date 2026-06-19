@@ -26,6 +26,10 @@ import { validateGetCplUmum, validateSaveCplUmum, validateDeleteCplUmum } from '
 
 const router = express.Router();
 
+// GET opsi dropdown Tingkat CPL (Universitas + daftar Fakultas) -- harus
+// didaftarkan SEBELUM '/:tahunKurikulumId' supaya tidak ketangkap jadi param
+router.get('/opsi/tingkat-cpl', CplUmumController.fetchOpsiTingkatCpl);
+
 // GET
 router.get('/:tahunKurikulumId', validateGetCplUmum, CplUmumController.fetchCplUmum);
 

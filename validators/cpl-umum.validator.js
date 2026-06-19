@@ -21,12 +21,13 @@ export const validateGetCplUmum = [
 export const validateSaveCplUmum = [
     param('tahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID tidak valid'),
     body('id').optional().isUUID().withMessage('ID CPL Umum tidak valid'), // Opsional karena kalau Create nggak bawa ID
-    body('kode').notEmpty().withMessage('Kode CPL wajib diisi'),
+    body('kode').notEmpty().withMessage('Kode CPL wajib diisi').isLength({ max: 25 }).withMessage('Kode CPL maksimal 25 karakter'),
     body('deskripsiInd').notEmpty().withMessage('Deskripsi CPL (ID) wajib diisi'),
     body('targetCpl').isFloat({ min: 0, max: 100 }).withMessage('Target CPL harus angka 0-100'),
     body('kategori').notEmpty().withMessage('Kategori wajib dipilih'),
-    // Tingkat CPL di UI sepertinya opsional atau belum mandatory, kita buat notEmpty juga
-    body('tingkatCpl').notEmpty().withMessage('Tingkat CPL wajib diisi'),
+    // null/kosong = Tingkat CPL berlaku di level Universitas; kalau diisi
+    // harus UUID Fakultas yang valid (dicek lebih lanjut di service)
+    body('siakFakultasId').optional({ nullable: true }).isUUID().withMessage('Tingkat CPL (Fakultas) tidak valid'),
     validate
 ];
 

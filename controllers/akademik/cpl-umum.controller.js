@@ -27,10 +27,19 @@ export const saveCplUmum = async (req, res, next) => {
 
 export const deleteCplUmum = async (req, res, next) => {
     try {
-        const idCplUmum = req.params.id; 
+        const idCplUmum = req.params.id;
         await CplUmumService.destroyCplUmum(idCplUmum);
         return new ResponseBuilder(res).code(200).message("Berhasil menghapus CPL Umum").json();
-    } catch (error) { 
-        next(error); 
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const fetchOpsiTingkatCpl = async (req, res, next) => {
+    try {
+        const data = await CplUmumService.getOpsiTingkatCpl();
+        return new ResponseBuilder(res).code(200).message("Berhasil mengambil opsi Tingkat CPL").json(data);
+    } catch (error) {
+        next(error);
     }
 };

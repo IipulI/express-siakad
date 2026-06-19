@@ -7,6 +7,7 @@ import KurikulumProdiRouter from "./kurikulum-prodi.router.js";
 import KelasKuliahRouter from "./kelas-kuliah.router.js";
 import RuanganRouter from "./ruangan.router.js";
 import JenjangRouter from "./jenjang.router.js";
+import FakultasRouter from "./fakultas.router.js";
 import PembimbingAkademikRouter from "./pembimbing-akademik.router.js";
 import AgamaRouter from "./agama.router.js";
 import SukuRouter from "./suku.router.js";
@@ -76,7 +77,7 @@ router.use("/pembimbing-akademik", PembimbingAkademikRouter);
 // perguruan tinggi
 router.use("/ruangan", RuanganRouter);
 router.use("/jenjang", JenjangRouter);
-// router.use("/fakultas", )
+router.use("/fakultas", FakultasRouter);
 // router.use("/program-studi", )
 
 // perkuliahan

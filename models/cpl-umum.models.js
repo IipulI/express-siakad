@@ -8,6 +8,11 @@ export default (sequelize) => {
                 foreignKey: 'siak_tahun_kurikulum_id',
                 as: 'tahunKurikulum'
             });
+            // Relasi ke Fakultas -- null artinya berlaku di tingkat Universitas
+            this.belongsTo(models.Fakultas, {
+                foreignKey: 'siak_fakultas_id',
+                as: 'fakultas'
+            });
         }
     }
 
@@ -43,6 +48,11 @@ export default (sequelize) => {
         tingkatCpl: {
             type: DataTypes.STRING(100),
             field: 'tingkat_cpl'
+        },
+        siakFakultasId: {
+            type: DataTypes.UUID,
+            field: 'siak_fakultas_id',
+            allowNull: true
         }
     }, {
         sequelize,
