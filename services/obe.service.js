@@ -1205,6 +1205,27 @@ export const createCplBulk = async (obeId, payload) => {
         // payload di sini bisa berupa satu object {} atau array of objects [{}]
         const dataArray = Array.isArray(payload) ? payload : [payload];
 
+        // Cek duplikat kode DI DALAM payload sendiri (mis. Excel ada baris kembar)
+        const kodeDiPayload = dataArray.map(item => (item.kode || '').trim().toLowerCase());
+        const dupDiPayload = kodeDiPayload.filter((k, i) => kodeDiPayload.indexOf(k) !== i);
+        if (dupDiPayload.length > 0) {
+            throw new CustomError.BadRequestError(`Kode CPL duplikat di dalam data yang dikirim: ${[...new Set(dupDiPayload)].join(', ')}`);
+        }
+
+        // Cek duplikat kode dengan CPL yang SUDAH ADA untuk OBE ini -- mencegah
+        // submit ulang (form/Import Excel) menumpuk baris baru alih-alih
+        // ditolak/diupdate.
+        const existing = await CapaianPembelajaranLulusan.findAll({
+            where: {
+                siakObeId: obeId,
+                [Op.or]: dataArray.map(item => ({ kode: { [Op.iLike]: item.kode } }))
+            },
+            attributes: ['kode']
+        });
+        if (existing.length > 0) {
+            throw new CustomError.BadRequestError(`Kode CPL sudah ada untuk Program Studi ini: ${existing.map(e => e.kode).join(', ')}`);
+        }
+
         // Petakan data agar setiap item punya siakObeId
         const dataToInsert = dataArray.map(item => ({
             siakObeId: obeId,
@@ -1219,7 +1240,7 @@ export const createCplBulk = async (obeId, payload) => {
         return await CapaianPembelajaranLulusan.bulkCreate(dataToInsert);
     } catch (error) {
         // Lempar error asli biar keliatan kalau ada yang salah di mapping
-        throw error; 
+        throw error;
     }
 };
 // export const createCpl = async (payload) => {
