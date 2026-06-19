@@ -1189,6 +1189,22 @@ export const pratinjauSalinRencanaEvaluasi = async (mkId, periodeAsalId) => {
 // CPMK id tetap sama (milik MK, bukan milik periode), jadi pemetaan CPMK
 // ikut tersalin langsung tanpa perlu translasi kode->id.
 // =========================================================
+// Cek apakah ada nilai mahasiswa yang sudah tersimpan & merujuk ke baris
+// RencanaEvaluasi tertentu. FK siak_nilai_evaluasi_mahasiswa.siak_rencana_evaluasi_id
+// adalah ON DELETE SET NULL -- bukan RESTRICT -- jadi hard-delete baris
+// RencanaEvaluasi TIDAK akan error, tapi diam-diam memutus nilai mahasiswa
+// yang sudah ada dari komponennya (skor tidak hilang, tapi jadi tidak
+// terhubung ke komponen apa pun: tidak tampil di tabel nilai dosen, dan
+// tidak ikut terhitung kalau hitungNilaiAkhir dijalankan ulang).
+const cekAdaNilaiTerinput = async (rencanaEvaluasiIds, trx) => {
+    if (rencanaEvaluasiIds.length === 0) return false;
+    const jumlah = await models.NilaiEvaluasiMahasiswa.count({
+        where: { siakRencanaEvaluasiId: rencanaEvaluasiIds },
+        transaction: trx
+    });
+    return jumlah > 0;
+};
+
 export const salinRencanaEvaluasi = async (mkId, periodeAsalId, periodeTujuanId) => {
     if (periodeAsalId === periodeTujuanId) {
         throw new CustomError.BadRequestError("Periode asal dan tujuan tidak boleh sama");
@@ -1207,6 +1223,11 @@ export const salinRencanaEvaluasi = async (mkId, periodeAsalId, periodeTujuanId)
             attributes: ['id'], transaction: t
         });
         const existingIds = existingTujuan.map(e => e.id);
+
+        if (await cekAdaNilaiTerinput(existingIds, t)) {
+            throw new CustomError.BadRequestError("Tidak bisa menyalin: sudah ada nilai mahasiswa yang tersimpan untuk Rencana Evaluasi di periode tujuan. Salin Data hanya bisa dilakukan sebelum nilai mulai diisi, agar nilai yang sudah ada tidak terputus dari komponennya.");
+        }
+
         if (existingIds.length > 0) {
             await models.PemetaanEvaluasiCpmk.destroy({ where: { siakRencanaEvaluasiId: existingIds }, force: true, transaction: t });
             await models.RencanaEvaluasi.destroy({ where: { id: existingIds }, force: true, transaction: t });
@@ -1269,6 +1290,11 @@ export const resetRencanaEvaluasi = async (mkId, periodeId) => {
             attributes: ['id'], transaction: t
         });
         const existingIds = existing.map(e => e.id);
+
+        if (await cekAdaNilaiTerinput(existingIds, t)) {
+            throw new CustomError.BadRequestError("Tidak bisa reset: sudah ada nilai mahasiswa yang tersimpan untuk Rencana Evaluasi di periode ini. Reset Data hanya bisa dilakukan sebelum nilai mulai diisi, agar nilai yang sudah ada tidak terputus dari komponennya.");
+        }
+
         if (existingIds.length > 0) {
             await models.PemetaanEvaluasiCpmk.destroy({ where: { siakRencanaEvaluasiId: existingIds }, force: true, transaction: t });
             await models.RencanaEvaluasi.destroy({ where: { id: existingIds }, force: true, transaction: t });
