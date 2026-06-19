@@ -420,7 +420,7 @@ export const deleteRencanaEvaluasi = async (req, res) => {
         await rpsService.deleteRencanaEvaluasi(req.params.id);
         return responseBuilder.status("success").code(200).message("Berhasil menghapus data evaluasi").json();
     } catch (error) {
-        return responseBuilder.status("failure").code(500).message(error.message).json();
+        return responseBuilder.status("failure").code(error.status || 500).message(error.message).json();
     }
 };
 

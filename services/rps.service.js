@@ -1144,9 +1144,21 @@ export const saveRencanaEvaluasi = async (mkId, payload) => {
 };
 export const deleteRencanaEvaluasi = async (id) => {
     try {
+        // Soft-delete baris ini akan membuatnya tidak terlihat oleh semua query
+        // Sequelize (default scope deleted_at IS NULL) -- termasuk include dari
+        // siak_nilai_evaluasi_mahasiswa di hitungNilaiAkhir/getPesertaKelasList.
+        // Kalau sudah ada nilai mahasiswa yang merujuk ke baris ini, nilai itu
+        // akan terputus dari komponennya walau skor-nya sendiri tidak terhapus.
+        const adaNilai = await models.NilaiEvaluasiMahasiswa.count({ where: { siakRencanaEvaluasiId: id } });
+        if (adaNilai > 0) {
+            throw new CustomError.BadRequestError("Tidak bisa menghapus: sudah ada nilai mahasiswa yang tersimpan untuk komponen evaluasi ini.");
+        }
         const deleted = await models.RencanaEvaluasi.destroy({ where: { id } });
         return deleted > 0;
-    } catch (error) { throw new Error(error.message); }
+    } catch (error) {
+        if (error instanceof CustomError.BadRequestError) throw error;
+        throw new Error(error.message);
+    }
 };
 
 // =========================================================
