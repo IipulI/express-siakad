@@ -418,6 +418,12 @@ export const getDetailKurikulum = async (tahunId, jenjangId, filters) => {
         dataFinal = dataFinal.filter(d => d.jenisKurikulum === filters.jenisKurikulum);
     }
 
+    // Prodi yang sudah OBE ditaruh paling atas, sisanya tetap urut kode prodi
+    dataFinal.sort((a, b) => {
+        if (a.isObe !== b.isObe) return a.isObe ? -1 : 1;
+        return a.kodeProdi.localeCompare(b.kodeProdi);
+    });
+
     return {
         header: {
             tahun: header.tahun,
