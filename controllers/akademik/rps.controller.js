@@ -424,6 +424,60 @@ export const deleteRencanaEvaluasi = async (req, res) => {
     }
 };
 
+// =========================================================
+// CONTROLLER: Pratinjau Salin Rencana Evaluasi
+// =========================================================
+export const pratinjauSalinRencanaEvaluasi = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeAsalId } = req.query;
+        const data = await rpsService.pratinjauSalinRencanaEvaluasi(mataKuliahId, periodeAsalId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Pratinjau Rencana Evaluasi periode asal")
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =========================================================
+// CONTROLLER: Salin Rencana Evaluasi antar Periode
+// =========================================================
+export const salinRencanaEvaluasi = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeAsalId, periodeTujuanId } = req.body;
+        const data = await rpsService.salinRencanaEvaluasi(mataKuliahId, periodeAsalId, periodeTujuanId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil menyalin ${data.jumlahDisalin} komponen Rencana Evaluasi`)
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =========================================================
+// CONTROLLER: Reset Rencana Evaluasi ke Default Program Studi
+// =========================================================
+export const resetRencanaEvaluasi = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeId } = req.body;
+        const data = await rpsService.resetRencanaEvaluasi(mataKuliahId, periodeId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil reset ${data.jumlahDireset} komponen Rencana Evaluasi ke default Program Studi`)
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const getLaporanRpsCetak = async (req, res, next) => {
     try {
         const { mataKuliahId } = req.params;

@@ -1149,6 +1149,147 @@ export const deleteRencanaEvaluasi = async (id) => {
     } catch (error) { throw new Error(error.message); }
 };
 
+// =========================================================
+// PRATINJAU SALIN Rencana Evaluasi (lihat isi periode asal sebelum disalin)
+// =========================================================
+export const pratinjauSalinRencanaEvaluasi = async (mkId, periodeAsalId) => {
+    const evaluasiAsal = await models.RencanaEvaluasi.findAll({
+        where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeAsalId },
+        include: [{
+            model: models.PemetaanEvaluasiCpmk, as: 'pemetaanCpmk',
+            include: [{ model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['kode'] }]
+        }],
+        order: [['createdAt', 'ASC']]
+    });
+    if (evaluasiAsal.length === 0) throw new CustomError.NotFoundError("Rencana Evaluasi pada periode asal belum diisi");
+
+    const periodeAsal = await PeriodeAkademik.findByPk(periodeAsalId, { attributes: ['nama'] });
+    let totalBobot = 0;
+
+    const komponen = evaluasiAsal.map(e => {
+        totalBobot += parseFloat(e.bobot || 0);
+        return {
+            metodeEvaluasi: e.metodeEvaluasi,
+            jenisEvaluasi: e.jenisEvaluasi,
+            bobotEvaluasi: parseFloat(e.bobot || 0),
+            syaratLulus: e.syaratLulus,
+            cpmk: (e.pemetaanCpmk || []).map(p => p.capaianMataKuliah?.kode).filter(Boolean)
+        };
+    });
+
+    return {
+        periodeAsal: periodeAsal?.nama || '-',
+        totalBobot,
+        komponen
+    };
+};
+
+// =========================================================
+// SALIN Rencana Evaluasi antar Periode (wipe & replace periode tujuan)
+// CPMK id tetap sama (milik MK, bukan milik periode), jadi pemetaan CPMK
+// ikut tersalin langsung tanpa perlu translasi kode->id.
+// =========================================================
+export const salinRencanaEvaluasi = async (mkId, periodeAsalId, periodeTujuanId) => {
+    if (periodeAsalId === periodeTujuanId) {
+        throw new CustomError.BadRequestError("Periode asal dan tujuan tidak boleh sama");
+    }
+
+    const evaluasiAsal = await models.RencanaEvaluasi.findAll({
+        where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeAsalId },
+        include: [{ model: models.PemetaanEvaluasiCpmk, as: 'pemetaanCpmk', attributes: ['siakCpmkId', 'bobotCpmk'] }],
+        order: [['createdAt', 'ASC']]
+    });
+    if (evaluasiAsal.length === 0) throw new CustomError.NotFoundError("Rencana Evaluasi pada periode asal belum diisi");
+
+    return await sequelize.transaction(async (t) => {
+        const existingTujuan = await models.RencanaEvaluasi.findAll({
+            where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeTujuanId },
+            attributes: ['id'], transaction: t
+        });
+        const existingIds = existingTujuan.map(e => e.id);
+        if (existingIds.length > 0) {
+            await models.PemetaanEvaluasiCpmk.destroy({ where: { siakRencanaEvaluasiId: existingIds }, force: true, transaction: t });
+            await models.RencanaEvaluasi.destroy({ where: { id: existingIds }, force: true, transaction: t });
+        }
+
+        for (const evalAsal of evaluasiAsal) {
+            const evalBaru = await models.RencanaEvaluasi.create({
+                siakMataKuliahId: mkId,
+                siakPeriodeAkademikId: periodeTujuanId,
+                metodeEvaluasi: evalAsal.metodeEvaluasi,
+                jenisEvaluasi: evalAsal.jenisEvaluasi,
+                bobot: evalAsal.bobot,
+                syaratLulus: evalAsal.syaratLulus,
+                deskripsi: evalAsal.deskripsi,
+                deskripsiInggris: evalAsal.deskripsiInggris
+            }, { transaction: t });
+
+            const pivotData = (evalAsal.pemetaanCpmk || []).map(p => ({
+                siakRencanaEvaluasiId: evalBaru.id,
+                siakCpmkId: p.siakCpmkId,
+                bobotCpmk: p.bobotCpmk
+            }));
+            if (pivotData.length > 0) {
+                await models.PemetaanEvaluasiCpmk.bulkCreate(pivotData, { transaction: t });
+            }
+        }
+
+        return { jumlahDisalin: evaluasiAsal.length };
+    });
+};
+
+// =========================================================
+// RESET Rencana Evaluasi ke DEFAULT Program Studi
+// Ambil dari Template Evaluasi yang cocok (prodi + kurikulum + jenis MK ini),
+// wipe & replace Rencana Evaluasi periode ini. Pemetaan CPMK ikut dihapus
+// (kosong) karena Template Evaluasi sifatnya prodi-wide, tidak punya info CPMK
+// spesifik per MK -- koordinator perlu isi ulang pemetaan CPMK-nya manual.
+// =========================================================
+export const resetRencanaEvaluasi = async (mkId, periodeId) => {
+    const mk = await MataKuliah.findByPk(mkId, {
+        attributes: ['id', 'jenis', 'siakProgramStudiId', 'siakTahunKurikulumId']
+    });
+    if (!mk) throw new CustomError.NotFoundError("Mata Kuliah tidak ditemukan");
+
+    const templateList = await models.TemplateEvaluasi.findAll({
+        where: {
+            siakProgramStudiId: mk.siakProgramStudiId,
+            siakTahunKurikulumId: mk.siakTahunKurikulumId,
+            jenisMataKuliah: mk.jenis
+        },
+        order: [['createdAt', 'ASC']]
+    });
+    if (templateList.length === 0) {
+        throw new CustomError.NotFoundError("Template Evaluasi default untuk Program Studi & Jenis Mata Kuliah ini belum diisi");
+    }
+
+    return await sequelize.transaction(async (t) => {
+        const existing = await models.RencanaEvaluasi.findAll({
+            where: { siakMataKuliahId: mkId, siakPeriodeAkademikId: periodeId },
+            attributes: ['id'], transaction: t
+        });
+        const existingIds = existing.map(e => e.id);
+        if (existingIds.length > 0) {
+            await models.PemetaanEvaluasiCpmk.destroy({ where: { siakRencanaEvaluasiId: existingIds }, force: true, transaction: t });
+            await models.RencanaEvaluasi.destroy({ where: { id: existingIds }, force: true, transaction: t });
+        }
+
+        const dataBaru = templateList.map(tpl => ({
+            siakMataKuliahId: mkId,
+            siakPeriodeAkademikId: periodeId,
+            metodeEvaluasi: tpl.metodeEvaluasi,
+            jenisEvaluasi: tpl.jenisEvaluasi,
+            bobot: tpl.bobot,
+            syaratLulus: tpl.syaratLulus,
+            deskripsi: tpl.deskripsi,
+            deskripsiInggris: tpl.deskripsiInggris
+        }));
+        await models.RencanaEvaluasi.bulkCreate(dataBaru, { transaction: t });
+
+        return { jumlahDireset: dataBaru.length };
+    });
+};
+
 // ============================================================================
 // LAPORAN CETAK RPS LENGKAP (Kop + CP + Deskripsi + Rencana Pembelajaran + Rencana Evaluasi)
 // Menggabungkan data dari getFormDetailRps, getRencanaPembelajaran, getRencanaEvaluasi,

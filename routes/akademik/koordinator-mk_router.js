@@ -61,6 +61,9 @@ router.delete('/rencana-pembelajaran/:id', RpsController.deleteRencanaPembelajar
 // [6] Rencana Evaluasi
 router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.getRencanaEvaluasi);
 router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.saveRencanaEvaluasiList);
+router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi/pratinjau-salin', RpsController.pratinjauSalinRencanaEvaluasi);
+router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi/salin', RpsController.salinRencanaEvaluasi);
+router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi/reset', RpsController.resetRencanaEvaluasi);
 router.delete('/rencana-evaluasi/:id', RpsController.deleteRencanaEvaluasi);
 
 // Laporan Cetak RPS Lengkap (Kop + CP + Deskripsi + Rencana Pembelajaran + Rencana Evaluasi)
