@@ -433,6 +433,7 @@ export const getPesertaKelasList = async (kelasId) => {
         const mkId = kelas.siakMataKuliahId;
         const prodiId = kelas.mataKuliah?.siakProgramStudiId;
         const kurikulumId = kelas.mataKuliah?.siakTahunKurikulumId;
+        const periodeId = kelas.siakPeriodeAkademikId;
 
         // 2. Ambil komposisi nilai MK (dari Rencana Evaluasi, per MK + per periode)
         const komposisiList = await RencanaEvaluasi.findAll({
@@ -451,25 +452,41 @@ export const getPesertaKelasList = async (kelasId) => {
             };
         });
 
-        // 3. Ambil skala nilai dari DB, fallback ke DEFAULT jika kosong
+        // 3. Ambil skala nilai dari DB (scoping per Jenjang, bukan per Prodi --
+        // konsisten dengan Batas SKS/Predikat Kelulusan), fallback ke DEFAULT jika kosong
         let skalaAktif = DEFAULT_SKALA;
         if (prodiId && kurikulumId) {
-            const rawSkala = await SkalaPenilaian.findAll({
-                where: {
-                    siakProgramStudiId: prodiId,
-                    siakTahunKurikulumId: kurikulumId
-                },
-                attributes: ['hurufMutu', 'angkaMutu', 'nilaiMin', 'nilaiMax'],
-                order: [['nilaiMin', 'DESC']]
-            });
+            const prodi = await ProgramStudi.findByPk(prodiId, { attributes: ['siakJenjangId'] });
+            const jenjangId = prodi?.siakJenjangId;
 
-            if (rawSkala.length > 0) {
-                skalaAktif = rawSkala.map(s => ({
-                    hurufMutu: s.hurufMutu,
-                    angkaMutu: parseFloat(s.angkaMutu || 0),
-                    nilaiMin: parseFloat(s.nilaiMin || 0),
-                    nilaiMax: parseFloat(s.nilaiMax || 0),
-                }));
+            if (jenjangId) {
+                // Prioritas: skala nilai spesifik periode ini. Kalau belum ada
+                // (mis. belum di-set untuk periode berjalan), fallback ke skala
+                // nilai jenjang+kurikulum tanpa periode (data lama/legacy).
+                let rawSkala = periodeId
+                    ? await SkalaPenilaian.findAll({
+                        where: { siakJenjangId: jenjangId, siakTahunKurikulumId: kurikulumId, siakPeriodeAkademikId: periodeId },
+                        attributes: ['hurufMutu', 'angkaMutu', 'nilaiMin', 'nilaiMax'],
+                        order: [['nilaiMin', 'DESC']]
+                    })
+                    : [];
+
+                if (rawSkala.length === 0) {
+                    rawSkala = await SkalaPenilaian.findAll({
+                        where: { siakJenjangId: jenjangId, siakTahunKurikulumId: kurikulumId, siakPeriodeAkademikId: null },
+                        attributes: ['hurufMutu', 'angkaMutu', 'nilaiMin', 'nilaiMax'],
+                        order: [['nilaiMin', 'DESC']]
+                    });
+                }
+
+                if (rawSkala.length > 0) {
+                    skalaAktif = rawSkala.map(s => ({
+                        hurufMutu: s.hurufMutu,
+                        angkaMutu: parseFloat(s.angkaMutu || 0),
+                        nilaiMin: parseFloat(s.nilaiMin || 0),
+                        nilaiMax: parseFloat(s.nilaiMax || 0),
+                    }));
+                }
             }
         }
 

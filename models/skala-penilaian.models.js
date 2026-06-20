@@ -4,10 +4,19 @@ import { v7 as uuid7 } from 'uuid';
 export default (sequelize) => {
     class SkalaPenilaian extends Model {
         static associate(models) {
-            // Relasi ke Program Studi
+            // Relasi ke Program Studi (legacy, dipakai endpoint lama
+            // /ketentuan-akademik/skala-nilai -- fitur aktif sekarang pakai
+            // siakJenjangId, lihat relasi 'jenjang' di bawah)
             this.belongsTo(models.ProgramStudi, {
                 foreignKey: 'siak_program_studi_id',
                 as: 'programStudi'
+            });
+
+            // Relasi ke Jenjang (scoping aktif, konsisten dengan Batas SKS &
+            // Predikat Kelulusan)
+            this.belongsTo(models.Jenjang, {
+                foreignKey: 'siak_jenjang_id',
+                as: 'jenjang'
             });
 
             // Relasi ke Tahun Kurikulum
@@ -35,7 +44,12 @@ export default (sequelize) => {
             siakProgramStudiId: {
                 type: DataTypes.UUID,
                 field: 'siak_program_studi_id',
-                allowNull: false
+                allowNull: true // legacy -- fitur aktif sekarang pakai siakJenjangId
+            },
+            siakJenjangId: {
+                type: DataTypes.UUID,
+                field: 'siak_jenjang_id',
+                allowNull: true
             },
             siakTahunKurikulumId: {
                 type: DataTypes.UUID,

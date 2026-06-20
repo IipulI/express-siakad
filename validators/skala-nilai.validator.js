@@ -11,19 +11,16 @@ const validate = (req, res, next) => {
 
 export const validateGetSkalaNilai = [
     query('tahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID wajib valid UUID'),
+    query('jenjangId').isUUID().withMessage('Jenjang ID wajib valid UUID'),
     query('periodeId').optional().isUUID().withMessage('Periode ID harus UUID jika diisi'),
-    query('programStudiId').optional().isUUID().withMessage('Program Studi ID tidak valid'),
-    query('jenjangId').optional().isUUID().withMessage('Jenjang ID tidak valid'),
     validate
 ];
 
 export const validateUpsertSkalaNilai = [
     body('tahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID wajib valid UUID'),
-    body('periodeId').optional().isUUID().withMessage('Periode ID tidak valid'),
-    body('programStudiId').optional().isUUID().withMessage('Program Studi ID tidak valid'),
-    body('jenjangId').optional().isUUID().withMessage('Jenjang ID tidak valid'),
-    
-    // Validasi Array
+    body('jenjangId').isUUID().withMessage('Jenjang ID wajib valid UUID'),
+    body('periodeId').isUUID().withMessage('Berlaku Sejak Periode wajib dipilih'),
+
     body('dataSkala').isArray().withMessage('Format tidak valid! dataSkala harus berupa array'),
     body('dataSkala.*.grade').notEmpty().withMessage('Grade wajib diisi'),
     body('dataSkala.*.bobot').isFloat().withMessage('Bobot harus angka'),
@@ -31,5 +28,22 @@ export const validateUpsertSkalaNilai = [
     body('dataSkala.*.nilaiAtas').isFloat().withMessage('Nilai Atas harus angka'),
     body('dataSkala.*.keterangan').optional().isString(),
     body('dataSkala.*.nilaiDefault').isBoolean().withMessage('Nilai Default harus true/false'),
+    validate
+];
+
+export const validateGetPratinjauSalinSkalaNilai = [
+    query('jenjangIdAsal').isUUID().withMessage('Jenjang ID asal wajib valid UUID'),
+    query('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    query('periodeIdAsal').isUUID().withMessage('Berlaku Sejak Periode (asal) wajib dipilih'),
+    validate
+];
+
+export const validateSalinSkalaNilai = [
+    body('jenjangIdAsal').isUUID().withMessage('Jenjang ID asal wajib valid UUID'),
+    body('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    body('periodeIdAsal').isUUID().withMessage('Berlaku Sejak Periode (asal) wajib dipilih'),
+    body('jenjangIdTujuan').isUUID().withMessage('Jenjang ID tujuan wajib valid UUID'),
+    body('tahunKurikulumIdTujuan').isUUID().withMessage('Tahun Kurikulum ID tujuan wajib valid UUID'),
+    body('periodeIdTujuan').isUUID().withMessage('Berlaku Sejak Periode (tujuan) wajib dipilih'),
     validate
 ];

@@ -86,18 +86,36 @@ import * as CustomError from "../../utils/custom-error.js";
 
 export const fetchSkalaNilai = async (req, res, next) => {
     try {
-        const { programStudiId, jenjangId, tahunKurikulumId, periodeId } = req.query;
+        const { jenjangId, tahunKurikulumId, periodeId } = req.query;
 
-        // Pengecekan: Minimal harus ngirim salah satu (Prodi atau Jenjang)
-        if (!programStudiId && !jenjangId) {
-            throw new CustomError.BadRequestError("Pilih salah satu: programStudiId atau jenjangId wajib dikirim!");
-        }
+        const data = await skalaNilaiService.getSkalaNilaiList({ jenjangId, tahunKurikulumId, periodeId });
 
-        const data = await skalaNilaiService.getSkalaNilaiList({ programStudiId, jenjangId, tahunKurikulumId, periodeId });
-        
         return new ResponseBuilder(res)
             .code(200)
             .message("Data Skala Nilai berhasil diambil")
+            .json(data);
+    } catch (error) { next(error); }
+};
+
+export const fetchPratinjauSalinSkalaNilai = async (req, res, next) => {
+    try {
+        const { jenjangIdAsal, tahunKurikulumIdAsal, periodeIdAsal } = req.query;
+        const data = await skalaNilaiService.pratinjauSalinSkalaNilai(jenjangIdAsal, tahunKurikulumIdAsal, periodeIdAsal);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Pratinjau Skala Nilai sumber")
+            .json(data);
+    } catch (error) { next(error); }
+};
+
+export const postSalinSkalaNilai = async (req, res, next) => {
+    try {
+        const data = await skalaNilaiService.salinSkalaNilai(req.body);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil menyalin ${data.jumlahDisalin} baris Skala Nilai`)
             .json(data);
     } catch (error) { next(error); }
 };
