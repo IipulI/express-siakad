@@ -1,7 +1,8 @@
 import express from 'express';
 import * as MkKurikulumController from '../../controllers/akademik/mata-kuliah-kurikulum.controller.js';
-import { 
-    validateGetRekapSks, validateAssignMk, validateUpdateMk, validateIdParam 
+import {
+    validateGetRekapSks, validateAssignMk, validateUpdateMk, validateIdParam,
+    validateGetPratinjauSalinMataKuliahKurikulum, validateSalinMataKuliahKurikulum
 } from '../../validators/mata-kuliah-kurikulum.validator.js';
 
 const router = express.Router();
@@ -32,6 +33,11 @@ router.get('/rekap-sks', validateGetRekapSks, MkKurikulumController.fetchRekapDi
 router.get('/per-semester', MkKurikulumController.fetchMataKuliahPerSemester); // Bisa tambah validator query juga nanti
 router.get('/dropdown-prasyarat', MkKurikulumController.fetchDropdownPrasyarat);
 router.get('/dropdown-konsentrasi', MkKurikulumController.fetchDropdownKonsentrasi);
+
+// SALIN DATA -- harus ditaruh SEBELUM "/:id" supaya tidak ketangkap jadi param :id
+router.get('/pratinjau-salin', validateGetPratinjauSalinMataKuliahKurikulum, MkKurikulumController.fetchPratinjauSalinMataKuliahKurikulum);
+router.post('/salin', validateSalinMataKuliahKurikulum, MkKurikulumController.postSalinMataKuliahKurikulum);
+
 router.get('/:id', validateIdParam, MkKurikulumController.fetchDetailMataKuliah);
 
 // --- CREATE, UPDATE, DELETE ---

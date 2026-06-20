@@ -120,6 +120,21 @@ export const deleteMataKuliahKurikulum = async (req, res, next) => {
         return new ResponseBuilder(res).code(200).message("Berhasil menghapus Mata Kuliah").json({});
     } catch (error) { next(error); }
 };
+
+export const fetchPratinjauSalinMataKuliahKurikulum = async (req, res, next) => {
+    try {
+        const { prodiId, tahunKurikulumIdAsal } = req.query;
+        const data = await mkKurikulumService.pratinjauSalinMataKuliahKurikulum(prodiId, tahunKurikulumIdAsal);
+        return new ResponseBuilder(res).code(200).message("Pratinjau Mata Kuliah Kurikulum sumber").json(data);
+    } catch (error) { next(error); }
+};
+
+export const postSalinMataKuliahKurikulum = async (req, res, next) => {
+    try {
+        const data = await mkKurikulumService.salinMataKuliahKurikulum(req.body);
+        return new ResponseBuilder(res).code(200).message(`Berhasil menyalin ${data.jumlahDisalin} Mata Kuliah`).json(data);
+    } catch (error) { next(error); }
+};
 // --- 6. DELETE: Hapus Data (Tombol Tong Sampah) ---
 // export const deleteMataKuliahKurikulum = async (req, res) => {
 //     const responseBuilder = new ResponseBuilder(res);

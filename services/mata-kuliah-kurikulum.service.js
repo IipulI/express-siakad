@@ -421,8 +421,127 @@ export const updateMataKuliahKurikulum = async (id, payload) => {
 export const removeMataKuliah = async (id) => {
     const mk = await MataKuliah.findByPk(id);
     if (!mk) throw new CustomError.NotFoundError("Mata Kuliah tidak ditemukan!");
-    await mk.destroy(); 
+    await mk.destroy();
     return true;
+};
+
+// =========================================================
+// PRATINJAU SALIN Mata Kuliah Kurikulum (lihat isi sumber sebelum disalin)
+// =========================================================
+export const pratinjauSalinMataKuliahKurikulum = async (prodiId, tahunKurikulumIdAsal) => {
+    const mkAsal = await MataKuliah.findAll({
+        where: { siakProgramStudiId: prodiId, siakTahunKurikulumId: tahunKurikulumIdAsal },
+        attributes: ['kode', 'nama', 'semester', 'totalSks', 'opsiWajib'],
+        order: [['semester', 'ASC'], ['kode', 'ASC']]
+    });
+    if (mkAsal.length === 0) throw new CustomError.NotFoundError("Mata Kuliah pada Kurikulum asal belum diisi");
+
+    const kurikulum = await TahunKurikulum.findByPk(tahunKurikulumIdAsal, { attributes: ['tahun'] });
+
+    return {
+        tahunKurikulumAsal: kurikulum?.tahun || '-',
+        totalMataKuliah: mkAsal.length,
+        totalSks: mkAsal.reduce((sum, mk) => sum + (mk.totalSks || 0), 0),
+        mataKuliah: mkAsal.map(mk => ({
+            kode: mk.kode,
+            nama: mk.nama,
+            semester: mk.semester,
+            totalSks: mk.totalSks,
+            statusMk: mk.opsiWajib ? 'Wajib' : 'Pilihan'
+        }))
+    };
+};
+
+// =========================================================
+// SALIN Mata Kuliah Kurikulum (wipe & replace tujuan: prodi + kurikulum tujuan)
+// Prasyarat (relasi antar-MK) dipetakan ulang berdasarkan KODE, karena ID MK
+// di kurikulum asal tidak relevan lagi untuk baris baru di kurikulum tujuan.
+// =========================================================
+export const salinMataKuliahKurikulum = async (payload) => {
+    const { prodiId, tahunKurikulumIdAsal, tahunKurikulumIdTujuan } = payload;
+
+    if (tahunKurikulumIdAsal === tahunKurikulumIdTujuan) {
+        throw new CustomError.BadRequestError("Kurikulum asal dan tujuan tidak boleh sama");
+    }
+
+    const mkAsal = await MataKuliah.findAll({
+        where: { siakProgramStudiId: prodiId, siakTahunKurikulumId: tahunKurikulumIdAsal }
+    });
+    if (mkAsal.length === 0) throw new CustomError.NotFoundError("Mata Kuliah pada Kurikulum asal belum diisi");
+
+    return await models.sequelize.transaction(async (trx) => {
+        // Wipe MK lama di kurikulum tujuan (hard delete, supaya kode tidak bentrok)
+        await MataKuliah.destroy({
+            where: { siakProgramStudiId: prodiId, siakTahunKurikulumId: tahunKurikulumIdTujuan },
+            force: true,
+            transaction: trx
+        });
+
+        const mkLamaById = new Map(mkAsal.map(mk => [mk.id, mk]));
+        const kodeKeIdBaru = new Map();
+        const pasanganLamaBaru = [];
+
+        for (const lama of mkAsal) {
+            const baru = await MataKuliah.create({
+                siakProgramStudiId: prodiId,
+                siakTahunKurikulumId: tahunKurikulumIdTujuan,
+                nama: lama.nama,
+                kode: lama.kode,
+                jenis: lama.jenis,
+                semester: lama.semester,
+                nilaiMin: lama.nilaiMin,
+                adaPraktikum: lama.adaPraktikum,
+                opsiWajib: lama.opsiWajib,
+                sksTatapMuka: lama.sksTatapMuka,
+                sksPraktikum: lama.sksPraktikum,
+                sksPraktikLapangan: lama.sksPraktikLapangan,
+                totalSks: lama.totalSks,
+                namaEn: lama.namaEn,
+                siakKelompokMataKuliahId: lama.siakKelompokMataKuliahId,
+                siakRumpunMataKuliahId: lama.siakRumpunMataKuliahId,
+                sksSimulasi: lama.sksSimulasi,
+                merupakanMku: lama.merupakanMku,
+                adaSap: lama.adaSap,
+                adaSilabus: lama.adaSilabus,
+                adaBahanAjar: lama.adaBahanAjar,
+                adaDiktat: lama.adaDiktat,
+                levelPemetaan: lama.levelPemetaan,
+                metodePembobotan: lama.metodePembobotan,
+                topik: lama.topik,
+                kompetensiDasar: lama.kompetensiDasar,
+                sksMinimal: lama.sksMinimal,
+                isPaket: lama.isPaket
+            }, { transaction: trx });
+
+            kodeKeIdBaru.set(lama.kode, baru.id);
+            pasanganLamaBaru.push({ lama, baru });
+        }
+
+        // Remap prasyarat: cari kode MK lama yang jadi prasyarat, lalu pakai
+        // id baru dengan kode yang sama di kurikulum tujuan (kalau ada).
+        for (const { lama, baru } of pasanganLamaBaru) {
+            const cariIdBaru = (idPrasyaratLama) => {
+                if (!idPrasyaratLama) return null;
+                const mkPrasyaratLama = mkLamaById.get(idPrasyaratLama);
+                if (!mkPrasyaratLama) return null;
+                return kodeKeIdBaru.get(mkPrasyaratLama.kode) || null;
+            };
+
+            const p1 = cariIdBaru(lama.prasyaratMataKuliah1);
+            const p2 = cariIdBaru(lama.prasyaratMataKuliah2);
+            const p3 = cariIdBaru(lama.prasyaratMataKuliah3);
+
+            if (p1 || p2 || p3) {
+                await baru.update({
+                    prasyaratMataKuliah1: p1,
+                    prasyaratMataKuliah2: p2,
+                    prasyaratMataKuliah3: p3
+                }, { transaction: trx });
+            }
+        }
+
+        return { jumlahDisalin: pasanganLamaBaru.length };
+    });
 };
 // --- 7. GET DROPDOWN PRASYARAT (Menarik semua MK untuk Dropdown Prasyarat) ---
 export const getDropdownPrasyarat = async (prodiId, tahunKurikulumId) => {

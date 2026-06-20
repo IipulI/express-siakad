@@ -57,6 +57,19 @@ export const validateListProdi = [
     validate
 ];
 
+export const validateGetPratinjauSalinMataKuliahKurikulum = [
+    query('prodiId').isUUID().withMessage('Prodi ID wajib valid UUID'),
+    query('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    validate
+];
+
+export const validateSalinMataKuliahKurikulum = [
+    body('prodiId').isUUID().withMessage('Prodi ID wajib valid UUID'),
+    body('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    body('tahunKurikulumIdTujuan').isUUID().withMessage('Tahun Kurikulum ID tujuan wajib valid UUID'),
+    validate
+];
+
 export const validateSetObe = [
     body('programStudiId').isUUID().withMessage('Program Studi ID wajib UUID'),
     body('tahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID wajib UUID'),
