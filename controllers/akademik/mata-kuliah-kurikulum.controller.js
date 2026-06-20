@@ -1,6 +1,5 @@
 import * as mkKurikulumService from '../../services/mata-kuliah-kurikulum.service.js';
 import ResponseBuilder from "../../utils/response.js";
-import * as CustomError from "../../utils/custom-error.js";
 
 // --- 1. GET REKAP DISTRIBUSI SKS ---
 // export const fetchRekapDistribusiSks = async (req, res) => {
@@ -26,14 +25,10 @@ import * as CustomError from "../../utils/custom-error.js";
 // };
 export const fetchRekapDistribusiSks = async (req, res, next) => {
     try {
-        // 👇 Tambahkan jenjangId di sini
+        // jenjangId/prodiId/tahunKurikulumId semua opsional -- kalau ketiganya
+        // kosong ("-- Semua --" di UI), tampilkan semua kombinasi (pagination
+        // yang sudah ada di service tetap berlaku).
         const { jenjangId, prodiId, tahunKurikulumId, page, limit } = req.query;
-        
-        // Cek minimal ada salah satu filter utama (Opsional, biar DB gak ditarik semua kalau datanya jutaan)
-        if (!jenjangId && !prodiId && !tahunKurikulumId) {
-            throw new CustomError.BadRequestError("Minimal masukkan filter Jenjang, Prodi, atau Tahun Kurikulum!");
-        }
-
         const filters = { jenjangId, prodiId, tahunKurikulumId, page, limit };
 
         const data = await mkKurikulumService.getRekapDistribusiSks(filters);
