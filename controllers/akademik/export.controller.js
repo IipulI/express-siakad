@@ -25,6 +25,79 @@ const buildFooter = (namaPencetak) => {
 };
 
 // ============================================================================
+// TABEL GRID MANUAL (full border setiap sel, mirip tabel HTML/Excel) --
+// pdfkit-table cuma support garis pembatas horizontal, tidak ada border
+// vertikal antar kolom, sehingga hasilnya terlihat "kosong"/tidak rapat
+// dibanding Laporan Silabus referensi. Header otomatis diulang tiap halaman
+// kalau tabel terpotong (sama seperti laporan cetak HTML pada umumnya).
+// ============================================================================
+const drawGridTable = (doc, { columns, rows, headerFontSize = 8, rowFontSize = 7 }) => {
+    const padding = 4;
+    const lineColor = '#000000';
+    const headerBg = '#D9D9D9';
+    const startX = doc.page.margins.left;
+    const tableWidth = columns.reduce((sum, c) => sum + c.width, 0);
+    const bottomLimit = doc.page.height - doc.page.margins.bottom;
+
+    doc.lineWidth(0.75);
+
+    const drawHeader = () => {
+        doc.font('Helvetica-Bold').fontSize(headerFontSize);
+        const headerHeight = Math.max(
+            16,
+            ...columns.map(c => doc.heightOfString(c.label, { width: c.width - padding * 2 }))
+        ) + padding * 2;
+
+        const y0 = doc.y;
+        doc.rect(startX, y0, tableWidth, headerHeight).fillAndStroke(headerBg, lineColor);
+
+        let x = startX;
+        columns.forEach(c => {
+            doc.rect(x, y0, c.width, headerHeight).stroke(lineColor);
+            doc.fillColor('black').text(c.label, x + padding, y0 + padding, {
+                width: c.width - padding * 2,
+                align: c.align || 'left'
+            });
+            x += c.width;
+        });
+        doc.y = y0 + headerHeight;
+        doc.x = startX;
+    };
+
+    drawHeader();
+
+    doc.font('Helvetica').fontSize(rowFontSize);
+    rows.forEach(cells => {
+        const rowHeight = Math.max(
+            14,
+            ...columns.map((c, i) => doc.heightOfString(String(cells[i] ?? '-'), { width: c.width - padding * 2 }))
+        ) + padding * 2;
+
+        if (doc.y + rowHeight > bottomLimit) {
+            doc.addPage();
+            drawHeader();
+            doc.font('Helvetica').fontSize(rowFontSize);
+        }
+
+        const y0 = doc.y;
+        let x = startX;
+        columns.forEach((c, i) => {
+            doc.rect(x, y0, c.width, rowHeight).stroke(lineColor);
+            doc.fillColor('black').text(String(cells[i] ?? '-'), x + padding, y0 + padding, {
+                width: c.width - padding * 2,
+                align: c.align || 'left'
+            });
+            x += c.width;
+        });
+        doc.y = y0 + rowHeight;
+        doc.x = startX;
+    });
+
+    doc.x = startX;
+    doc.moveDown(0.6);
+};
+
+// ============================================================================
 // 1. EXPORT EXCEL - MANAJEMEN PL
 // ============================================================================
 
@@ -2767,36 +2840,39 @@ const renderRpsKeDokumen = async (doc, data, namaPencetak) => {
         doc.font('Helvetica-Bold').fontSize(11).text('Rencana Pembelajaran', { underline: true });
         doc.moveDown(0.5);
 
-        const rpRows = data.rencanaPembelajaran.map(r => ({
-            sesi: String(r.sesi),
-            cpmk: r.cpmkSubCpmk.map(p => {
+        const rpRows = data.rencanaPembelajaran.map(r => {
+            const cpmk = r.cpmkSubCpmk.map(p => {
                 const subText = (p.subCpmk || []).map(s => `${s.kode}: ${s.deskripsi}`).join('\n');
                 return `${p.kode}: ${p.deskripsi}${subText ? '\n' + subText : ''}`;
-            }).join('\n\n'),
-            indikator: r.indikatorPenilaian || '-',
-            kriteria: r.kriteriaPenilaian || '-',
-            luring: r.bentukLuring || '-',
-            daring: r.bentukDaring || '-',
-            materi: r.materiPembelajaran || '-',
-            bobot: r.bobotPenilaian ? `${r.bobotPenilaian}%` : '-'
-        }));
+            }).join('\n\n');
+            return [
+                String(r.sesi), cpmk || '-', r.indikatorPenilaian || '-', r.kriteriaPenilaian || '-',
+                r.bentukLuring || '-', r.bentukDaring || '-', r.materiPembelajaran || '-',
+                r.bobotPenilaian ? `${r.bobotPenilaian}%` : '-'
+            ];
+        });
 
         if (rpRows.length > 0) {
-            await doc.table({
-                headers: [
-                    { label: 'Mg', property: 'sesi', width: 25, align: 'center' },
-                    { label: 'CPMK / Sub-CPMK', property: 'cpmk', width: 140 },
-                    { label: 'Indikator', property: 'indikator', width: 110 },
-                    { label: 'Kriteria & Bentuk', property: 'kriteria', width: 90 },
-                    { label: 'Luring', property: 'luring', width: 80 },
-                    { label: 'Daring', property: 'daring', width: 70 },
-                    { label: 'Materi Pembelajaran', property: 'materi', width: 110 },
-                    { label: 'Bobot (%)', property: 'bobot', width: 50, align: 'center' }
+            // Lebar kolom diskalakan proporsional supaya tabel mengisi penuh
+            // lebar halaman (landscape A4 dikurangi margin), persis tampilan
+            // tabel HTML pada Laporan Silabus referensi.
+            const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+            const baseWidths = [25, 140, 110, 90, 80, 70, 110, 50];
+            const scale = usableWidth / baseWidths.reduce((a, b) => a + b, 0);
+            const [wMg, wCpmk, wIndikator, wKriteria, wLuring, wDaring, wMateri, wBobot] = baseWidths.map(w => w * scale);
+
+            drawGridTable(doc, {
+                columns: [
+                    { label: 'Mg', width: wMg, align: 'center' },
+                    { label: 'CPMK / Sub-CPMK', width: wCpmk },
+                    { label: 'Indikator', width: wIndikator },
+                    { label: 'Kriteria & Bentuk', width: wKriteria },
+                    { label: 'Luring', width: wLuring },
+                    { label: 'Daring', width: wDaring },
+                    { label: 'Materi Pembelajaran', width: wMateri },
+                    { label: 'Bobot (%)', width: wBobot, align: 'center' }
                 ],
-                datas: rpRows
-            }, {
-                prepareHeader: () => doc.font('Helvetica-Bold').fontSize(8),
-                prepareRow: () => doc.font('Helvetica').fontSize(7)
+                rows: rpRows
             });
         } else {
             doc.font('Helvetica').fontSize(9).text('Belum ada data Rencana Pembelajaran.');
@@ -2810,14 +2886,16 @@ const renderRpsKeDokumen = async (doc, data, namaPencetak) => {
         doc.moveDown(0.5);
 
         const kolomCpmk = data.rencanaEvaluasi.kolomCpmk;
-        const reRows = data.rencanaEvaluasi.baris.map(b => {
-            const row = { unsur: b.metodeEvaluasi, metode: b.jenisEvaluasi, total: b.total.toFixed(2) };
-            kolomCpmk.forEach((k, idx) => { row[`k${idx}`] = b.bobotPerKolom[idx] ? b.bobotPerKolom[idx].toFixed(2) : '-'; });
-            return row;
-        });
-        const totalRow = { unsur: '', metode: 'Total', total: data.rencanaEvaluasi.totalKeseluruhan.toFixed(2) };
-        kolomCpmk.forEach((k, idx) => { totalRow[`k${idx}`] = data.rencanaEvaluasi.totalPerKolom[idx].toFixed(2); });
-        reRows.push(totalRow);
+        const reRows = data.rencanaEvaluasi.baris.map(b => [
+            b.metodeEvaluasi, b.jenisEvaluasi,
+            ...kolomCpmk.map((k, idx) => (b.bobotPerKolom[idx] ? b.bobotPerKolom[idx].toFixed(2) : '-')),
+            b.total.toFixed(2)
+        ]);
+        reRows.push([
+            '', 'Total',
+            ...kolomCpmk.map((k, idx) => data.rencanaEvaluasi.totalPerKolom[idx].toFixed(2)),
+            data.rencanaEvaluasi.totalKeseluruhan.toFixed(2)
+        ]);
 
         if (kolomCpmk.length > 0) {
             // Hitung lebar kolom dinamis berdasarkan lebar halaman SEBENARNYA (landscape A4,
@@ -2829,17 +2907,16 @@ const renderRpsKeDokumen = async (doc, data, namaPencetak) => {
             const colWidth = Math.max(20, Math.floor(sisaWidth / kolomCpmk.length));
             const fontSize = colWidth < 28 ? 6 : 7;
 
-            await doc.table({
-                headers: [
-                    { label: 'Unsur Nilai', property: 'unsur', width: unsurW },
-                    { label: 'Metode Evaluasi', property: 'metode', width: metodeW },
-                    ...kolomCpmk.map((k, idx) => ({ label: k.kode, property: `k${idx}`, width: colWidth, align: 'center' })),
-                    { label: 'Total', property: 'total', width: totalW, align: 'center' }
+            drawGridTable(doc, {
+                columns: [
+                    { label: 'Unsur Nilai', width: unsurW },
+                    { label: 'Metode Evaluasi', width: metodeW },
+                    ...kolomCpmk.map(k => ({ label: k.kode, width: colWidth, align: 'center' })),
+                    { label: 'Total', width: totalW, align: 'center' }
                 ],
-                datas: reRows
-            }, {
-                prepareHeader: () => doc.font('Helvetica-Bold').fontSize(fontSize),
-                prepareRow: () => doc.font('Helvetica').fontSize(fontSize)
+                rows: reRows,
+                headerFontSize: fontSize,
+                rowFontSize: fontSize
             });
         } else {
             doc.font('Helvetica').fontSize(9).text('Belum ada data Rencana Evaluasi.');
