@@ -85,21 +85,23 @@ export const getRekapDistribusiSks = async (filters) => {
         return getPagingData({ count: 0, rows: [] }, page, pagination.limit);
     }
 
-    // 2. Pagination Kurikulum
+    // 2. Ambil SEMUA Tahun Kurikulum yang cocok filter -- TIDAK dipaginasi di
+    // sini. Setiap baris hasil = 1 kombinasi tahun×prodi, jadi pagination
+    // yang benar harus diterapkan ke baris hasil (di bawah), bukan ke jumlah
+    // Tahun Kurikulum (kalau dipaginasi di sini, hasilnya jadi tidak nyambung
+    // dengan perPage yang diminta -- itu bug yang baru diperbaiki).
     const kurikulumWhere = {};
     if (tahunKurikulumId) kurikulumWhere.id = tahunKurikulumId;
 
-    const listTahunKurikulum = await TahunKurikulum.findAndCountAll({
+    const listTahunKurikulum = await TahunKurikulum.findAll({
         where: kurikulumWhere,
-        order: [['tahun', 'DESC']],
-        limit: pagination.limit,
-        offset: pagination.offset
+        order: [['tahun', 'DESC']]
     });
 
     // 3. Looping kombinasi Kurikulum dan Prodi (Matriks Data)
     const resultData = [];
 
-    for (const kurikulum of listTahunKurikulum.rows) {
+    for (const kurikulum of listTahunKurikulum) {
         for (const prodi of listProdi) {
             // Tarik nama Jenjang
             let namaJenjang = 'S1';
@@ -154,13 +156,11 @@ export const getRekapDistribusiSks = async (filters) => {
         return a.kodeProdi.localeCompare(b.kodeProdi);
     });
 
-    // 👇 4. BUNGKUS DENGAN getPagingData DARI UTILS ABANG 👇
-    const resultForUtils = {
-        count: listTahunKurikulum.count,
-        rows: resultData
-    };
+    // 👇 4. PAGINASI BARIS HASIL (bukan jumlah Tahun Kurikulum) 👇
+    const totalItems = resultData.length;
+    const pagedRows = resultData.slice(pagination.offset, pagination.offset + pagination.limit);
 
-    return getPagingData(resultForUtils, page, pagination.limit);
+    return getPagingData({ count: totalItems, rows: pagedRows }, page, pagination.limit);
 };
 // --- 2. DAFTAR MATA KULIAH PER SEMESTER (Untuk Tabel Semester 1 - 8) ---
 export const getMataKuliahPerSemester = async (prodiId, tahunKurikulumId) => {
