@@ -110,16 +110,27 @@ export const deleteSkalaNilai = async (id) => {
     return await data.destroy();
 };
 
+// Cari Skala Nilai sumber: utamakan yang match persis periodeId-nya, kalau
+// belum ada (mis. data lama sebelum fitur ini di-scope per periode), fallback
+// ke baris tanpa periode (legacy/baseline) untuk jenjang+kurikulum yang sama.
+const _cariSkalaAsal = async (jenjangId, tahunKurikulumId, periodeId) => {
+    const { SkalaPenilaian } = models;
+    const opsiUmum = { where: { siak_jenjang_id: jenjangId, siak_tahun_kurikulum_id: tahunKurikulumId }, order: [['angkaMutu', 'DESC']] };
+
+    let rows = await SkalaPenilaian.findAll({ ...opsiUmum, where: { ...opsiUmum.where, siak_periode_akademik_id: periodeId } });
+    if (rows.length === 0) {
+        rows = await SkalaPenilaian.findAll({ ...opsiUmum, where: { ...opsiUmum.where, siak_periode_akademik_id: null } });
+    }
+    return rows;
+};
+
 // =========================================================
 // PRATINJAU SALIN Skala Nilai (lihat isi sumber sebelum disalin)
 // =========================================================
 export const pratinjauSalinSkalaNilai = async (jenjangIdAsal, tahunKurikulumIdAsal, periodeIdAsal) => {
-    const { SkalaPenilaian, Jenjang, TahunKurikulum } = models;
+    const { Jenjang, TahunKurikulum } = models;
 
-    const skalaAsal = await SkalaPenilaian.findAll({
-        where: { siak_jenjang_id: jenjangIdAsal, siak_tahun_kurikulum_id: tahunKurikulumIdAsal, siak_periode_akademik_id: periodeIdAsal },
-        order: [['angkaMutu', 'DESC']]
-    });
+    const skalaAsal = await _cariSkalaAsal(jenjangIdAsal, tahunKurikulumIdAsal, periodeIdAsal);
     if (skalaAsal.length === 0) throw new CustomError.NotFoundError("Skala Nilai pada Jenjang & Tahun Kurikulum asal belum diisi");
 
     const jenjang = await Jenjang.findByPk(jenjangIdAsal, { attributes: ['jenjang'] });
@@ -149,9 +160,7 @@ export const salinSkalaNilai = async (payload) => {
     if (!periodeIdAsal) throw new CustomError.BadRequestError("Berlaku Sejak Periode (asal) wajib diisi");
     if (!periodeIdTujuan) throw new CustomError.BadRequestError("Berlaku Sejak Periode (tujuan) wajib diisi");
 
-    const skalaAsal = await SkalaPenilaian.findAll({
-        where: { siak_jenjang_id: jenjangIdAsal, siak_tahun_kurikulum_id: tahunKurikulumIdAsal, siak_periode_akademik_id: periodeIdAsal }
-    });
+    const skalaAsal = await _cariSkalaAsal(jenjangIdAsal, tahunKurikulumIdAsal, periodeIdAsal);
     if (skalaAsal.length === 0) throw new CustomError.NotFoundError("Skala Nilai pada Jenjang & Tahun Kurikulum asal belum diisi");
 
     return await models.sequelize.transaction(async (trx) => {
