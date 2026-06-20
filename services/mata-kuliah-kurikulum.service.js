@@ -117,9 +117,9 @@ export const getRekapDistribusiSks = async (filters) => {
                 attributes: ['id', 'opsiWajib', 'totalSks'] 
             });
 
-            // Kalau gak ada MK di prodi & kurikulum ini, jangan dimasukin ke tabel
-            if (daftarMk.length === 0) continue; 
-
+            // Tetap dimasukkan ke tabel walau belum ada MK -- tampil 0/0/0,
+            // bukan disembunyikan, supaya prodi yang belum input kurikulum
+            // tetap kelihatan di rekap.
             let sksWajib = 0;
             let sksPilihan = 0;
 
