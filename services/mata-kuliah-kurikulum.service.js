@@ -144,6 +144,16 @@ export const getRekapDistribusiSks = async (filters) => {
         }
     }
 
+    // Urut: tahun kurikulum terbaru dulu, lalu di dalam tahun yang sama
+    // prodi yang SUDAH ada datanya (totalSks > 0) ditaruh paling atas.
+    resultData.sort((a, b) => {
+        if (a.tahun !== b.tahun) return b.tahun.localeCompare(a.tahun);
+        const aAdaData = a.totalSks > 0 ? 0 : 1;
+        const bAdaData = b.totalSks > 0 ? 0 : 1;
+        if (aAdaData !== bAdaData) return aAdaData - bAdaData;
+        return a.kodeProdi.localeCompare(b.kodeProdi);
+    });
+
     // 👇 4. BUNGKUS DENGAN getPagingData DARI UTILS ABANG 👇
     const resultForUtils = {
         count: listTahunKurikulum.count,
