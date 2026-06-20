@@ -492,3 +492,20 @@ export const getLaporanRpsCetak = async (req, res, next) => {
         next(error);
     }
 };
+
+// =========================================================
+// CONTROLLER: Pratinjau Laporan RPS Gabungan (semua MK dalam 1 Prodi + Tahun Kurikulum)
+// =========================================================
+export const getLaporanRpsGabunganProdi = async (req, res, next) => {
+    try {
+        const { prodiId, tahunKurikulumId, periodeId } = req.query;
+        const data = await rpsService.getLaporanRpsGabunganProdi(prodiId, tahunKurikulumId, periodeId || null);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil mengambil pratinjau RPS gabungan (${data.jumlahMataKuliah} Mata Kuliah)`)
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};

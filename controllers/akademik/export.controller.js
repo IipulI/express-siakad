@@ -4,6 +4,7 @@ import axios from 'axios';
 import * as obeService from '../../services/obe.service.js';
 import * as MonitoringService from '../../services/monitoring.service.js';
 import * as rpsService from '../../services/rps.service.js';
+import * as CustomError from '../../utils/custom-error.js';
 
 import path from 'path';
 
@@ -2691,19 +2692,11 @@ export const exportPdfTranskripObeMahasiswa = async (req, res, next) => {
 // };
 
 // ============================================================================
-// EXPORT PDF — LAPORAN CETAK RPS LENGKAP
+// HELPER — Render 1 Laporan RPS (data dari getLaporanRpsCetak) ke dalam
+// PDFDocument yang sedang berjalan. Dipanggil sekali per Mata Kuliah; bisa
+// dipanggil berulang dalam 1 dokumen yang sama untuk laporan gabungan.
 // ============================================================================
-export const exportPdfLaporanRps = async (req, res, next) => {
-    try {
-        const { mataKuliahId } = req.params;
-        const { periodeId } = req.query;
-        const data = await rpsService.getLaporanRpsCetak(mataKuliahId, periodeId || null);
-
-        const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="RPS_${data.mataKuliah.kode}.pdf"`);
-        doc.pipe(res);
-
+const renderRpsKeDokumen = async (doc, data, namaPencetak) => {
         // =========================================================
         // A. KOP
         // =========================================================
@@ -2857,7 +2850,54 @@ export const exportPdfLaporanRps = async (req, res, next) => {
         // =========================================================
         doc.moveDown(1);
         doc.font('Helvetica').fontSize(7).fillColor('#555555')
-            .text(buildFooter(req.user?.nama || req.user?.name || 'Sistem'));
+            .text(buildFooter(namaPencetak));
+};
+
+// ============================================================================
+// EXPORT PDF — LAPORAN CETAK RPS LENGKAP (1 Mata Kuliah)
+// ============================================================================
+export const exportPdfLaporanRps = async (req, res, next) => {
+    try {
+        const { mataKuliahId } = req.params;
+        const { periodeId } = req.query;
+        const data = await rpsService.getLaporanRpsCetak(mataKuliahId, periodeId || null);
+
+        const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="RPS_${data.mataKuliah.kode}.pdf"`);
+        doc.pipe(res);
+
+        await renderRpsKeDokumen(doc, data, req.user?.nama || req.user?.name || 'Sistem');
+
+        doc.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============================================================================
+// EXPORT PDF — LAPORAN CETAK RPS GABUNGAN (semua Mata Kuliah dalam 1 Prodi +
+// Tahun Kurikulum, ditumpuk jadi 1 file, masing-masing MK mulai di halaman baru)
+// ============================================================================
+export const exportPdfLaporanRpsGabungan = async (req, res, next) => {
+    try {
+        const { prodiId, tahunKurikulumId, periodeId } = req.query;
+        const gabungan = await rpsService.getLaporanRpsGabunganProdi(prodiId, tahunKurikulumId, periodeId || null);
+
+        if (gabungan.daftarRps.length === 0) {
+            throw new CustomError.NotFoundError("Belum ada Mata Kuliah untuk Program Studi dan Tahun Kurikulum ini");
+        }
+
+        const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="RPS_Gabungan_${gabungan.tahunKurikulum}.pdf"`);
+        doc.pipe(res);
+
+        const namaPencetak = req.user?.nama || req.user?.name || 'Sistem';
+        for (let i = 0; i < gabungan.daftarRps.length; i++) {
+            if (i > 0) doc.addPage();
+            await renderRpsKeDokumen(doc, gabungan.daftarRps[i], namaPencetak);
+        }
 
         doc.end();
     } catch (error) {

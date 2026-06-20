@@ -1472,3 +1472,40 @@ export const getLaporanRpsCetak = async (mkId, periodeId = null) => {
         }
     };
 };
+
+// ============================================================================
+// LAPORAN CETAK RPS GABUNGAN -- semua Mata Kuliah dalam 1 Program Studi +
+// Tahun Kurikulum, digabung jadi 1 daftar (dasar utk pratinjau JSON & PDF
+// gabungan, mirip Laporan Silabus yang menumpuk semua MK dalam 1 file).
+// ============================================================================
+export const getLaporanRpsGabunganProdi = async (prodiId, tahunKurikulumId, periodeId = null) => {
+    const prodi = await ProgramStudi.findByPk(prodiId, { attributes: ['id', 'nama', 'siakJenjangId'] });
+    if (!prodi) throw new CustomError.NotFoundError("Program Studi tidak ditemukan");
+
+    const tahunKurikulum = await TahunKurikulum.findByPk(tahunKurikulumId, { attributes: ['id', 'tahun'] });
+    if (!tahunKurikulum) throw new CustomError.NotFoundError("Tahun Kurikulum tidak ditemukan");
+
+    let namaJenjang = 'S1';
+    if (prodi.siakJenjangId) {
+        const j = await Jenjang.findByPk(prodi.siakJenjangId);
+        if (j) namaJenjang = j.jenjang;
+    }
+
+    const daftarMk = await MataKuliah.findAll({
+        where: { siakProgramStudiId: prodiId, siakTahunKurikulumId: tahunKurikulumId },
+        attributes: ['id', 'kode', 'nama', 'semester'],
+        order: [['semester', 'ASC'], ['kode', 'ASC']]
+    });
+
+    const daftarRps = [];
+    for (const mk of daftarMk) {
+        daftarRps.push(await getLaporanRpsCetak(mk.id, periodeId));
+    }
+
+    return {
+        kop: { programStudi: `${namaJenjang} - ${prodi.nama}` },
+        tahunKurikulum: tahunKurikulum.tahun,
+        jumlahMataKuliah: daftarRps.length,
+        daftarRps
+    };
+};
