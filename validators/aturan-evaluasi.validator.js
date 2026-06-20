@@ -26,3 +26,17 @@ export const validateIdParam = [
     param('id').isUUID().withMessage('ID tidak valid'),
     validate
 ];
+
+export const validateGetPratinjauSalinAturanEvaluasi = [
+    query('jenjangIdAsal').isUUID().withMessage('Jenjang ID asal wajib valid UUID'),
+    query('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    validate
+];
+
+export const validateSalinAturanEvaluasi = [
+    body('jenjangIdAsal').isUUID().withMessage('Jenjang ID asal wajib valid UUID'),
+    body('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    body('jenjangIdTujuan').isUUID().withMessage('Jenjang ID tujuan wajib valid UUID'),
+    body('tahunKurikulumIdTujuan').isUUID().withMessage('Tahun Kurikulum ID tujuan wajib valid UUID'),
+    validate
+];

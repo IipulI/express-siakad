@@ -67,3 +67,18 @@ export const deleteAturanEvaluasi = async (req, res, next) => {
             .json();
     } catch (error) { next(error); }
 };
+
+export const fetchPratinjauSalinAturanEvaluasi = async (req, res, next) => {
+    try {
+        const { jenjangIdAsal, tahunKurikulumIdAsal } = req.query;
+        const data = await AturanEvaluasiService.pratinjauSalinAturanEvaluasi(jenjangIdAsal, tahunKurikulumIdAsal);
+        return new ResponseBuilder(res).code(200).message("Pratinjau Aturan Evaluasi sumber").json(data);
+    } catch (error) { next(error); }
+};
+
+export const postSalinAturanEvaluasi = async (req, res, next) => {
+    try {
+        const data = await AturanEvaluasiService.salinAturanEvaluasi(req.body);
+        return new ResponseBuilder(res).code(200).message(`Berhasil menyalin ${data.jumlahDisalin} baris Aturan Evaluasi`).json(data);
+    } catch (error) { next(error); }
+};

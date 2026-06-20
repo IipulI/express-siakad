@@ -134,3 +134,60 @@ export const destroyAturanEvaluasi = async (id) => {
     if (!existingData) throw new CustomError.NotFoundError("Data Aturan Evaluasi tidak ditemukan");
     return await existingData.destroy();
 };
+
+// =========================================================
+// PRATINJAU SALIN Aturan Evaluasi (lihat isi sumber sebelum disalin)
+// =========================================================
+export const pratinjauSalinAturanEvaluasi = async (jenjangIdAsal, tahunKurikulumIdAsal) => {
+    const { Jenjang } = models;
+
+    const aturanAsal = await AturanEvaluasi.findAll({
+        where: { siak_jenjang_id: jenjangIdAsal, siak_tahun_kurikulum_id: tahunKurikulumIdAsal },
+        order: [['semester_ke', 'ASC']]
+    });
+    if (aturanAsal.length === 0) throw new CustomError.NotFoundError("Aturan Evaluasi pada Jenjang & Tahun Kurikulum asal belum diisi");
+
+    const jenjang = await Jenjang.findByPk(jenjangIdAsal, { attributes: ['jenjang'] });
+    const kurikulum = await TahunKurikulum.findByPk(tahunKurikulumIdAsal, { attributes: ['tahun'] });
+
+    return {
+        jenjangAsal: jenjang?.jenjang || '-',
+        tahunKurikulumAsal: kurikulum?.tahun || '-',
+        aturanEvaluasi: aturanAsal.map(a => ({
+            semesterKe: a.semesterKe,
+            totalSksMinimal: parseInt(a.totalSksMinimal || 0),
+            batasIpkMinimal: parseFloat(a.batasIpkMinimal || 0).toFixed(2)
+        }))
+    };
+};
+
+// =========================================================
+// SALIN Aturan Evaluasi (wipe & replace tujuan: jenjang + tahun kurikulum tujuan)
+// =========================================================
+export const salinAturanEvaluasi = async (payload) => {
+    const { jenjangIdAsal, tahunKurikulumIdAsal, jenjangIdTujuan, tahunKurikulumIdTujuan } = payload;
+
+    const aturanAsal = await AturanEvaluasi.findAll({
+        where: { siak_jenjang_id: jenjangIdAsal, siak_tahun_kurikulum_id: tahunKurikulumIdAsal }
+    });
+    if (aturanAsal.length === 0) throw new CustomError.NotFoundError("Aturan Evaluasi pada Jenjang & Tahun Kurikulum asal belum diisi");
+
+    return await models.sequelize.transaction(async (trx) => {
+        await AturanEvaluasi.destroy({
+            where: { siak_jenjang_id: jenjangIdTujuan, siak_tahun_kurikulum_id: tahunKurikulumIdTujuan },
+            force: true,
+            transaction: trx
+        });
+
+        const dataBaru = aturanAsal.map(a => ({
+            siakJenjangId: jenjangIdTujuan,
+            siakTahunKurikulumId: tahunKurikulumIdTujuan,
+            semesterKe: a.semesterKe,
+            totalSksMinimal: a.totalSksMinimal,
+            batasIpkMinimal: a.batasIpkMinimal
+        }));
+        await AturanEvaluasi.bulkCreate(dataBaru, { transaction: trx });
+
+        return { jumlahDisalin: dataBaru.length };
+    });
+};

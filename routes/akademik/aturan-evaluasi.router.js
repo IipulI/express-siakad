@@ -15,10 +15,12 @@
 // export default router;
 import express from 'express';
 import * as AturanEvaluasiController from '../../controllers/akademik/aturan-evaluasi.controller.js';
-import { 
-    validateGetAturanEvaluasi, 
-    validateSaveAturanEvaluasi, 
-    validateIdParam 
+import {
+    validateGetAturanEvaluasi,
+    validateSaveAturanEvaluasi,
+    validateIdParam,
+    validateGetPratinjauSalinAturanEvaluasi,
+    validateSalinAturanEvaluasi
 } from '../../validators/aturan-evaluasi.validator.js';
 
 const router = express.Router();
@@ -28,6 +30,10 @@ router.get('/', validateGetAturanEvaluasi, AturanEvaluasiController.fetchAturanE
 
 // POST: Simpan Baru / Update (Jika ada ID di body)
 router.post('/', validateSaveAturanEvaluasi, AturanEvaluasiController.saveAturanEvaluasi);
+
+// SALIN DATA
+router.get('/pratinjau-salin', validateGetPratinjauSalinAturanEvaluasi, AturanEvaluasiController.fetchPratinjauSalinAturanEvaluasi);
+router.post('/salin', validateSalinAturanEvaluasi, AturanEvaluasiController.postSalinAturanEvaluasi);
 
 // DELETE: Hapus per baris
 router.delete('/:id', validateIdParam, AturanEvaluasiController.deleteAturanEvaluasi);
