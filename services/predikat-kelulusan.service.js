@@ -359,3 +359,76 @@ export const deletePredikatKelulusan = async (id) => {
     if (!data) throw new CustomError.NotFoundError("Data tidak ditemukan");
     return await data.destroy();
 };
+
+// =========================================================
+// PRATINJAU SALIN Predikat Kelulusan (lihat isi sumber sebelum disalin)
+// =========================================================
+export const pratinjauSalinPredikat = async (jenjangIdAsal, tahunKurikulumIdAsal) => {
+    const { Jenjang } = models;
+
+    const predikatAsal = await PredikatKelulusan.findAll({
+        where: { siakJenjangId: jenjangIdAsal, siakTahunKurikulumId: tahunKurikulumIdAsal },
+        order: [['ipkMin', 'DESC']]
+    });
+    if (predikatAsal.length === 0) throw new CustomError.NotFoundError("Predikat Kelulusan pada Jenjang & Tahun Kurikulum asal belum diisi");
+
+    const jenjang = await Jenjang.findByPk(jenjangIdAsal, { attributes: ['jenjang'] });
+    const kurikulum = await TahunKurikulum.findByPk(tahunKurikulumIdAsal, { attributes: ['tahun'] });
+
+    return {
+        jenjangAsal: jenjang?.jenjang || '-',
+        tahunKurikulumAsal: kurikulum?.tahun || '-',
+        predikat: predikatAsal.map(p => ({
+            kode: p.kode,
+            nama: p.namaInd || '-',
+            namaEn: p.namaEng || '-',
+            ipkMin: parseFloat(p.ipkMin || 0),
+            ipkMax: parseFloat(p.ipkMax || 0),
+            masaStudi: parseInt(p.masaStudi || 0),
+            nilaiMin: p.nilaiMin || null,
+            nilaiMinTa: p.nilaiMinTa || null,
+            isCuti: p.isCuti || false,
+            isMengulang: p.isMengulang || false,
+            isMabaOnly: p.isMabaOnly || false
+        }))
+    };
+};
+
+// =========================================================
+// SALIN Predikat Kelulusan (wipe & replace tujuan: jenjang + tahun kurikulum tujuan)
+// =========================================================
+export const salinPredikat = async (payload) => {
+    const { jenjangIdAsal, tahunKurikulumIdAsal, jenjangIdTujuan, tahunKurikulumIdTujuan } = payload;
+
+    const predikatAsal = await PredikatKelulusan.findAll({
+        where: { siakJenjangId: jenjangIdAsal, siakTahunKurikulumId: tahunKurikulumIdAsal }
+    });
+    if (predikatAsal.length === 0) throw new CustomError.NotFoundError("Predikat Kelulusan pada Jenjang & Tahun Kurikulum asal belum diisi");
+
+    return await models.sequelize.transaction(async (trx) => {
+        await PredikatKelulusan.destroy({
+            where: { siakJenjangId: jenjangIdTujuan, siakTahunKurikulumId: tahunKurikulumIdTujuan },
+            force: true,
+            transaction: trx
+        });
+
+        const dataBaru = predikatAsal.map(p => ({
+            siakJenjangId: jenjangIdTujuan,
+            siakTahunKurikulumId: tahunKurikulumIdTujuan,
+            kode: p.kode,
+            namaInd: p.namaInd,
+            namaEng: p.namaEng,
+            ipkMin: p.ipkMin,
+            ipkMax: p.ipkMax,
+            masaStudi: p.masaStudi,
+            nilaiMin: p.nilaiMin,
+            nilaiMinTa: p.nilaiMinTa,
+            isCuti: p.isCuti,
+            isMengulang: p.isMengulang,
+            isMabaOnly: p.isMabaOnly
+        }));
+        await PredikatKelulusan.bulkCreate(dataBaru, { transaction: trx });
+
+        return { jumlahDisalin: dataBaru.length };
+    });
+};

@@ -32,3 +32,17 @@ export const validateSavePredikat = [
     body('isMabaOnly').optional().isBoolean(),
     validate
 ];
+
+export const validateGetPratinjauSalinPredikat = [
+    query('jenjangIdAsal').isUUID().withMessage('Jenjang ID asal wajib valid UUID'),
+    query('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    validate
+];
+
+export const validateSalinPredikat = [
+    body('jenjangIdAsal').isUUID().withMessage('Jenjang ID asal wajib valid UUID'),
+    body('tahunKurikulumIdAsal').isUUID().withMessage('Tahun Kurikulum ID asal wajib valid UUID'),
+    body('jenjangIdTujuan').isUUID().withMessage('Jenjang ID tujuan wajib valid UUID'),
+    body('tahunKurikulumIdTujuan').isUUID().withMessage('Tahun Kurikulum ID tujuan wajib valid UUID'),
+    validate
+];

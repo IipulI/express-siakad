@@ -173,7 +173,7 @@
 //     } catch (error) { 
 //         next(error); 
 //     }
-// };import * as PredikatService from '../../services/predikat-kelulusan.service.js';
+// };
 import * as PredikatService from '../../services/predikat-kelulusan.service.js';
 import ResponseBuilder from "../../utils/response.js";
 
@@ -202,5 +202,20 @@ export const deletePredikat = async (req, res, next) => {
     try {
         await PredikatService.deletePredikatKelulusan(req.params.id);
         return new ResponseBuilder(res).code(200).message("Berhasil dihapus").json();
+    } catch (error) { next(error); }
+};
+
+export const fetchPratinjauSalinPredikat = async (req, res, next) => {
+    try {
+        const { jenjangIdAsal, tahunKurikulumIdAsal } = req.query;
+        const data = await PredikatService.pratinjauSalinPredikat(jenjangIdAsal, tahunKurikulumIdAsal);
+        return new ResponseBuilder(res).code(200).message("Pratinjau Predikat Kelulusan sumber").json(data);
+    } catch (error) { next(error); }
+};
+
+export const postSalinPredikat = async (req, res, next) => {
+    try {
+        const data = await PredikatService.salinPredikat(req.body);
+        return new ResponseBuilder(res).code(200).message(`Berhasil menyalin ${data.jumlahDisalin} baris Predikat Kelulusan`).json(data);
     } catch (error) { next(error); }
 };
