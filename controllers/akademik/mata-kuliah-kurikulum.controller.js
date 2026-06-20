@@ -1,5 +1,6 @@
 import * as mkKurikulumService from '../../services/mata-kuliah-kurikulum.service.js';
 import ResponseBuilder from "../../utils/response.js";
+import * as CustomError from "../../utils/custom-error.js";
 
 // --- 1. GET REKAP DISTRIBUSI SKS ---
 // export const fetchRekapDistribusiSks = async (req, res) => {
