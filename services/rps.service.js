@@ -1334,12 +1334,15 @@ export const resetRencanaEvaluasi = async (mkId, periodeId) => {
 // dan pemetaan CPL -- supaya FE bisa render 1 halaman cetak utuh seperti Laporan RPS SEVIMA.
 // ============================================================================
 export const getLaporanRpsCetak = async (mkId, periodeId = null) => {
-    const { Dosen, CapaianPembelajaranLulusan, PemetaanCplMk } = models;
+    const { Dosen, CapaianPembelajaranLulusan, PemetaanCplMk, Fakultas } = models;
 
     const mk = await MataKuliah.findByPk(mkId, {
         attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis', 'semester'],
         include: [
-            { model: ProgramStudi, as: 'programStudi', attributes: ['nama', 'siakJenjangId', 'kaprodiId'] },
+            {
+                model: ProgramStudi, as: 'programStudi', attributes: ['nama', 'siakJenjangId', 'kaprodiId'],
+                include: [{ model: Fakultas, as: 'fakultas', attributes: ['nama'] }]
+            },
             { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
             { model: Dosen, as: 'koordinatorMk', attributes: ['nama', 'nidn'] }
         ]
@@ -1431,7 +1434,8 @@ export const getLaporanRpsCetak = async (mkId, periodeId = null) => {
 
     return {
         kop: {
-            programStudi: `${namaJenjang} - ${mk.programStudi?.nama || '-'}`
+            programStudi: `${namaJenjang} - ${mk.programStudi?.nama || '-'}`,
+            fakultas: mk.programStudi?.fakultas?.nama || '-'
         },
         mataKuliah: {
             kode: mk.kode,
@@ -1479,7 +1483,11 @@ export const getLaporanRpsCetak = async (mkId, periodeId = null) => {
 // gabungan, mirip Laporan Silabus yang menumpuk semua MK dalam 1 file).
 // ============================================================================
 export const getLaporanRpsGabunganProdi = async (prodiId, tahunKurikulumId, periodeId = null) => {
-    const prodi = await ProgramStudi.findByPk(prodiId, { attributes: ['id', 'nama', 'siakJenjangId'] });
+    const { Fakultas } = models;
+    const prodi = await ProgramStudi.findByPk(prodiId, {
+        attributes: ['id', 'nama', 'siakJenjangId'],
+        include: [{ model: Fakultas, as: 'fakultas', attributes: ['nama'] }]
+    });
     if (!prodi) throw new CustomError.NotFoundError("Program Studi tidak ditemukan");
 
     const tahunKurikulum = await TahunKurikulum.findByPk(tahunKurikulumId, { attributes: ['id', 'tahun'] });
@@ -1503,7 +1511,7 @@ export const getLaporanRpsGabunganProdi = async (prodiId, tahunKurikulumId, peri
     }
 
     return {
-        kop: { programStudi: `${namaJenjang} - ${prodi.nama}` },
+        kop: { programStudi: `${namaJenjang} - ${prodi.nama}`, fakultas: prodi.fakultas?.nama || '-' },
         tahunKurikulum: tahunKurikulum.tahun,
         jumlahMataKuliah: daftarRps.length,
         daftarRps

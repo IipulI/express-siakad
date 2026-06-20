@@ -2769,69 +2769,143 @@ export const exportPdfTranskripObeMahasiswa = async (req, res, next) => {
 // PDFDocument yang sedang berjalan. Dipanggil sekali per Mata Kuliah; bisa
 // dipanggil berulang dalam 1 dokumen yang sama untuk laporan gabungan.
 // ============================================================================
+const LOGO_PATH = path.join(process.cwd(), 'public', 'logo', 'uika.jpg');
+
 const renderRpsKeDokumen = async (doc, data, namaPencetak) => {
-        // =========================================================
-        // A. KOP
-        // =========================================================
-        doc.font('Helvetica-Bold').fontSize(12).text(ENV_NAMA_UNIV(), { align: 'center' });
-        doc.font('Helvetica-Bold').fontSize(11).text(data.kop.programStudi, { align: 'center' });
-        doc.moveDown(0.5);
-        doc.font('Helvetica-Bold').fontSize(12).text('RENCANA PEMBELAJARAN SEMESTER', { align: 'center', underline: true });
-        doc.moveDown(1);
+        const startX = doc.page.margins.left;
+        const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+        const lineColor = '#000000';
+        doc.lineWidth(0.75);
 
         // =========================================================
-        // B. INFO MATA KULIAH
+        // A. KOP (logo + nama universitas/fakultas/prodi, dalam kotak,
+        // persis tampilan Laporan Silabus referensi)
         // =========================================================
-        doc.font('Helvetica').fontSize(9);
-        const infoLines = [
-            [`Mata Kuliah: ${data.mataKuliah.nama}`, `Kode: ${data.mataKuliah.kode}`, `SKS: ${data.mataKuliah.bobotSks}`, `Semester: ${data.mataKuliah.semester}`],
-            [`Periode Akademik: ${data.periodeAkademik}`, `Tgl Penyusunan: ${data.mataKuliah.tanggalPenyusunan || '-'}`]
+        const logoSize = 48;
+        const kopY = doc.y;
+        const kopHeight = 58;
+        doc.rect(startX, kopY, usableWidth, kopHeight).stroke(lineColor);
+        try { doc.image(LOGO_PATH, startX + 8, kopY + (kopHeight - logoSize) / 2, { width: logoSize }); } catch (e) { /* logo opsional */ }
+        doc.fillColor('black').font('Helvetica-Bold').fontSize(12).text(ENV_NAMA_UNIV(), startX, kopY + 8, { width: usableWidth, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(10).text(data.kop.fakultas || '-', startX, doc.y + 1, { width: usableWidth, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(10).text(data.kop.programStudi, startX, doc.y + 1, { width: usableWidth, align: 'center' });
+        doc.y = kopY + kopHeight;
+        doc.x = startX;
+
+        const judulY = doc.y;
+        doc.rect(startX, judulY, usableWidth, 18).stroke(lineColor);
+        doc.font('Helvetica-Bold').fontSize(11).text('RENCANA PEMBELAJARAN SEMESTER', startX, judulY + 4, { width: usableWidth, align: 'center' });
+        doc.y = judulY + 18;
+        doc.x = startX;
+
+        // =========================================================
+        // B. INFO MATA KULIAH (tabel header + 1 baris data, 6 kolom)
+        // =========================================================
+        const infoBaseWidths = [180, 90, 110, 70, 70, 100];
+        const infoScale = usableWidth / infoBaseWidths.reduce((a, b) => a + b, 0);
+        const [wMataKuliah, wKode, wRumpun, wSks, wSemester, wTglSusun] = infoBaseWidths.map(w => w * infoScale);
+        drawGridTable(doc, {
+            columns: [
+                { label: 'MATA KULIAH (MK)', width: wMataKuliah },
+                { label: 'KODE', width: wKode, align: 'center' },
+                { label: 'Rumpun MK', width: wRumpun },
+                { label: 'Bobot (sks)', width: wSks, align: 'center' },
+                { label: 'SEMESTER', width: wSemester, align: 'center' },
+                { label: 'Tgl Penyusunan', width: wTglSusun, align: 'center' }
+            ],
+            rows: [[
+                data.mataKuliah.nama, data.mataKuliah.kode, data.mataKuliah.rumpunMk || '-',
+                data.mataKuliah.bobotSks, data.mataKuliah.semester, data.mataKuliah.tanggalPenyusunan || '-'
+            ]],
+            headerFontSize: 8, rowFontSize: 8
+        });
+
+        // =========================================================
+        // C. OTORISASI (Koordinator RMK / Ketua Prodi, mirip tabel TTD)
+        // =========================================================
+        const otoLabelW = 90;
+        const otoColW = (usableWidth - otoLabelW) / 2;
+        const otoRowH = 16;
+        const otoY = doc.y;
+        const otoRows = [
+            ['OTORISASI', 'Koordinator RMK', 'Ketua PRODI'],
+            ['', 'Tanda Tangan', 'Tanda Tangan'],
+            ['', data.otorisasi.koordinatorRmk, data.otorisasi.ketuaProdi]
         ];
-        infoLines.forEach(row => doc.text(row.join('    |    ')));
-        doc.moveDown(0.5);
-
-        doc.font('Helvetica-Bold').text('OTORISASI', { continued: true }).font('Helvetica')
-            .text(`     Koordinator RMK: ${data.otorisasi.koordinatorRmk}     Ketua Prodi: ${data.otorisasi.ketuaProdi}`);
-        doc.moveDown(0.8);
-
-        // =========================================================
-        // C. CAPAIAN PEMBELAJARAN
-        // =========================================================
-        doc.font('Helvetica-Bold').fontSize(10).text('Capaian Pembelajaran (CP)');
-        doc.font('Helvetica-Bold').fontSize(9).text('CPL-Prodi yang dibebankan pada MK', { underline: true });
-        doc.font('Helvetica').fontSize(9);
-        if (data.capaianPembelajaran.cplProdi.length > 0) {
-            data.capaianPembelajaran.cplProdi.forEach(c => doc.text(`${c.kode} - ${c.deskripsi}`));
-        } else {
-            doc.text('-');
-        }
-        doc.moveDown(0.3);
-        doc.font('Helvetica-Bold').fontSize(9).text('Capaian Pembelajaran Mata Kuliah (CPMK)', { underline: true });
-        doc.font('Helvetica').fontSize(9);
-        if (data.capaianPembelajaran.cpmk.length > 0) {
-            data.capaianPembelajaran.cpmk.forEach(c => doc.text(`${c.kode} - ${c.deskripsi}`));
-        } else {
-            doc.text('-');
-        }
-        doc.moveDown(0.5);
+        otoRows.forEach((cells, idx) => {
+            const ry = otoY + idx * otoRowH;
+            doc.rect(startX, ry, otoLabelW, otoRowH).stroke(lineColor);
+            doc.rect(startX + otoLabelW, ry, otoColW, otoRowH).stroke(lineColor);
+            doc.rect(startX + otoLabelW + otoColW, ry, otoColW, otoRowH).stroke(lineColor);
+            doc.font(idx === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(8)
+                .text(cells[0], startX + 4, ry + 4, { width: otoLabelW - 8 });
+            doc.text(cells[1], startX + otoLabelW + 4, ry + 4, { width: otoColW - 8, align: 'center' });
+            doc.text(cells[2], startX + otoLabelW + otoColW + 4, ry + 4, { width: otoColW - 8, align: 'center' });
+        });
+        doc.y = otoY + otoRows.length * otoRowH;
+        doc.x = startX;
 
         // =========================================================
-        // D. DESKRIPSI, TUJUAN, BAHAN KAJIAN, PUSTAKA, MEDIA
+        // D. TABEL KEY-VALUE: CAPAIAN PEMBELAJARAN, DESKRIPSI, TUJUAN,
+        // BAHAN KAJIAN, PUSTAKA, MEDIA, DOSEN, MATAKULIAH SYARAT
+        // (1 tabel 2-kolom bergaris, label di kiri, isi multi-baris di kanan,
+        // dengan sub-header bold di dalam sel untuk seksi CP -- persis
+        // struktur Laporan Silabus referensi)
         // =========================================================
-        const textSection = (label, value) => {
-            doc.font('Helvetica-Bold').fontSize(9).text(label, { underline: true });
-            doc.font('Helvetica').fontSize(9).text(value || '-');
-            doc.moveDown(0.4);
+        const kvLabelW = 130;
+        const kvContentW = usableWidth - kvLabelW;
+        const kvPadding = 4;
+
+        const drawKvRow = (label, segments) => {
+            doc.font('Helvetica').fontSize(8);
+            let contentHeight = 0;
+            const measured = segments.map(seg => {
+                doc.font(seg.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8);
+                const h = doc.heightOfString(seg.text || '-', { width: kvContentW - kvPadding * 2 });
+                contentHeight += h + 2;
+                return h;
+            });
+            const rowHeight = Math.max(16, contentHeight + kvPadding * 2);
+            const bottomLimit = doc.page.height - doc.page.margins.bottom;
+            if (doc.y + rowHeight > bottomLimit) doc.addPage();
+
+            const y0 = doc.y;
+            doc.rect(startX, y0, kvLabelW, rowHeight).stroke(lineColor);
+            doc.rect(startX + kvLabelW, y0, kvContentW, rowHeight).stroke(lineColor);
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('black')
+                .text(label, startX + kvPadding, y0 + kvPadding, { width: kvLabelW - kvPadding * 2 });
+
+            let cy = y0 + kvPadding;
+            segments.forEach((seg, i) => {
+                doc.font(seg.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8);
+                doc.text(seg.text || '-', startX + kvLabelW + kvPadding, cy, { width: kvContentW - kvPadding * 2 });
+                cy += measured[i] + 2;
+            });
+
+            doc.y = y0 + rowHeight;
+            doc.x = startX;
         };
-        textSection('Deskripsi Singkat', data.deskripsiSingkat);
-        textSection('Tujuan Mata Kuliah', data.tujuanMataKuliah);
-        textSection('Bahan Kajian', data.bahanKajian);
-        textSection('Pustaka Utama', data.pustakaUtama);
-        textSection('Pustaka Pendukung', data.pustakaPendukung);
-        textSection('Media Pembelajaran (Perangkat Lunak)', data.mediaPerangkatLunak);
-        textSection('Media Pembelajaran (Perangkat Keras)', data.mediaPerangkatKeras);
-        textSection('Dosen Pengampu', data.dosenPengampu);
-        textSection('Matakuliah Syarat', data.matakuliahSyarat);
+
+        const cpSegments = [
+            { text: 'CPL-Prodi yang dibebankan pada MK', bold: true },
+            { text: data.capaianPembelajaran.cplProdi.length > 0 ? data.capaianPembelajaran.cplProdi.map(c => `${c.kode} - ${c.deskripsi}`).join('\n') : '-' },
+            { text: 'Capaian Pembelajaran Mata Kuliah (CPMK)', bold: true },
+            { text: data.capaianPembelajaran.cpmk.length > 0 ? data.capaianPembelajaran.cpmk.map(c => `${c.kode} - ${c.deskripsi}`).join('\n') : '-' }
+        ];
+        drawKvRow('Capaian Pembelajaran (CP)', cpSegments);
+        drawKvRow('Deskripsi Singkat', [{ text: data.deskripsiSingkat }]);
+        drawKvRow('Tujuan Mata Kuliah', [{ text: data.tujuanMataKuliah }]);
+        drawKvRow('Bahan Kajian', [{ text: data.bahanKajian }]);
+        drawKvRow('Pustaka', [
+            { text: 'Utama:', bold: true }, { text: data.pustakaUtama },
+            { text: 'Pendukung:', bold: true }, { text: data.pustakaPendukung }
+        ]);
+        drawKvRow('Media Pembelajaran', [
+            { text: 'Perangkat Lunak:', bold: true }, { text: data.mediaPerangkatLunak },
+            { text: 'Perangkat Keras:', bold: true }, { text: data.mediaPerangkatKeras }
+        ]);
+        drawKvRow('Dosen Pengampu', [{ text: data.dosenPengampu }]);
+        drawKvRow('Matakuliah Syarat', [{ text: data.matakuliahSyarat }]);
 
         // =========================================================
         // E. TABEL RENCANA PEMBELAJARAN
