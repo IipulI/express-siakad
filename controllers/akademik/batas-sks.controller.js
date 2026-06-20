@@ -79,3 +79,26 @@ export const deleteBatasSks = async (req, res, next) => {
         next(error)
     }
 }
+
+export const fetchPratinjauSalinBatasSks = async (req, res, next) => {
+    try {
+        const { jenjangIdAsal, tahunKurikulumIdAsal } = req.query;
+        const data = await batasSksService.pratinjauSalinBatasSks(jenjangIdAsal, tahunKurikulumIdAsal);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Pratinjau Batas SKS sumber")
+            .json(data);
+    } catch (error) { next(error); }
+};
+
+export const postSalinBatasSks = async (req, res, next) => {
+    try {
+        const data = await batasSksService.salinBatasSks(req.body);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message(`Berhasil menyalin ${data.jumlahDisalin} baris Batas SKS`)
+            .json(data);
+    } catch (error) { next(error); }
+};

@@ -11,10 +11,12 @@
 // export default router;
 import { Router } from "express";
 import * as BatasSksController from "../../controllers/akademik/batas-sks.controller.js";
-import { 
-    validateGetBatasSks, 
-    validateSaveBatasSks, 
-    validateDeleteBatasSks 
+import {
+    validateGetBatasSks,
+    validateSaveBatasSks,
+    validateDeleteBatasSks,
+    validateGetPratinjauSalinBatasSks,
+    validateSalinBatasSks
 } from "../../validators/batas-sks.validator.js";
 
 const router = new Router();
@@ -23,6 +25,8 @@ const router = new Router();
 router.get("/", validateGetBatasSks, BatasSksController.fetchBatasSks);
 router.post("/", validateSaveBatasSks, BatasSksController.create);
 router.put("/:id", validateSaveBatasSks, BatasSksController.updateBatasSks);
+router.get("/pratinjau-salin", validateGetPratinjauSalinBatasSks, BatasSksController.fetchPratinjauSalinBatasSks);
+router.post("/salin", validateSalinBatasSks, BatasSksController.postSalinBatasSks);
 router.delete("/:id", validateDeleteBatasSks, BatasSksController.deleteBatasSks);
 
 export default router;

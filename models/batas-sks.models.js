@@ -5,7 +5,14 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class BatasSks extends Model {
         static associate(models) {
-            // define assoc
+            this.belongsTo(models.Jenjang, {
+                foreignKey: 'siak_jenjang_id',
+                as: 'jenjang'
+            });
+            this.belongsTo(models.TahunKurikulum, {
+                foreignKey: 'siak_tahun_kurikulum_id',
+                as: 'tahunKurikulum'
+            });
         }
     }
 
@@ -19,6 +26,11 @@ export default (sequelize) => {
             siakJenjangId: {
                 type: DataTypes.UUID,
                 field: 'siak_jenjang_id',
+            },
+            siakTahunKurikulumId: {
+                type: DataTypes.UUID,
+                field: 'siak_tahun_kurikulum_id',
+                allowNull: true
             },
             ipsMin: {
                 type: DataTypes.DOUBLE(5, 2),
