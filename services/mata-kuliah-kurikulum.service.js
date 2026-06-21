@@ -247,6 +247,72 @@ export const getMataKuliahPerSemester = async (prodiId, tahunKurikulumId) => {
         semesterData: groupedData
     };
 };
+// --- 2B. LAPORAN DAFTAR KURIKULUM PRODI (Semua MK 1 Prodi + Tahun Kurikulum,
+// diurut per semester, dengan baris subtotal "TOTAL SKS PER SEMESTER") ---
+export const getLaporanDaftarKurikulumProdi = async (prodiId, tahunKurikulumId) => {
+    const prodi = await ProgramStudi.findByPk(prodiId);
+    if (!prodi) throw new CustomError.NotFoundError("Program Studi tidak ditemukan");
+
+    const kurikulum = await TahunKurikulum.findByPk(tahunKurikulumId);
+    if (!kurikulum) throw new CustomError.NotFoundError("Tahun Kurikulum tidak ditemukan");
+
+    const listMk = await MataKuliah.findAll({
+        where: { siakProgramStudiId: prodiId, siakTahunKurikulumId: tahunKurikulumId },
+        attributes: ['id', 'kode', 'nama', 'totalSks', 'opsiWajib', 'nilaiMin', 'semester', 'isPaket'],
+        include: [{
+            model: models.Konsentrasi, as: 'konsentrasi',
+            attributes: ['nama'], through: { attributes: [] }
+        }],
+        order: [['semester', 'ASC'], ['kode', 'ASC']]
+    });
+
+    // Kelompokkan berturutan per semester (urutan kemunculan, sesuai ORDER BY semester ASC)
+    const groups = [];
+    let currentGroup = null;
+    listMk.forEach(mk => {
+        const semesterKey = mk.semester ?? 'Belum Terjadwal';
+        if (!currentGroup || currentGroup.semester !== semesterKey) {
+            currentGroup = { semester: semesterKey, items: [], totalSks: 0 };
+            groups.push(currentGroup);
+        }
+        currentGroup.items.push(mk);
+        currentGroup.totalSks += (mk.totalSks || 0);
+    });
+
+    // Ratakan jadi 1 array baris: tiap grup diakhiri 1 baris subtotal
+    let no = 0;
+    let totalSksKeseluruhan = 0;
+    const rows = [];
+    groups.forEach(group => {
+        group.items.forEach(mk => {
+            no += 1;
+            totalSksKeseluruhan += (mk.totalSks || 0);
+            rows.push({
+                tipe: 'mk',
+                no,
+                kode: mk.kode,
+                namaMataKuliah: mk.nama,
+                konsentrasi: (mk.konsentrasi || []).map(k => k.nama).join(', '),
+                sks: mk.totalSks,
+                nilaiMinimal: mk.nilaiMin || '-',
+                semester: mk.semester ?? '-',
+                statusMk: mk.opsiWajib ? 'Wajib' : 'Pilihan',
+                paket: mk.isPaket ? 'Paket' : 'Tidak'
+            });
+        });
+        rows.push({ tipe: 'subtotal', semester: group.semester, totalSks: group.totalSks });
+    });
+
+    return {
+        header: {
+            programStudi: prodi.nama,
+            tahunKurikulum: kurikulum.tahun,
+            totalSks: totalSksKeseluruhan
+        },
+        rows
+    };
+};
+
 // --- 3. DETAIL MATA KULIAH BESERTA PRASYARAT (Halaman Detail) ---
 export const getDetailMataKuliah = async (mataKuliahId) => {
     const mk = await MataKuliah.findByPk(mataKuliahId, {

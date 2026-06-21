@@ -77,6 +77,12 @@ export const validateGetRpsGabungan = [
     validate
 ];
 
+export const validateGetLaporanKurikulumProdi = [
+    query('prodiId').isUUID().withMessage('Prodi ID wajib valid UUID'),
+    query('tahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID wajib valid UUID'),
+    validate
+];
+
 export const validateSetObe = [
     body('programStudiId').isUUID().withMessage('Program Studi ID wajib UUID'),
     body('tahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID wajib UUID'),

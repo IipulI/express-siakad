@@ -5,7 +5,7 @@ import * as ExportController from '../../controllers/akademik/export.controller.
 import {
     validateGetRekapSks, validateAssignMk, validateUpdateMk, validateIdParam,
     validateGetPratinjauSalinMataKuliahKurikulum, validateSalinMataKuliahKurikulum,
-    validateGetRpsGabungan
+    validateGetRpsGabungan, validateGetLaporanKurikulumProdi
 } from '../../validators/mata-kuliah-kurikulum.validator.js';
 
 const router = express.Router();
@@ -45,6 +45,11 @@ router.post('/salin', validateSalinMataKuliahKurikulum, MkKurikulumController.po
 // Tahun Kurikulum sekaligus (digabung jadi 1 dokumen, seperti Laporan Silabus)
 router.get('/rps/pratinjau', validateGetRpsGabungan, RpsController.getLaporanRpsGabunganProdi);
 router.get('/rps/cetak/pdf', validateGetRpsGabungan, ExportController.exportPdfLaporanRpsGabungan);
+
+// LAPORAN DAFTAR KURIKULUM PRODI -- pratinjau (JSON) & cetak PDF semua Mata
+// Kuliah dalam 1 Prodi + Tahun Kurikulum, diurut per semester + subtotal SKS
+router.get('/kurikulum-prodi/pratinjau', validateGetLaporanKurikulumProdi, MkKurikulumController.fetchPratinjauLaporanKurikulumProdi);
+router.get('/kurikulum-prodi/cetak/pdf', validateGetLaporanKurikulumProdi, ExportController.exportPdfLaporanKurikulumProdi);
 
 router.get('/:id', validateIdParam, MkKurikulumController.fetchDetailMataKuliah);
 

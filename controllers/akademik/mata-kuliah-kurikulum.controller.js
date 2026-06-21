@@ -58,6 +58,21 @@ export const fetchMataKuliahPerSemester = async (req, res, next) => {
     }
 };
 
+// --- 2B. GET PRATINJAU LAPORAN DAFTAR KURIKULUM PRODI ---
+export const fetchPratinjauLaporanKurikulumProdi = async (req, res, next) => {
+    try {
+        const { prodiId, tahunKurikulumId } = req.query;
+        const data = await mkKurikulumService.getLaporanDaftarKurikulumProdi(prodiId, tahunKurikulumId);
+
+        return new ResponseBuilder(res)
+            .code(200)
+            .message("Berhasil mengambil pratinjau Laporan Daftar Kurikulum Prodi")
+            .json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
 // --- 3. GET DETAIL MATA KULIAH & PRASYARAT ---
 export const fetchDetailMataKuliah = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);

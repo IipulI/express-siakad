@@ -4,6 +4,7 @@ import axios from 'axios';
 import * as obeService from '../../services/obe.service.js';
 import * as MonitoringService from '../../services/monitoring.service.js';
 import * as rpsService from '../../services/rps.service.js';
+import * as mkKurikulumService from '../../services/mata-kuliah-kurikulum.service.js';
 import * as CustomError from '../../utils/custom-error.js';
 
 import path from 'path';
@@ -3049,6 +3050,133 @@ export const exportPdfLaporanRpsGabungan = async (req, res, next) => {
             if (i > 0) doc.addPage();
             await renderRpsKeDokumen(doc, gabungan.daftarRps[i], namaPencetak);
         }
+
+        doc.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============================================================================
+// EXPORT PDF — LAPORAN DAFTAR KURIKULUM PRODI (semua Mata Kuliah dalam 1 Prodi
+// + Tahun Kurikulum, diurut per semester, dengan baris subtotal "TOTAL SKS
+// PER SEMESTER" mengikuti referensi Laporan Daftar Kurikulum Prodi)
+// ============================================================================
+const renderDaftarKurikulumProdiKeDokumen = (doc, data, namaPencetak) => {
+    const startX = doc.page.margins.left;
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const lineColor = '#000000';
+    const headerBg = '#D9D9D9';
+    const padding = 4;
+    const bottomLimit = doc.page.height - doc.page.margins.bottom;
+    doc.lineWidth(0.75);
+
+    doc.font('Helvetica-Bold').fontSize(12)
+        .text('LAPORAN DAFTAR KURIKULUM PRODI', startX, doc.y, { width: usableWidth, align: 'center' });
+    doc.moveDown(0.5);
+
+    const halfWidth = usableWidth / 2;
+    const infoY = doc.y;
+    doc.font('Helvetica').fontSize(9);
+    doc.text(`Program Studi : ${data.header.programStudi}`, startX, infoY, { width: halfWidth });
+    doc.text(`Total SKS : ${data.header.totalSks} SKS`, startX + halfWidth, infoY, { width: halfWidth });
+    doc.text(`Kurikulum : ${data.header.tahunKurikulum}`, startX, doc.y, { width: halfWidth });
+    doc.moveDown(0.8);
+    doc.x = startX;
+
+    const baseWidths = [25, 55, 175, 70, 35, 60, 50, 50, 45];
+    const scale = usableWidth / baseWidths.reduce((a, b) => a + b, 0);
+    const [wNo, wKode, wMk, wKonsentrasi, wSks, wNilaiMin, wSemester, wStatus, wPaket] = baseWidths.map(w => w * scale);
+    const columns = [
+        { label: 'No.', width: wNo, align: 'center' },
+        { label: 'Kode', width: wKode, align: 'center' },
+        { label: 'Matakuliah', width: wMk },
+        { label: 'Konsentrasi', width: wKonsentrasi },
+        { label: 'SKS', width: wSks, align: 'center' },
+        { label: 'Nilai Minimal', width: wNilaiMin, align: 'center' },
+        { label: 'Semester', width: wSemester, align: 'center' },
+        { label: 'Wajib/Pilihan', width: wStatus, align: 'center' },
+        { label: 'Paket?', width: wPaket, align: 'center' }
+    ];
+
+    const drawHeaderRow = () => {
+        doc.font('Helvetica-Bold').fontSize(8);
+        const headerHeight = Math.max(
+            16, ...columns.map(c => doc.heightOfString(c.label, { width: c.width - padding * 2 }))
+        ) + padding * 2;
+        const y0 = doc.y;
+        doc.rect(startX, y0, usableWidth, headerHeight).fillAndStroke(headerBg, lineColor);
+        let x = startX;
+        columns.forEach(c => {
+            doc.rect(x, y0, c.width, headerHeight).stroke(lineColor);
+            doc.fillColor('black').text(c.label, x + padding, y0 + padding, { width: c.width - padding * 2, align: c.align || 'left' });
+            x += c.width;
+        });
+        doc.y = y0 + headerHeight;
+        doc.x = startX;
+    };
+
+    drawHeaderRow();
+    doc.font('Helvetica').fontSize(8);
+
+    data.rows.forEach(row => {
+        if (row.tipe === 'subtotal') {
+            const mergedWidth = columns[0].width + columns[1].width + columns[2].width + columns[3].width;
+            const sksColX = startX + mergedWidth;
+            const restWidth = usableWidth - mergedWidth - columns[4].width;
+            const rowHeight = 16;
+
+            if (doc.y + rowHeight > bottomLimit) { doc.addPage(); drawHeaderRow(); doc.font('Helvetica').fontSize(8); }
+
+            const y0 = doc.y;
+            doc.font('Helvetica-Bold').fontSize(8);
+            doc.rect(startX, y0, mergedWidth, rowHeight).stroke(lineColor);
+            doc.fillColor('black').text('TOTAL SKS PER SEMESTER', startX + padding, y0 + padding, { width: mergedWidth - padding * 2 });
+            doc.rect(sksColX, y0, columns[4].width, rowHeight).stroke(lineColor);
+            doc.text(String(row.totalSks), sksColX + padding, y0 + padding, { width: columns[4].width - padding * 2, align: 'center' });
+            doc.rect(sksColX + columns[4].width, y0, restWidth, rowHeight).stroke(lineColor);
+            doc.y = y0 + rowHeight;
+            doc.x = startX;
+            doc.font('Helvetica').fontSize(8);
+        } else {
+            const cells = [
+                row.no, row.kode, row.namaMataKuliah, row.konsentrasi || '',
+                row.sks, row.nilaiMinimal, row.semester, row.statusMk, row.paket
+            ];
+            const rowHeight = Math.max(
+                14, ...columns.map((c, i) => doc.heightOfString(String(cells[i] ?? '-'), { width: c.width - padding * 2 }))
+            ) + padding * 2;
+
+            if (doc.y + rowHeight > bottomLimit) { doc.addPage(); drawHeaderRow(); doc.font('Helvetica').fontSize(8); }
+
+            const y0 = doc.y;
+            let x = startX;
+            columns.forEach((c, i) => {
+                doc.rect(x, y0, c.width, rowHeight).stroke(lineColor);
+                doc.fillColor('black').text(String(cells[i] ?? '-'), x + padding, y0 + padding, { width: c.width - padding * 2, align: c.align || 'left' });
+                x += c.width;
+            });
+            doc.y = y0 + rowHeight;
+            doc.x = startX;
+        }
+    });
+
+    doc.moveDown(1);
+    doc.x = startX;
+    doc.font('Helvetica').fontSize(7).fillColor('#555555').text(buildFooter(namaPencetak));
+};
+
+export const exportPdfLaporanKurikulumProdi = async (req, res, next) => {
+    try {
+        const { prodiId, tahunKurikulumId } = req.query;
+        const data = await mkKurikulumService.getLaporanDaftarKurikulumProdi(prodiId, tahunKurikulumId);
+
+        const doc = new PDFDocument({ margin: 30, size: 'A4' });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Daftar_Kurikulum_Prodi_${data.header.tahunKurikulum}.pdf"`);
+        doc.pipe(res);
+
+        renderDaftarKurikulumProdiKeDokumen(doc, data, req.user?.nama || req.user?.name || 'Sistem');
 
         doc.end();
     } catch (error) {
