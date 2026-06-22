@@ -30,10 +30,10 @@ export default (sequelize) => {
                 as: 'mataKuliahDiajar'
             });
 
-this.hasOne(models.ProgramStudi, {
-        foreignKey: 'kaprodi_id', // Harus sama dengan yang di atas
-        as: 'kepalaProdi'
-    });
+            this.hasOne(models.ProgramStudi, {
+                foreignKey: 'kaprodi_id', // Harus sama dengan yang di atas
+                as: 'kepalaProdi'
+            });
         }
     }
     Dosen.init({
