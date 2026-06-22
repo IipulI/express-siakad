@@ -146,7 +146,4 @@ export const fetchAllExport = async (page, size) => {
             isPaginated: false
         }
     }
-
-
-    return data;
 }

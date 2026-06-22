@@ -1,11 +1,11 @@
-import * as model from '../models/index.js'
+import db from "../models/index.js"
 import { getPagination } from "../utils/pagination.js";
 
-const  {
+const {
     Dosen
-} = model
+} = db
 
-export const getAllDosen = async function (page, size, filter) {
+export const fetchAllDosen = async (page, size, filter) => {
     const isPaginated = page !== null && size !== null;
     const queryBuilder = {
         attributes: ['id', 'nama', 'nidn'],
