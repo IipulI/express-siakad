@@ -81,6 +81,39 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
   };
 };
 
+export const historyHasilStudi = async (mahasiswaId) => {
+    const mahasiswa = await Mahasiswa.findByPk(mahasiswaId)
+    if (!mahasiswa) {
+        throw new NotFoundError(`Mahasiswa tidak dapat ditemukan`)
+    }
+
+    const hasilStudi = await HasilStudi.findAll({
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        where: {
+            siakMahasiswaId: idMahasiswa
+        },
+        order: [['semester', 'ASC']],
+        include: [
+            {
+                model: PeriodeAkademik,
+                as: 'periodeAkademik',
+                attributes: ['id', 'nama', 'kode'],
+            },
+            {
+                model: Mahasiswa,
+                as: 'mahasiswa',
+                attributes: ['id', 'nama', 'npm'],
+            }
+        ]
+    })
+
+    return {
+        hasilStudi: hasilStudi,
+    }
+}
+
 export const getIpk = async (mahasiswaId) => {
   const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
     attributes: ['id', 'nama', 'periodeMasuk'],
