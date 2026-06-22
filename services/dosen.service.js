@@ -1,0 +1,37 @@
+import * as model from '../models/index.js'
+import { getPagination } from "../utils/pagination.js";
+
+const  {
+    Dosen
+} = model
+
+export const getAllDosen = async function (page, size, filter) {
+    const isPaginated = page !== null && size !== null;
+    const queryBuilder = {
+        attributes: ['id', 'nama', 'nidn'],
+        order: [['id', 'DESC']]
+    }
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await Dosen.findAndCountAll(queryBuilder)
+
+        return {
+            count,
+            rows,
+            isPaginated: true
+        }
+    }
+    else {
+        const data = await Dosen.findAll(queryBuilder)
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false
+        }
+    }
+}
