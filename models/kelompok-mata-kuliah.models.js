@@ -1,41 +1,32 @@
-// /models/bidang-ilmu.models.js
-import { Model, DataTypes } from "sequelize";
-import { v7 as uuid7 } from "uuid";
+import { Model, DataTypes } from 'sequelize';
+import { v7 as uuid7 } from 'uuid';
 
 export default (sequelize) => {
     class KelompokMataKuliah extends Model {
         static associate(models) {
-            // define assoc
+            this.hasMany(models.MataKuliah, {
+                foreignKey: 'siak_kelompok_mata_kuliah_id',
+                as: 'mataKuliahs'
+            });
         }
     }
 
-    KelompokMataKuliah.init(
-        {
-            id: {
-                type: DataTypes.UUID,
-                primaryKey: true,
-                defaultValue: uuid7
-            },
-            kode: {
-                allowNull: false,
-                type: DataTypes.STRING,
-            },
-            nama: {
-                allowNull: false,
-                type: DataTypes.INTEGER,
-            },
+    KelompokMataKuliah.init({
+        id: {
+            type: DataTypes.UUID,
+            primaryKey: true,
+            defaultValue: uuid7
         },
-
-        {
-            sequelize,
-            underscored: true,
-            timestamps: true,
-            paranoid: true,
-
-            modelName: "KelompokMataKuliah",
-            tableName: "siak_kelompok_mata_kuliah",
-        }
-    );
+        kode: DataTypes.STRING(50),
+        nama: DataTypes.STRING(255)
+    }, {
+        sequelize,
+        underscored: true,
+        timestamps: true,
+        paranoid: true, // Karena di SQL dump ada deleted_at
+        modelName: "KelompokMataKuliah",
+        tableName: "siak_kelompok_mata_kuliah"
+    });
 
     return KelompokMataKuliah;
-}
+};

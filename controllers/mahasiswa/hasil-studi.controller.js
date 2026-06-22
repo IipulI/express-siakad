@@ -33,3 +33,20 @@ export const getHasilStudi = async (req, res) => {
       .json(error.message);
   }
 };
+
+export const getHistoryHasilStudi = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+
+    try {
+        const data = await hasilStudiService
+
+        responseBuilder
+            .status('success')
+            .code(200)
+            .message("Berhasil mengambil data")
+            .json(data)
+
+    } catch (error) {
+        next(error)
+    }
+};

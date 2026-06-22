@@ -1,120 +1,111 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { Op } from "sequelize";
+import { NotFoundError } from "../utils/custom-error.js";
 
-const { Pengumuman } = models;
+const {
+    Pegawai,
+    Pengumuman
+} = models;
 
-export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
+export const findAll = async (page, size, order, limitPage, search) => {
+    const isPaginated = page !== null && size !== null
+    const queryBuilder = {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+    }
 
-      const { count, rows } = await Pengumuman.findAndCountAll({
-        attributes: [
-          "id",
-          "siakPegawaiId",
-          "judul",
-          "isi",
-          "isActive",
-          "isPriority",
-          "banner",
-        ],
-        limit,
-        offset,
-        order: [["id", "DESC"]],
-        raw: true,
-      });
-
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
-
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
+    if (order === null || order === undefined) {
+        queryBuilder.order = [['id', 'DESC']]
     } else {
-      const { count, rows } = await Pengumuman.findAndCountAll({
-        attributes: [
-          "id",
-          "siakPegawaiId",
-          "judul",
-          "isi",
-          "isActive",
-          "isPriority",
-          "banner",
-        ],
-        // raw: true,
-      });
-
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
-    }
-  } catch (error) {
-    console.log(error);
-    throw new Error(`Error retrieving data : ${error.message}`);
-  }
-};
-
-export const createPengumuman = async (pengumumanData) => {
-  const { siakPegawaiId, judul, isi, isActive, isPriority, banner } =
-    pengumumanData;
-
-  //   const existingPengumuman = await Pengumuman.findOne({ where: { ruangan } });
-
-  //   if (existingRuangan) {
-  //     throw new Error(`Ruangan with name "${ruangan}" already exists.`);
-  //   }
-
-  try {
-    await Pengumuman.create({
-      siakPegawaiId,
-      judul,
-      isi,
-      isActive,
-      isPriority,
-      banner,
-    });
-  } catch (err) {
-    if (err.name === "SequelizeUniqueConstraintError") {
-      throw new Error(
-        `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
-      );
-    }
-    throw new Error(`Error creating Pengumuman: ${err.message}`);
-  }
-};
-
-export const updatePengumuman = async (id, updateData) => {
-  try {
-    const pengumuman = await Pengumuman.findByPk(id);
-
-    if (!pengumuman) {
-      return null;
+        queryBuilder.order = [[order, 'DESC']]
     }
 
-    const [updatedRowsCount] = await Pengumuman.update(updateData, {
-      where: { id: id },
-    });
+    if (search) {
+        queryBuilder.where = {
+            judul: { [Op.iLike]: `%${search}%` }
+        }
+    }
 
-    return updatedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Error updating Pengumuman: ${error.message}`);
-  }
-};
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await Pengumuman.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    } else {
+        if (limitPage) {
+            queryBuilder.limit = limitPage
+        }
+
+        const data = await Pengumuman.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
+    }
+}
+
+export const findOneById = async (id) => {
+    const existPengumuman = await Pengumuman.findByPk(id)
+    if (!existPengumuman) {
+        throw new NotFoundError(`Pengumuman tidak dapat ditemukan`)
+    }
+
+    return existPengumuman
+}
+
+export const createPengumuman = async (data, file, userId) => {
+    const pegawai = await Pegawai.findOne({
+        where: {
+            siakUserId: userId
+        }
+    })
+    if (!pegawai) {
+        throw new NotFoundError(`Pegawai tidak ditemukan`)
+    }
+
+    const relativePath = file.path.replace(/\\/g, '/');
+    const fileUrl = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+
+    const isActive = data.isActive === 'true' || data.isActive === true;
+    const isPriority = data.isPriority === 'true' || data.isPriority === true;
+
+    const dataBody = {
+        banner: fileUrl,
+        siakPegawaiId: pegawai.id,
+        judul: data.judul,
+        isi: data.isi,
+        isActive: isActive,
+        isPriority: isPriority,
+    }
+
+    return await Pengumuman.create(dataBody);
+}
+
+export const updatePengumuman = async (id, data) => {
+    const existPengumuman = await findOneById(id);
+    if (!existPengumuman) {
+        throw new NotFoundError(`Pengumuman tidak dapat ditemukan`)
+    }
+
+    return await existPengumuman.update(data);
+}
 
 export const deletePengumuman = async (id) => {
-  try {
-    const deletedRowsCount = await Pengumuman.destroy({
-      where: { id: id },
-    });
+    const existPengumuman = await findOneById(id);
+    if (!existPengumuman) {
+        throw new NotFoundError(`Pengumuman tidak dapat ditemukan`)
+    }
 
-    return deletedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Error deleting Pengumuman: ${error.message}`);
-  }
-};
+    return await existPengumuman.destroy();
+}

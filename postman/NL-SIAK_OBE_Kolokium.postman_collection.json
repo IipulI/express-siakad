@@ -1,0 +1,1260 @@
+{
+  "info": {
+    "_postman_id": "nl-siak-obe-kolokium-2026-v2",
+    "name": "NL-SIAK OBE — Kolokium Lengkap (Satria)",
+    "description": "Collection end-to-end modul penilaian OBE dinamis.\nDua MK demo:\n• TIF117 — Rangkaian Digital (pendekatan KOMPOSISI)\n• TIK101 — Kalkulus I (pendekatan PER CPMK LANGSUNG)\n\n⚠️ ISI VARIABEL COLLECTION SEBELUM MULAI (tab Variables)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://103.158.196.106:3000/api"
+    },
+    {
+      "key": "obeId",
+      "value": "GANTI_OBE_ID",
+      "description": "GET /api/akademik/obe → lihat id"
+    },
+    {
+      "key": "periodeId",
+      "value": "GANTI_PERIODE_ID",
+      "description": "GET /api/periode-akademik/dropdown → id periode 2025 Genap"
+    },
+    {
+      "key": "kelasId_tif117",
+      "value": "019e8162-946d-772a-b88c-907ea941b21c"
+    },
+    {
+      "key": "kelasId_tik101",
+      "value": "GANTI_KELAS_ID_TIK101",
+      "description": "GET peserta kelas TIK101 → lihat kelasId"
+    },
+    {
+      "key": "mkId_tif117",
+      "value": "GANTI_MK_ID_TIF117",
+      "description": "GET /koordinator-mk/mata-kuliah → cari TIF117"
+    },
+    {
+      "key": "mkId_tik101",
+      "value": "GANTI_MK_ID_TIK101",
+      "description": "GET /koordinator-mk/mata-kuliah → cari TIK101"
+    },
+    {
+      "key": "cplId_CPL02",
+      "value": "019e7f1f-6b29-724b-a71b-3bd6c7c7ed97"
+    },
+    {
+      "key": "cplId_CPL03",
+      "value": "019e7f1f-6b29-724b-a71b-3d8308b2d06d"
+    },
+    {
+      "key": "cplId_CPL04",
+      "value": "019e7f1f-6b2a-7029-8ab1-4cea2a44200a"
+    },
+    {
+      "key": "cpmkId_021",
+      "value": "019e811f-b1b6-75a6-8bbd-66a15f39ca06",
+      "description": "CPMK021 TIF117"
+    },
+    {
+      "key": "cpmkId_031",
+      "value": "019e811f-b1e6-7378-9c33-dbf2d88a78ea",
+      "description": "CPMK031 TIF117"
+    },
+    {
+      "key": "cpmkId_032",
+      "value": "019e811f-b209-728b-be19-11762d35f9f9",
+      "description": "CPMK032 TIF117"
+    },
+    {
+      "key": "cpmkId_033_tif",
+      "value": "019e811f-b22d-75c0-ae17-94a0f9163f47",
+      "description": "CPMK033 TIF117"
+    },
+    {
+      "key": "cpmkId_034_tif",
+      "value": "019e811f-b250-712e-b557-19c6804e8eab",
+      "description": "CPMK034 TIF117"
+    },
+    {
+      "key": "cpmkId_042",
+      "value": "019e811f-b274-76ec-a7ae-5c44755ece22",
+      "description": "CPMK042 TIF117"
+    },
+    {
+      "key": "cpmkId_033_tik",
+      "value": "019e828b-3e9e-7473-9786-c3df29909827",
+      "description": "CPMK033 TIK101 (target=40)"
+    },
+    {
+      "key": "cpmkId_034_tik",
+      "value": "019e828b-3edc-7310-b417-3b93e64ba11e",
+      "description": "CPMK034 TIK101 (target=5)"
+    },
+    {
+      "key": "komposisiId_tugas",
+      "value": "019e814d-34ae-7435-90fd-30c5e90c8dac"
+    },
+    {
+      "key": "komposisiId_uts",
+      "value": "019e814d-34ef-76f2-b922-f8786376a51e"
+    },
+    {
+      "key": "komposisiId_uas",
+      "value": "019e814d-3517-75fd-97fe-8135b5f5896b"
+    },
+    {
+      "key": "komposisiId_kehadiran",
+      "value": "019e814d-353e-75fe-9802-e59d3957c5de"
+    },
+    {
+      "key": "rksId_ikhsan_tif",
+      "value": "6ca838c3-9258-4d23-9635-d15a3354c495",
+      "description": "rincianKrsId ikhsanmhs di TIF117"
+    },
+    {
+      "key": "rksId_siti_tif",
+      "value": "019e8169-cddd-773a-a014-b1e4ce601c53",
+      "description": "rincianKrsId SITI KHOERIYYAH TIF117"
+    },
+    {
+      "key": "rksId_agnia_tif",
+      "value": "4d03e5f6-c88c-472a-95fe-c4cdf89dfa2a",
+      "description": "rincianKrsId Agnia TIF117"
+    },
+    {
+      "key": "rksId_fitri_tif",
+      "value": "91737587-31ea-44aa-acce-c1833e192386",
+      "description": "rincianKrsId FITRI TIF117"
+    },
+    {
+      "key": "rksId_ikhsan_tik",
+      "value": "GANTI_RKS_IKHSAN_TIK101",
+      "description": "lihat dari GET peserta kelas TIK101"
+    },
+    {
+      "key": "komposisiId_kehadiran_baru",
+      "value": "",
+      "description": "Diisi OTOMATIS oleh script Test setelah POST Setup Komposisi Nilai TIK101 (Skema Baru)"
+    },
+    {
+      "key": "komposisiId_tugasakhir_baru",
+      "value": "",
+      "description": "Diisi OTOMATIS oleh script Test setelah POST Setup Komposisi Nilai TIK101 (Skema Baru)"
+    }
+  ],
+  "item": [
+    {
+      "name": "0️⃣  CARA DAPAT ID — Baca Dulu",
+      "item": [
+        {
+          "name": "GET Periode Akademik (dapat periodeId)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/periode-akademik/dropdown"
+            }
+          }
+        },
+        {
+          "name": "GET Daftar Mata Kuliah (dapat mkId TIF117 & TIK101)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah"
+            }
+          }
+        },
+        {
+          "name": "GET Peserta Kelas TIF117 (dapat rincianKrsId tiap mahasiswa)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/peserta-kelas"
+            }
+          }
+        },
+        {
+          "name": "GET Peserta Kelas TIK101 (dapat rincianKrsId + kelasId)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/peserta-kelas"
+            }
+          }
+        },
+        {
+          "name": "GET Nilai Kelas TIF117 (lihat status semua mahasiswa)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai"
+            }
+          }
+        },
+        {
+          "name": "GET Nilai Kelas TIK101 (lihat status semua mahasiswa)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1️⃣  KAPRODI — Setup OBE & CPL",
+      "description": "Dilakukan sekali saat kurikulum baru. Base: /api/akademik/obe/:obeId",
+      "item": [
+        {
+          "name": "GET CPL Prodi (lihat CPL yang sudah ada)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/obe/{{obeId}}/capaian-pembelajaran"
+            }
+          }
+        },
+        {
+          "name": "POST Buat CPL Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kode\": \"CPL03\",\n  \"deskripsi\": \"Mampu menguasai prinsip-prinsip dasar informatika serta menerapkan teknologi dan pengetahuan informatika secara tepat sebagai landasan dalam pengembangan solusi digital.\",\n  \"targetCpl\": 3.2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/obe/{{obeId}}/capaian-pembelajaran"
+            }
+          }
+        },
+        {
+          "name": "PUT Update CPL",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kode\": \"CPL03\",\n  \"deskripsi\": \"Deskripsi diperbarui...\",\n  \"targetCpl\": 3.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/obe/{{obeId}}/capaian-pembelajaran/{{cplId_CPL03}}"
+            }
+          }
+        },
+        {
+          "name": "GET Laporan Lengkap OBE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/obe/laporan/{{obeId}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2️⃣  KOORDINATOR MK — Setup TIF117 (KOMPOSISI)",
+      "description": "MK Rangkaian Digital — 6 CPMK — evaluasi: Tugas20%+UTS25%+UAS40%+Kehadiran15%",
+      "item": [
+        {
+          "name": "GET Detail MK TIF117",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}"
+            }
+          }
+        },
+        {
+          "name": "GET Pemetaan CPL → TIF117 (lihat CPL terpetakan)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/pemetaan-cpl"
+            }
+          }
+        },
+        {
+          "name": "POST Petakan CPL ke TIF117",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cplIds\": [\n    \"{{cplId_CPL02}}\",\n    \"{{cplId_CPL03}}\",\n    \"{{cplId_CPL04}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/pemetaan-cpl"
+            },
+            "description": "Pilih CPL mana yang ingin dicapai oleh MK TIF117"
+          }
+        },
+        {
+          "name": "GET Pemetaan CPMK TIF117 (lihat 6 CPMK)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/pemetaan-cpmk"
+            }
+          }
+        },
+        {
+          "name": "POST Setup CPMK TIF117 (6 CPMK → 3 CPL)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpmkList\": [\n    {\n      \"kode\": \"CPMK021\",\n      \"deskripsi\": \"Mampu menjelaskan konsep, teori, dan prinsip dasar teknologi.\",\n      \"bobot\": 20,\n      \"target\": 20,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL02}}\", \"bobotCpl\": 100 }\n      ]\n    },\n    {\n      \"kode\": \"CPMK031\",\n      \"deskripsi\": \"Mahasiswa mampu menjelaskan prinsip dasar sistem komputer dan teknologi digital.\",\n      \"bobot\": 15,\n      \"target\": 10,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL03}}\", \"bobotCpl\": 100 }\n      ]\n    },\n    {\n      \"kode\": \"CPMK032\",\n      \"deskripsi\": \"Mahasiswa mampu mengidentifikasi penggunaan teknologi informasi dalam konteks yang sesuai.\",\n      \"bobot\": 15,\n      \"target\": 10,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL03}}\", \"bobotCpl\": 100 }\n      ]\n    },\n    {\n      \"kode\": \"CPMK033\",\n      \"deskripsi\": \"Mahasiswa mampu menguasai konsep teoritis bidang pengetahuan informatika.\",\n      \"bobot\": 20,\n      \"target\": 20,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL03}}\", \"bobotCpl\": 100 }\n      ]\n    },\n    {\n      \"kode\": \"CPMK034\",\n      \"deskripsi\": \"Mahasiswa mampu menerapkan konsep informatika dasar dalam pemecahan masalah sederhana.\",\n      \"bobot\": 15,\n      \"target\": 20,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL03}}\", \"bobotCpl\": 100 }\n      ]\n    },\n    {\n      \"kode\": \"CPMK042\",\n      \"deskripsi\": \"Mahasiswa mampu melakukan analisis masalah menggunakan pendekatan logika dan pemikiran kritis.\",\n      \"bobot\": 15,\n      \"target\": 20,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL04}}\", \"bobotCpl\": 100 }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/pemetaan-cpmk"
+            },
+            "description": "Total bobot CPMK harus 100%: 20+15+15+20+15+15=100 ✓\nTiap baris cplPemetaan harus sum 100% ✓"
+          }
+        },
+        {
+          "name": "GET Rencana Evaluasi TIF117",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/rencana-evaluasi"
+            }
+          }
+        },
+        {
+          "name": "POST Setup Rencana Evaluasi TIF117 (Tugas+UTS+UAS+Kehadiran)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"siakPeriodeAkademikId\": \"{{periodeId}}\",\n  \"evaluasiList\": [\n    {\n      \"metodeEvaluasi\": \"Tugas\",\n      \"jenisEvaluasi\": \"Formatif\",\n      \"bobotEvaluasi\": 20,\n      \"deskripsi\": \"Tugas individu dan kelompok sepanjang semester\",\n      \"deskripsiInggris\": \"Individual and group assignments throughout the semester\",\n      \"syaratLulus\": \"MENJADI_SYARAT_LULUS\",\n      \"cpmkData\": [\n        { \"cpmkId\": \"{{cpmkId_021}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_031}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_032}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_034_tif}}\", \"bobotCpmk\": 5 }\n      ]\n    },\n    {\n      \"metodeEvaluasi\": \"UTS\",\n      \"jenisEvaluasi\": \"Sumatif\",\n      \"bobotEvaluasi\": 25,\n      \"deskripsi\": \"Ujian Tengah Semester\",\n      \"deskripsiInggris\": \"Mid-Term Examination\",\n      \"syaratLulus\": \"MENJADI_SYARAT_LULUS\",\n      \"cpmkData\": [\n        { \"cpmkId\": \"{{cpmkId_021}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_031}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_032}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_033_tif}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_042}}\", \"bobotCpmk\": 5 }\n      ]\n    },\n    {\n      \"metodeEvaluasi\": \"UAS\",\n      \"jenisEvaluasi\": \"Sumatif\",\n      \"bobotEvaluasi\": 40,\n      \"deskripsi\": \"Ujian Akhir Semester\",\n      \"deskripsiInggris\": \"Final Examination\",\n      \"syaratLulus\": \"MENJADI_SYARAT_LULUS\",\n      \"cpmkData\": [\n        { \"cpmkId\": \"{{cpmkId_021}}\", \"bobotCpmk\": 7 },\n        { \"cpmkId\": \"{{cpmkId_031}}\", \"bobotCpmk\": 7 },\n        { \"cpmkId\": \"{{cpmkId_032}}\", \"bobotCpmk\": 7 },\n        { \"cpmkId\": \"{{cpmkId_033_tif}}\", \"bobotCpmk\": 10 },\n        { \"cpmkId\": \"{{cpmkId_034_tif}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_042}}\", \"bobotCpmk\": 4 }\n      ]\n    },\n    {\n      \"metodeEvaluasi\": \"Kehadiran\",\n      \"jenisEvaluasi\": \"Non-Akademik\",\n      \"bobotEvaluasi\": 15,\n      \"deskripsi\": \"Kehadiran minimal 75%\",\n      \"deskripsiInggris\": \"Attendance minimum 75%\",\n      \"syaratLulus\": \"TIDAK_MENJADI_SYARAT_LULUS\",\n      \"cpmkData\": [\n        { \"cpmkId\": \"{{cpmkId_021}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_031}}\", \"bobotCpmk\": 5 },\n        { \"cpmkId\": \"{{cpmkId_032}}\", \"bobotCpmk\": 5 }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/rencana-evaluasi"
+            },
+            "description": "Total bobotEvaluasi: 20+25+40+15=100% ✓\nTiap baris: sum cpmkData.bobotCpmk == bobotEvaluasi ✓\nTugas: 5+5+5+5=20 ✓ | UTS: 5+5+5+5+5=25 ✓ | UAS: 7+7+7+10+5+4=40 ✓ | Kehadiran: 5+5+5=15 ✓"
+          }
+        },
+        {
+          "name": "GET Komposisi Nilai TIF117 (lihat mapping komponen→CPMK)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/komposisi-nilai"
+            }
+          }
+        },
+        {
+          "name": "POST Setup Komposisi Nilai TIF117 [INOVASI OBE DINAMIS]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"namaKomponen\": \"TUGAS INDIVIDU\",\n    \"persentase\": 20,\n    \"key\": \"tugas\",\n    \"mappingCpmk\": [\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_021}}\",\n        \"bobot\": 25\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_031}}\",\n        \"bobot\": 25\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_032}}\",\n        \"bobot\": 25\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_034_tif}}\",\n        \"bobot\": 25\n      }\n    ]\n  },\n  {\n    \"namaKomponen\": \"UTS\",\n    \"persentase\": 25,\n    \"key\": \"uts\",\n    \"mappingCpmk\": [\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_021}}\",\n        \"bobot\": 20\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_031}}\",\n        \"bobot\": 20\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_032}}\",\n        \"bobot\": 20\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_033_tif}}\",\n        \"bobot\": 20\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_042}}\",\n        \"bobot\": 20\n      }\n    ]\n  },\n  {\n    \"namaKomponen\": \"UAS\",\n    \"persentase\": 40,\n    \"key\": \"uas\",\n    \"mappingCpmk\": [\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_021}}\",\n        \"bobot\": 12.5\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_031}}\",\n        \"bobot\": 12.5\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_032}}\",\n        \"bobot\": 12.5\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_033_tif}}\",\n        \"bobot\": 25\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_034_tif}}\",\n        \"bobot\": 12.5\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_042}}\",\n        \"bobot\": 25\n      }\n    ]\n  },\n  {\n    \"namaKomponen\": \"KEHADIRAN\",\n    \"persentase\": 15,\n    \"key\": \"kehadiran\",\n    \"mappingCpmk\": [\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_021}}\",\n        \"bobot\": 33.3333\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_031}}\",\n        \"bobot\": 33.3333\n      },\n      {\n        \"siakCapaianMataKuliahId\": \"{{cpmkId_032}}\",\n        \"bobot\": 33.3334\n      }\n    ]\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tif117}}/komposisi-nilai"
+            },
+            "description": "Ini INOVASI utama sistem OBE Dinamis:\nSetiap komponen evaluasi (Tugas/UTS/UAS) dipetakan ke CPMK mana saja.\nSistem akan otomatis menghitung nilai CPMK = weighted avg dari komponen terkait.\n\nTotal persentase: 20+25+40+15=100% ✓"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3️⃣  KOORDINATOR MK — Setup TIK101 (PER CPMK LANGSUNG)",
+      "description": "MK Kalkulus I — 2 CPMK — input nilai langsung per CPMK tanpa komposisi",
+      "item": [
+        {
+          "name": "GET Detail MK TIK101",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tik101}}"
+            }
+          }
+        },
+        {
+          "name": "POST Petakan CPL ke TIK101",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cplIds\": [\n    \"{{cplId_CPL03}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tik101}}/pemetaan-cpl"
+            }
+          }
+        },
+        {
+          "name": "POST Setup CPMK TIK101 (2 CPMK, bobot total 100%)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpmkList\": [\n    {\n      \"kode\": \"CPMK033\",\n      \"deskripsi\": \"Mahasiswa mampu menguasai konsep teoritis bidang pengetahuan informatika\",\n      \"bobot\": 60,\n      \"target\": 40,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL03}}\", \"bobotCpl\": 100 }\n      ]\n    },\n    {\n      \"kode\": \"CPMK034\",\n      \"deskripsi\": \"Mahasiswa mampu menerapkan konsep informatika dasar dalam pemecahan masalah sederhana.\",\n      \"bobot\": 40,\n      \"target\": 5,\n      \"cplPemetaan\": [\n        { \"idCpl\": \"{{cplId_CPL03}}\", \"bobotCpl\": 100 }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tik101}}/pemetaan-cpmk"
+            },
+            "description": "Bobot total: 60+40=100% ✓\nTarget CPMK033=40 (minimum nilai 40), CPMK034=5 (minimum nilai 5)\n\nMK ini TIDAK pakai komposisi nilai.\nDosen input langsung nilai per CPMK → nilaiAkhir = (nilaiCPMK033×60 + nilaiCPMK034×40)/100"
+          }
+        },
+        {
+          "name": "GET Rencana Evaluasi TIK101",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tik101}}/rencana-evaluasi"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4️⃣  DOSEN — Input Nilai TIF117 (KOMPOSISI)",
+      "description": "Dosen input nilai per komponen: Tugas, UTS, UAS, Kehadiran\nSistem otomatis: weighted avg → nilai CPMK → cek syaratLulus → grade",
+      "item": [
+        {
+          "name": "GET Nilai Kelas TIF117 (sebelum input)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai"
+            }
+          }
+        },
+        {
+          "name": "POST Input Nilai — ikhsanmhs (Nilai Bagus: A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nilai\": [\n    { \"komposisiId\": \"{{komposisiId_tugas}}\",    \"skor\": 85 },\n    { \"komposisiId\": \"{{komposisiId_uts}}\",       \"skor\": 90 },\n    { \"komposisiId\": \"{{komposisiId_uas}}\",       \"skor\": 95 },\n    { \"komposisiId\": \"{{komposisiId_kehadiran}}\", \"skor\": 90 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai/{{rksId_ikhsan_tif}}"
+            },
+            "description": "nilaiAkhir = (85×20 + 90×25 + 95×40 + 90×15)/100 = 91\nGrade: A | angkaMutu: 4"
+          }
+        },
+        {
+          "name": "POST Input Nilai — SITI KHOERIYYAH (Nilai Bagus: A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nilai\": [\n    { \"komposisiId\": \"{{komposisiId_tugas}}\",    \"skor\": 88 },\n    { \"komposisiId\": \"{{komposisiId_uts}}\",       \"skor\": 90 },\n    { \"komposisiId\": \"{{komposisiId_uas}}\",       \"skor\": 88 },\n    { \"komposisiId\": \"{{komposisiId_kehadiran}}\", \"skor\": 92 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai/{{rksId_siti_tif}}"
+            },
+            "description": "nilaiAkhir ≈ 89.1 → Grade A"
+          }
+        },
+        {
+          "name": "POST Input Nilai — Agnia (Nilai Bagus: A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nilai\": [\n    { \"komposisiId\": \"{{komposisiId_tugas}}\",    \"skor\": 85 },\n    { \"komposisiId\": \"{{komposisiId_uts}}\",       \"skor\": 87 },\n    { \"komposisiId\": \"{{komposisiId_uas}}\",       \"skor\": 86 },\n    { \"komposisiId\": \"{{komposisiId_kehadiran}}\", \"skor\": 88 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai/{{rksId_agnia_tif}}"
+            }
+          }
+        },
+        {
+          "name": "POST Input Nilai — FITRI [DEMO SYARAT LULUS: UTS < 60 → E]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nilai\": [\n    { \"komposisiId\": \"{{komposisiId_tugas}}\",    \"skor\": 75 },\n    { \"komposisiId\": \"{{komposisiId_uts}}\",       \"skor\": 55 },\n    { \"komposisiId\": \"{{komposisiId_uas}}\",       \"skor\": 80 },\n    { \"komposisiId\": \"{{komposisiId_kehadiran}}\", \"skor\": 80 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai/{{rksId_fitri_tif}}"
+            },
+            "description": "⚡ DEMO FITUR syaratLulus:\nUTS=55 < 60 dan UTS = MENJADI_SYARAT_LULUS\n→ Sistem PAKSA grade E meskipun nilaiAkhir = 72.5 (yang normalnya dapat B)\n\nIni membuktikan sistem OBE dinamis bekerja sesuai kebijakan akademik!"
+          }
+        },
+        {
+          "name": "GET Nilai Kelas TIF117 (setelah input — lihat grade E pada FITRI)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5️⃣  DOSEN — Input Nilai TIK101 (PER CPMK LANGSUNG)",
+      "description": "Dosen input nilai langsung per CPMK — TIDAK perlu komposisi\nnilaiAkhir = (nilaiCPMK033×60 + nilaiCPMK034×40) / 100\nJika nilaiCPMK < target → sistem paksa grade E",
+      "item": [
+        {
+          "name": "GET Nilai Kelas TIK101 (sebelum input)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tik101}}/nilai"
+            }
+          }
+        },
+        {
+          "name": "POST Input Nilai Per CPMK — ikhsanmhs (Semua CPMK terpenuhi: A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nilaiCpmk\": [\n    { \"cpmkId\": \"{{cpmkId_033_tik}}\", \"nilai\": 85 },\n    { \"cpmkId\": \"{{cpmkId_034_tik}}\", \"nilai\": 90 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tik101}}/nilai-cpmk/{{rksId_ikhsan_tik}}"
+            },
+            "description": "CPMK033=85 ≥ target(40) ✓\nCPMK034=90 ≥ target(5) ✓\nnilaiAkhir = (85×60 + 90×40)/100 = 87\nGrade: A"
+          }
+        },
+        {
+          "name": "POST Input Nilai Per CPMK — mahasiswa lain [DEMO TARGET CPMK < target → E]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nilaiCpmk\": [\n    { \"cpmkId\": \"{{cpmkId_033_tik}}\", \"nilai\": 30 },\n    { \"cpmkId\": \"{{cpmkId_034_tik}}\", \"nilai\": 90 }\n  ]\n}\n\n// ⚠️ Ganti URL: pakai rincianKrsId mahasiswa lain dari GET peserta kelas TIK101",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tik101}}/nilai-cpmk/GANTI_RINCIAN_KRS_ID"
+            },
+            "description": "⚡ DEMO FITUR target CPMK:\nCPMK033=30 < target(40) → sistem PAKSA grade E\nmeskipun nilaiAkhir = (30×60 + 90×40)/100 = 54 (normalnya CD)\n\nIni membuktikan OBE per-CPMK langsung berjalan dengan benar!"
+          }
+        },
+        {
+          "name": "GET Nilai Kelas TIK101 (setelah input — lihat perbedaan grade)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tik101}}/nilai"
+            }
+          }
+        },
+        {
+          "name": "GET Rapor OBE ikhsanmhs TIK101",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{rksId_ikhsan_tik}}/rapor-obe"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🆕  SKENARIO LIVE — Dosen Ubah Skema Penilaian TIK101 (Custom Bobot/Persentase)",
+      "description": "Pakai folder ini KALAU PENGUJI MINTA: \"coba ganti bobotnya\", \"persentasenya diubah\", atau \"buat yang penilaiannya cuma Kehadiran + Tugas Akhir saja\".\n\nIni mengubah TIK101 dari pendekatan PER-CPMK-LANGSUNG menjadi pendekatan KOMPOSISI dengan 2 komponen: KEHADIRAN (30%) + TUGAS AKHIR (70%) — angka ini BISA DIKETIK ULANG live sesuai permintaan dosen, asal total persentase = 100% dan tiap komponen mappingCpmk totalnya = 100%.\n\n⚠️ CATATAN: endpoint komposisi-nilai bersifat WIPE & REPLACE (skema lama dihapus, diganti yang baru). Setelah ini TIK101 PERMANEN memakai skema baru — jadikan ini bagian akhir demo TIK101, sesudah menunjukkan pendekatan PER-CPMK-LANGSUNG aslinya di folder 5️⃣.\n\nSetiap request POST/GET di sini punya script Test yang otomatis ambil ID dari response dan simpan ke Collection Variables — jadi tinggal Send berurutan, tidak perlu copy-paste ID manual.",
+      "item": [
+        {
+          "name": "POST Setup Komposisi Nilai TIK101 (Skema Baru: Kehadiran 30% + Tugas Akhir 70%)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const list = (json.data && json.data.komposisi) || [];",
+                  "const kehadiran = list.find(k => k.key === 'kehadiran_baru');",
+                  "const tugasAkhir = list.find(k => k.key === 'tugas_akhir_baru');",
+                  "if (kehadiran) pm.collectionVariables.set('komposisiId_kehadiran_baru', kehadiran.id);",
+                  "if (tugasAkhir) pm.collectionVariables.set('komposisiId_tugasakhir_baru', tugasAkhir.id);",
+                  "pm.test('Komposisi baru tersimpan & ID ter-capture', function () {",
+                  "    pm.expect(kehadiran).to.not.be.undefined;",
+                  "    pm.expect(tugasAkhir).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"namaKomponen\": \"KEHADIRAN\",\n    \"persentase\": 30,\n    \"key\": \"kehadiran_baru\",\n    \"mappingCpmk\": [\n      { \"siakCapaianMataKuliahId\": \"{{cpmkId_033_tik}}\", \"bobot\": 50 },\n      { \"siakCapaianMataKuliahId\": \"{{cpmkId_034_tik}}\", \"bobot\": 50 }\n    ]\n  },\n  {\n    \"namaKomponen\": \"TUGAS AKHIR\",\n    \"persentase\": 70,\n    \"key\": \"tugas_akhir_baru\",\n    \"mappingCpmk\": [\n      { \"siakCapaianMataKuliahId\": \"{{cpmkId_033_tik}}\", \"bobot\": 70 },\n      { \"siakCapaianMataKuliahId\": \"{{cpmkId_034_tik}}\", \"bobot\": 30 }\n    ]\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tik101}}/komposisi-nilai"
+            },
+            "description": "GANTI ANGKA INI sesuai permintaan dosen:\n• \"persentase\" tiap komponen → totalnya WAJIB 100\n• \"mappingCpmk[].bobot\" tiap komponen → totalnya WAJIB 100\n\nKalau dosen bilang \"cuma kehadiran sama tugas akhir\" → cukup 2 komponen ini sudah pas. Kalau mau tambah/kurang komponen, tinggal tambah/hapus object dalam array & sesuaikan persentase."
+          }
+        },
+        {
+          "name": "GET Komposisi Nilai TIK101 (Verifikasi Skema Baru)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/mata-kuliah/{{mkId_tik101}}/komposisi-nilai"
+            },
+            "description": "Tunjukkan ke penguji: TIK101 sekarang punya 2 komponen baru (Kehadiran 30% + Tugas Akhir 70%), masing-masing terhubung ke CPMK033 & CPMK034."
+          }
+        },
+        {
+          "name": "POST Input Nilai TIK101 — ikhsanmhs (Skema Baru)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nilai\": [\n    { \"komposisiId\": \"{{komposisiId_kehadiran_baru}}\", \"skor\": 90 },\n    { \"komposisiId\": \"{{komposisiId_tugasakhir_baru}}\", \"skor\": 85 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tik101}}/nilai/{{rksId_ikhsan_tik}}"
+            },
+            "description": "Re-input nilai ikhsan pakai komponen BARU (komposisiId hasil capture otomatis dari request sebelumnya).\n\nEkspektasi hitungan:\nnilaiAkhir = 90×30% + 85×70% = 86.5 → A\nCPMK033 ≈ 86.17 (target 40 ✓)\nCPMK034 ≈ 87.08 (target 5 ✓)\n\nIni membuktikan: ganti skema penilaian → input ulang nilai → sistem OTOMATIS hitung ulang nilaiAkhir & CPMK sesuai bobot/persentase BARU."
+          }
+        },
+        {
+          "name": "GET Nilai Kelas TIK101 (Setelah Skema Baru)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai"
+            }
+          }
+        },
+        {
+          "name": "GET Capaian CPMK TIK101 (Setelah Skema Baru)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/capaian/cpmk"
+            },
+            "description": "CPMK033 & CPMK034 ikhsan sekarang dihitung dari komponen Kehadiran+Tugas Akhir, bukan lagi dari input per-CPMK langsung."
+          }
+        },
+        {
+          "name": "GET Capaian CPL TIK101 (Setelah Skema Baru)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/capaian/cpl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6️⃣  KUNCI & FINALISASI NILAI",
+      "item": [
+        {
+          "name": "— TIF117 —",
+          "item": [
+            {
+              "name": "PATCH Kunci 1 Mahasiswa TIF117 (ikhsanmhs)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"action\": \"kunci\" }"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai/{{rksId_ikhsan_tif}}/kunci"
+                }
+              }
+            },
+            {
+              "name": "PATCH Buka Kunci 1 Mahasiswa TIF117 (ikhsanmhs)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"action\": \"buka\" }"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/nilai/{{rksId_ikhsan_tif}}/kunci"
+                },
+                "description": "Buka kunci → bisa edit nilai lagi (hanya jika belum finalisasi)"
+              }
+            },
+            {
+              "name": "PATCH Kunci Seluruh Kelas TIF117",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"action\": \"kunci\" }"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/kunci"
+                },
+                "description": "Koordinator MK kunci semua nilai kelas sekaligus.\nMahasiswa belum dinilai (AKHDAN) tidak ikut dikunci."
+              }
+            },
+            {
+              "name": "PATCH Buka Kunci Seluruh TIF117 (reset test)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"action\": \"buka\" }"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/kunci"
+                },
+                "description": "⚠️ Gagal jika sudah finalisasi. Gunakan RESET FINALISASI dulu."
+              }
+            },
+            {
+              "name": "PATCH Finalisasi TIF117 [PERMANENT LOCK]",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/finalisasi"
+                },
+                "description": "Permanent lock setelah masa sanggah habis.\nSyarat: SEMUA mahasiswa harus status 'Dikunci' dulu.\nHasil: status → 'Lulus' atau 'Tidak Lulus'\n⚠️ TIDAK BISA DIBUKA KEMBALI via API.\n\nUntuk reset: gunakan endpoint RESET FINALISASI di folder 🔄"
+              }
+            }
+          ]
+        },
+        {
+          "name": "— TIK101 —",
+          "item": [
+            {
+              "name": "PATCH Kunci Seluruh Kelas TIK101",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"action\": \"kunci\" }"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai/kunci"
+                }
+              }
+            },
+            {
+              "name": "PATCH Buka Kunci Seluruh TIK101",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"action\": \"buka\" }"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai/kunci"
+                }
+              }
+            },
+            {
+              "name": "PATCH Finalisasi TIK101 [PERMANENT LOCK]",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai/finalisasi"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7️⃣  MONITORING CAPAIAN",
+      "item": [
+        {
+          "name": "— TIF117 (Komposisi) —",
+          "item": [
+            {
+              "name": "GET Capaian CPMK TIF117",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/capaian/cpmk"
+                },
+                "description": "Nilai CPMK021~CPMK042 per mahasiswa.\nFormula: nilai CPMK = SUM(skor_komponen × persentase_komponen) / SUM(persentase) untuk CPMK terkait\nstatusCapaian: Sudah Memenuhi / Belum Memenuhi / Belum Dinilai"
+              }
+            },
+            {
+              "name": "GET Capaian CPL TIF117",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/capaian/cpl"
+                },
+                "description": "Nilai CPL02, CPL03, CPL04 per mahasiswa.\nFormula: CPL = SUM(nilaiCPMK × bobotCPMK) / SUM(bobotCPMK)\nMemerlukan minimal satu nilai sudah dikunci."
+              }
+            },
+            {
+              "name": "GET Rapor OBE ikhsanmhs (TIF117)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{rksId_ikhsan_tif}}/rapor-obe"
+                }
+              }
+            },
+            {
+              "name": "GET Laporan Daftar Nilai TIF117",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/laporan/daftar-nilai"
+                }
+              }
+            },
+            {
+              "name": "GET Laporan Perkuliahan TIF117",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/dosen/kelas/{{kelasId_tif117}}/laporan/perkuliahan"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "— TIK101 (Per CPMK) —",
+          "item": [
+            {
+              "name": "GET Capaian CPMK TIK101",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/capaian/cpmk"
+                },
+                "description": "Nilai CPMK033, CPMK034 per mahasiswa.\nTarget CPMK033=40, CPMK034=5.\nMahasiswa dengan CPMK < target → Belum Memenuhi → grade E"
+              }
+            },
+            {
+              "name": "GET Capaian CPL TIK101",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/capaian/cpl"
+                }
+              }
+            },
+            {
+              "name": "GET Rapor OBE ikhsanmhs (TIK101)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/dosen/kelas/{{rksId_ikhsan_tik}}/rapor-obe"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "— MONITORING KAPRODI (Akumulasi Prodi) —",
+          "item": [
+            {
+              "name": "GET Monitoring CPL per Prodi",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/obe/monitoring/cpl-prodi"
+                }
+              }
+            },
+            {
+              "name": "GET Monitoring CPL per Mata Kuliah",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/obe/monitoring/cpl-mata-kuliah"
+                }
+              }
+            },
+            {
+              "name": "GET Monitoring CPL per Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/obe/monitoring/cpl-mahasiswa"
+                }
+              }
+            },
+            {
+              "name": "GET Monitoring CPMK per Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/obe/monitoring/cpmk-mahasiswa"
+                }
+              }
+            },
+            {
+              "name": "GET Transkrip OBE Mahasiswa",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/obe/monitoring/transkrip-obe"
+                }
+              }
+            },
+            {
+              "name": "GET Laporan Lengkap OBE",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/akademik/obe/laporan/{{obeId}}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8️⃣  EXPORT (Excel & PDF)",
+      "item": [
+        {
+          "name": "GET Export Nilai Excel — TIF117",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/export"
+            }
+          }
+        },
+        {
+          "name": "GET Export Nilai PDF — TIF117",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/export?format=pdf"
+            }
+          }
+        },
+        {
+          "name": "GET Export Capaian Excel — TIF117",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/capaian/export"
+            }
+          }
+        },
+        {
+          "name": "GET Export Capaian PDF — TIF117",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/capaian/export?format=pdf"
+            }
+          }
+        },
+        {
+          "name": "GET Export Nilai Excel — TIK101",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai/export"
+            }
+          }
+        },
+        {
+          "name": "GET Export Capaian Excel — TIK101",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/capaian/export"
+            }
+          }
+        },
+        {
+          "name": "GET Export PDF Monitoring CPL Prodi",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/obe/export/pdf/monitoring-cpl-prodi"
+            }
+          }
+        },
+        {
+          "name": "GET Export PDF CPL per Mahasiswa",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/obe/export/pdf/monitoring-cpl-mahasiswa"
+            }
+          }
+        },
+        {
+          "name": "GET Export PDF Transkrip OBE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/akademik/obe/export/pdf/transkrip-obe"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄  RESET DATA — Testing Aman",
+      "description": "Gunakan untuk reset state sebelum demo ulang. Tidak perlu masuk DB manual.",
+      "item": [
+        {
+          "name": "PATCH Reset Finalisasi → Dikunci (TIF117)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/reset-finalisasi"
+            },
+            "description": "Reset Lulus/Tidak Lulus → Dikunci.\nSetelah ini bisa finalisasi ulang."
+          }
+        },
+        {
+          "name": "PATCH Reset Finalisasi → Dikunci (TIK101)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai/reset-finalisasi"
+            }
+          }
+        },
+        {
+          "name": "DELETE Reset Nilai 1 Mahasiswa — ikhsanmhs TIF117",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/{{rksId_ikhsan_tif}}/reset"
+            },
+            "description": "Hapus semua nilai ikhsanmhs di TIF117:\n• siak_nilai_evaluasi_mahasiswa → DELETE\n• siak_nilai_cpmk_mahasiswa → DELETE\n• nilaiAkhir, hurufMutu, angkaMutu → NULL\n• status → 'Belum Dinilai'"
+          }
+        },
+        {
+          "name": "DELETE Reset Nilai 1 Mahasiswa — ikhsanmhs TIK101",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai/{{rksId_ikhsan_tik}}/reset"
+            }
+          }
+        },
+        {
+          "name": "DELETE Reset SEMUA Nilai Kelas TIF117 ⚠️",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tif117}}/nilai/reset-semua"
+            },
+            "description": "⚠️ HAPUS SEMUA nilai seluruh mahasiswa TIF117.\nGunakan hanya jika demo ulang dari nol."
+          }
+        },
+        {
+          "name": "DELETE Reset SEMUA Nilai Kelas TIK101 ⚠️",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/akademik/koordinator-mk/kelas/{{kelasId_tik101}}/nilai/reset-semua"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,10 @@ export default (sequelize) => {
     class TahunKurikulum extends Model {
         static associate(models) {
             // define assoc
+            this.belongsTo(models.PeriodeAkademik, {
+        as: 'periodeAkademik',
+        foreignKey: 'siak_periode_akademik_id' // 👈 Sesuaikan dengan nama kolom di screenshot Abang
+    });
         }
     }
 

@@ -22,7 +22,7 @@ export default (sequelize) => {
             },
             nama: {
                 allowNull: false,
-                type: DataTypes.INTEGER,
+                type: DataTypes.STRING,
             },
         },
 

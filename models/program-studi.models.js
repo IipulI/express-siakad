@@ -10,10 +10,15 @@ export default (sequelize) => {
           as: "fakultas",
       });
 
-      this.belongsTo(models.Jenjang, {
-        foreignKey: "siak_jenjang_id",
-        as: "jenjang"
+     this.belongsTo(models.Jenjang, { 
+        foreignKey: "siak_jenjang_id", // Pastikan nama kolom di DB sesuai
+        as: "jenjang" 
       });
+
+     this.belongsTo(models.Dosen, { 
+        foreignKey: 'kaprodi_id', // UBAH JIKA NAMA KOLOM DI DB BEDA (misal: 'siak_dosen_id')
+        as: 'kaprodi' 
+    });
     }
   }
 
@@ -26,11 +31,11 @@ export default (sequelize) => {
       },
       siakFakultasId: {
         type: DataTypes.UUID,
-        fields: "siak_fakultas_id",
+        field: "siak_fakultas_id", // <-- Tanpa 's'
       },
       siakJenjangId: {
         type: DataTypes.UUID,
-        fields: "siak_jenjang_id",
+        field: "siak_jenjang_id", // <-- Tanpa 's'
       },
       nama: {
         type: DataTypes.STRING,
@@ -39,6 +44,11 @@ export default (sequelize) => {
       kode: {
         type: DataTypes.STRING,
         allowNull: false,
+      },
+      kaprodiId: {
+        type: DataTypes.UUID,
+        field: "kaprodi_id", // Harus sama persis dengan nama kolom di DB
+        allowNull: true,
       },
     },
     {

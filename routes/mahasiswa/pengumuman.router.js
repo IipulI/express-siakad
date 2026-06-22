@@ -5,8 +5,6 @@ import { validateCreatePengumuman } from "../../validators/pengumuman.validator.
 const router = new Router();
 
 router.get("/", PengumumanController.findAll);
-router.post("/", validateCreatePengumuman, PengumumanController.create);
-router.put("/:id", PengumumanController.updatePengumuman);
-router.delete("/:id", PengumumanController.deletePengumuman);
+router.get('/:id', PengumumanController.findOneById)
 
 export default router;

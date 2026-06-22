@@ -1,5 +1,6 @@
 import db from "../models/index.js";
 import { NotFoundError } from "../utils/custom-error.js";
+import { Op } from "sequelize";
 
 const {
   HasilStudi,
@@ -80,7 +81,6 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
   };
 };
 
-
 export const historyHasilStudi = async (mahasiswaId) => {
     const mahasiswa = await Mahasiswa.findByPk(mahasiswaId)
     if (!mahasiswa) {
@@ -113,3 +113,115 @@ export const historyHasilStudi = async (mahasiswaId) => {
         hasilStudi: hasilStudi,
     }
 }
+
+export const getIpk = async (mahasiswaId) => {
+  const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
+    attributes: ['id', 'nama', 'periodeMasuk'],
+  })
+
+  if (!mahasiswa) {
+    throw new NotFoundError(`Mahasiswa tidak dapat ditemukan`)
+  }
+
+  const hasilStudi = await HasilStudi.findAll({
+    attributes: ['semester', 'ips', 'ipk', 'sksDiambil', 'sksLulus'],
+    where: {
+      siakMahasiswaId: mahasiswaId
+    },
+    include: {
+      model: PeriodeAkademik,
+      as: 'periodeAkademik',
+      attributes: ['id', 'kode', 'nama']
+    },
+    order: [
+      ['semester', 'ASC']
+    ]
+  })
+
+  let totalMutu = 0;
+  let totalSks = 0;
+
+  const riwayatCalculated = hasilStudi.map(item => {
+    const data = item.toJSON();
+    const ips = parseFloat(data.ips);
+    const sks = parseInt(data.sksDiambil);
+
+    totalMutu += (ips * sks);
+    totalSks += sks;
+
+    const calculatedIpk = totalSks > 0 ? (totalMutu / totalSks).toFixed(2) : "0.00";
+
+    return {
+      ...data,
+      ipk: calculatedIpk // override with calculated IPK
+    };
+  });
+
+  const finalIpk = riwayatCalculated.length > 0 ? riwayatCalculated[riwayatCalculated.length - 1].ipk : "0.00";
+
+  return {
+    ipk: finalIpk,
+    riwayat: riwayatCalculated
+  };
+};
+
+export const getKkn = async (mahasiswaId) => {
+  const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
+    attributes: ['id', 'nama', 'periodeMasuk'],
+  });
+
+  if (!mahasiswa) {
+    throw new NotFoundError(`Mahasiswa tidak dapat ditemukan`);
+  }
+
+  const kknMataKuliah = await RincianKrsMahasiswa.findAll({
+    attributes: [
+      "id",
+      "kehadiran",
+      "tugas",
+      "uts",
+      "uas",
+      "nilai",
+      "hurufMutu",
+      "angkaMutu",
+      "nilaiAkhir",
+    ],
+    include: [
+      {
+        attributes: ['id', 'siakPeriodeAkademikId', 'semester'],
+        where: {
+          siakMahasiswaId: mahasiswaId,
+        },
+        model: KrsMahasiswa,
+        as: "krsMahasiswa",
+        required: true,
+        include: [
+          {
+            model: PeriodeAkademik,
+            as: "periodeAkademik",
+            attributes: ['id', 'nama', 'kode']
+          }
+        ]
+      },
+      {
+        attributes: ['id', 'nama'],
+        model: KelasKuliah,
+        as: "kelasKuliah",
+        required: true,
+        include: {
+          attributes: ["nama", "kode", "totalSks"],
+          model: MataKuliah,
+          as: "mataKuliah",
+          required: true,
+          where: {
+            jenis: {
+              [Op.like]: '%KKN%'
+            }
+          }
+        },
+      },
+    ]
+  });
+
+  return kknMataKuliah;
+};

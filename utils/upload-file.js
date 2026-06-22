@@ -25,6 +25,17 @@ const storage = multer.diskStorage({
 
 export const upload = multer({ storage });
 
+// Untuk import file Excel — simpan di memory, tidak perlu ke disk
+export const uploadExcel = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 }, // maks 2 MB
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (ext !== '.xlsx') return cb(new Error('Hanya file .xlsx yang diizinkan'));
+        cb(null, true);
+    }
+});
+
 export const normalizeFilePath = (req, res, next) => {
   if (req.file) {
     req.file.path = req.file.path.replace(/\\/g, "/"); // jadi public/rps/nama_file.pdf
