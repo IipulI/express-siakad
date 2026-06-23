@@ -2,7 +2,7 @@ import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
 import * as penilaianService from './penilaian.service.js';
 
-const { sequelize, Soal, PemetaanSoalCpmk, NilaiSoalMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, CapaianMataKuliah, NilaiCpmkMahasiswa, RencanaEvaluasi } = models;
+const { sequelize, Soal, PemetaanSoalCpmk, NilaiSoalMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, CapaianMataKuliah, NilaiCpmkMahasiswa, RencanaEvaluasi, NilaiEvaluasiMahasiswa } = models;
 
 const STATUS_FINAL_ATAU_KUNCI = ['Dikunci', 'Lulus', 'Tidak Lulus'];
 
@@ -10,8 +10,10 @@ const STATUS_FINAL_ATAU_KUNCI = ['Dikunci', 'Lulus', 'Tidak Lulus'];
 // 1. CRUD SOAL (rubrik unit penilaian per komponen evaluasi)
 // ============================================================================
 
-// payload: { nomor, label, jenisUnit, skorMaksimal, parentSoalId, urutan, pemetaanCpmk: [{cpmkId, bobotPoin}] }
-export const createSoal = async (rencanaEvaluasiId, payload) => {
+// payload: { nomor, label, jenisUnit, skorMaksimal, parentSoalId, urutan,
+//            pertanyaan, opsiJawaban: [{label,teks}], kunciJawaban,
+//            pemetaanCpmk: [{cpmkId, bobotPoin}] }
+export const createSoal = async (rencanaEvaluasiId, payload, trxLuar) => {
     const rencana = await RencanaEvaluasi.findByPk(rencanaEvaluasiId);
     if (!rencana) throw new CustomError.NotFoundError("Komponen Evaluasi (Rencana Evaluasi) tidak ditemukan");
 
@@ -25,7 +27,7 @@ export const createSoal = async (rencanaEvaluasiId, payload) => {
         );
     }
 
-    return await sequelize.transaction(async (trx) => {
+    const eksekusi = async (trx) => {
         const soal = await Soal.create({
             siakRencanaEvaluasiId: rencanaEvaluasiId,
             parentSoalId: payload.parentSoalId || null,
@@ -33,7 +35,10 @@ export const createSoal = async (rencanaEvaluasiId, payload) => {
             label: payload.label || null,
             jenisUnit: payload.jenisUnit || 'RUBRIK',
             skorMaksimal,
-            urutan: payload.urutan || 0
+            urutan: payload.urutan || 0,
+            pertanyaan: payload.pertanyaan || null,
+            opsiJawaban: Array.isArray(payload.opsiJawaban) ? payload.opsiJawaban : null,
+            kunciJawaban: payload.kunciJawaban || null
         }, { transaction: trx });
 
         if (pemetaanCpmk.length > 0) {
@@ -48,6 +53,26 @@ export const createSoal = async (rencanaEvaluasiId, payload) => {
         }
 
         return soal;
+    };
+
+    // Dipakai sendiri (1 soal) -> bikin transaksi sendiri. Dipakai dari createSoalBatch
+    // (banyak soal sekaligus) -> ikut transaksi luar yang sudah ada (trxLuar).
+    return trxLuar ? eksekusi(trxLuar) : sequelize.transaction(eksekusi);
+};
+
+// Bikin BANYAK soal sekaligus dalam 1 komponen evaluasi, 1 transaksi (semua sukses atau semua batal).
+// payload: { daftarSoal: [ {nomor, label, jenisUnit, skorMaksimal, parentSoalId, urutan,
+//                            pertanyaan, opsiJawaban, kunciJawaban, pemetaanCpmk}, ... ] }
+export const createSoalBatch = async (rencanaEvaluasiId, daftarSoalPayload) => {
+    if (!Array.isArray(daftarSoalPayload) || daftarSoalPayload.length === 0) {
+        throw new CustomError.BadRequestError("daftarSoal harus berupa array, minimal 1 soal");
+    }
+    return await sequelize.transaction(async (trx) => {
+        const hasil = [];
+        for (const payload of daftarSoalPayload) {
+            hasil.push(await createSoal(rencanaEvaluasiId, payload, trx));
+        }
+        return hasil;
     });
 };
 
@@ -73,7 +98,10 @@ export const updateSoal = async (soalId, payload) => {
             label: payload.label ?? soal.label,
             jenisUnit: payload.jenisUnit ?? soal.jenisUnit,
             skorMaksimal,
-            urutan: payload.urutan ?? soal.urutan
+            urutan: payload.urutan ?? soal.urutan,
+            pertanyaan: payload.pertanyaan ?? soal.pertanyaan,
+            opsiJawaban: payload.opsiJawaban !== undefined ? payload.opsiJawaban : soal.opsiJawaban,
+            kunciJawaban: payload.kunciJawaban ?? soal.kunciJawaban
         }, { transaction: trx });
 
         if (pemetaanCpmk) {
@@ -131,6 +159,9 @@ export const getSoalByKomponen = async (rencanaEvaluasiId) => {
             skorMaksimal: parseFloat(s.skorMaksimal),
             parentSoalId: s.parentSoalId,
             urutan: s.urutan,
+            pertanyaan: s.pertanyaan,
+            opsiJawaban: s.opsiJawaban,
+            kunciJawaban: s.kunciJawaban,
             pemetaanCpmk: s.pemetaanCpmk.map(p => ({
                 cpmkId: p.siakCpmkId,
                 cpmkKode: p.cpmk?.kode,
@@ -202,6 +233,23 @@ export const inputNilaiPerSoal = async (krsId, arrNilaiSoal) => {
         komposisiId: rencanaEvaluasiId,
         skor: agg.totalMaks > 0 ? Math.round((agg.totalDiperoleh / agg.totalMaks) * 10000) / 100 : 0
     }));
+
+    // 1b. inputNilaiMahasiswa (dipanggil di langkah 2) MENGHAPUS SEMUA komponen nilai
+    //     mahasiswa ini sebelum menulis ulang -- supaya komponen yang diisi manual
+    //     lewat Jalur A (mis. KEHADIRAN, tanpa soal) TIDAK ikut terhapus, gabungkan
+    //     dulu komponen existing yang TIDAK punya soal ke payloadKomponen.
+    //     (Lihat RENCANA-PENILAIAN-PER-SOAL.md — "Risiko mencampur Jalur A & Jalur C")
+    const rencanaIdsDariSoal = new Set(payloadKomponen.map(p => p.komposisiId));
+    const nilaiEksisting = await NilaiEvaluasiMahasiswa.findAll({
+        where: { siakRincianKrsMahasiswaId: krsId }
+    });
+    nilaiEksisting.forEach(n => {
+        const rId = n.siakRencanaEvaluasiId;
+        if (!rencanaIdsDariSoal.has(rId)) {
+            payloadKomponen.push({ komposisiId: rId, skor: parseFloat(n.skor) });
+            rencanaIdsDariSoal.add(rId);
+        }
+    });
 
     // 2. REUSE fungsi lama yang sudah ada — TIDAK DIUBAH SATU BARIS PUN
     await penilaianService.inputNilaiMahasiswa(krsId, payloadKomponen);

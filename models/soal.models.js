@@ -35,7 +35,10 @@ export default (sequelize) => {
         label: { type: DataTypes.STRING, allowNull: true },
         jenisUnit: { type: DataTypes.STRING(20), field: "jenis_unit", defaultValue: "RUBRIK" }, // 'OBJEKTIF' | 'RUBRIK'
         skorMaksimal: { type: DataTypes.DECIMAL(6, 2), field: "skor_maksimal", allowNull: false },
-        urutan: { type: DataTypes.INTEGER, defaultValue: 0 }
+        urutan: { type: DataTypes.INTEGER, defaultValue: 0 },
+        pertanyaan: { type: DataTypes.TEXT, allowNull: true },
+        opsiJawaban: { type: DataTypes.JSONB, field: "opsi_jawaban", allowNull: true }, // OBJEKTIF: [{label:'A', teks:'...'}, ...]
+        kunciJawaban: { type: DataTypes.TEXT, field: "kunci_jawaban", allowNull: true } // OBJEKTIF: label opsi benar. RUBRIK: jawaban acuan (opsional).
     }, {
         sequelize, underscored: true, timestamps: true, paranoid: true,
         modelName: "Soal", tableName: "siak_soal"

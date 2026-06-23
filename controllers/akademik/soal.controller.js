@@ -18,6 +18,15 @@ export const postSoal = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const postSoalBatch = async (req, res, next) => {
+    try {
+        const { rencanaEvaluasiId } = req.params;
+        const { daftarSoal } = req.body;
+        const data = await soalService.createSoalBatch(rencanaEvaluasiId, daftarSoal);
+        return new ResponseBuilder(res).code(201).message(`Berhasil menambahkan ${data.length} soal`).json(data);
+    } catch (error) { next(error); }
+};
+
 export const putSoal = async (req, res, next) => {
     try {
         const { soalId } = req.params;

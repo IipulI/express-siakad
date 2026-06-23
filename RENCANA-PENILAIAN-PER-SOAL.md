@@ -227,6 +227,109 @@ Saat Jalur C menulis materialisasi nilai CPMK (langkah 5f), kalau soal dipetakan
 - [ ] Materialisasi Jalur C **wajib** cek apakah `siak_cpmk_id` pada `PemetaanSoalCpmk` punya `parentId` terisi (sub-CPMK). Kalau ya, hitung & tulis juga baris rollup ke CPMK induk.
 - [ ] Testing tambahan: buat 1 skenario soal yang dipetakan ke sub-CPMK, pastikan nilai mahasiswa itu **tetap muncul** di `cpl-prodi`/`cpl-mahasiswa` (bukan hilang).
 
+### Risiko khusus: Mencampur Jalur A dan Jalur C untuk komponen berbeda, mahasiswa yang sama
+
+**Status**: Ditemukan saat verifikasi pasca-deploy (23 Juni 2026). Ini **bukan bug di kode yang sudah ada** — `inputNilaiMahasiswa` (fungsi lama, tidak diubah) sudah benar untuk pola pakainya sendiri (hapus-lalu-tulis-ulang SEMUA komponen yang dikirim). Risiko muncul justru **karena Jalur C me-reuse fungsi ini**, jadi ini syarat operasional yang wajib dipatuhi pengguna sistem, bukan sesuatu yang perlu ditambal di kode.
+
+**Temuan — di laporan/monitoring AMAN, di INPUT berisiko:**
+- Level laporan (`cpl-prodi`, `cpl-mahasiswa`, `cpl-mata-kuliah`, `transkrip-obe`, `cpmk-mahasiswa`): **tidak bentrok**. Jalur A dan Jalur C menulis ke tabel hasil yang sama (`NilaiCpmkMahasiswa`, `nilai_akhir`); endpoint baca tabel itu apa adanya, tidak peduli jalur mana yang menulis — campuran antar-mahasiswa dalam 1 kelas aman.
+- Level input, **untuk 1 mahasiswa yang sama**: berisiko. `inputNilaiPerSoal` (Jalur C) menghitung `payloadKomponen` hanya dari komponen yang **punya baris soal** (`siak_nilai_soal_mahasiswa`), lalu memanggil `inputNilaiMahasiswa` — yang menghapus **SEMUA** baris `NilaiEvaluasiMahasiswa` milik mahasiswa itu sebelum menulis ulang hanya yang ada di `payloadKomponen`.
+
+**Skenario bahaya:**
+```
+1. Dosen input KEHADIRAN = 100 manual lewat Jalur A (komponen ini TIDAK punya soal)
+2. Beberapa hari kemudian, dosen input TUGAS/UTS/UAS lewat Jalur C (per soal)
+3. inputNilaiPerSoal cuma menghitung ulang komponen yang ADA datanya di
+   siak_nilai_soal_mahasiswa (TUGAS/UTS/UAS) -- KEHADIRAN tidak ikut, karena
+   tidak ada soal yang menyentuhnya
+4. inputNilaiMahasiswa (dipanggil di dalamnya) HAPUS SEMUA NilaiEvaluasiMahasiswa
+   mahasiswa ini, lalu tulis ulang HANYA TUGAS/UTS/UAS
+5. Akibat: nilai KEHADIRAN yang sudah diisi manual di langkah 1 HILANG,
+   tanpa peringatan apa pun
+```
+
+**Mitigasi — sudah diimplementasikan (23 Juni 2026) di `services/soal.service.js`, fungsi `inputNilaiPerSoal`:**
+
+Sebelum memanggil `inputNilaiMahasiswa`, sistem sekarang mengambil dulu semua `NilaiEvaluasiMahasiswa` yang sudah ada untuk mahasiswa itu, lalu **menggabungkan komponen yang TIDAK punya soal** (artinya diisi manual lewat Jalur A, seperti KEHADIRAN) ke dalam `payloadKomponen` sebelum dikirim — supaya komponen itu **ikut ditulis ulang dengan nilai yang sama**, bukan ikut terhapus.
+
+```js
+const rencanaIdsDariSoal = new Set(payloadKomponen.map(p => p.komposisiId));
+const nilaiEksisting = await NilaiEvaluasiMahasiswa.findAll({ where: { siakRincianKrsMahasiswaId: krsId } });
+nilaiEksisting.forEach(n => {
+    if (!rencanaIdsDariSoal.has(n.siakRencanaEvaluasiId)) {
+        payloadKomponen.push({ komposisiId: n.siakRencanaEvaluasiId, skor: parseFloat(n.skor) });
+    }
+});
+```
+
+**Sudah diverifikasi** (skenario test: PRAKTIKUM & PROYEK diisi manual lewat Jalur A = 100, lalu UTS diisi lewat Jalur C = 75) — hasilnya kedua komponen tetap ada (`PRAKTIKUM & PROYEK = 100,00`, `UTS = 75,00`), Nilai Akhir benar menggabungkan keduanya (49,63 = 100×35% + 75×19,51%), data test sudah dibersihkan total setelahnya.
+
+**Catatan operasional yang masih berlaku**: kalau komponen sama (mis. UTS) pernah diisi lewat Jalur A (manual, tanpa soal) lalu BELAKANGAN mau diisi ulang lewat Jalur C (soal) untuk komponen YANG SAMA, nilai manual itu akan **digantikan** hasil hitung soal — itu perilaku yang diharapkan (Jalur C dianggap lebih akurat untuk komponen yang sama), bukan bug.
+
+## 11. Referensi: Alur Lengkap Jalur A & Jalur C (Setelah Fix, 23 Juni 2026)
+
+### Gambaran besar — titik temu kedua jalur
+
+```
+                    siak_nilai_evaluasi_mahasiswa      <- titik temu kedua jalur
+                    (1 baris = 1 komponen, 1 angka)
+                          ^                    ^
+                Jalur A   |                    |  Jalur C
+            (input manual)|                    | (hitung dari soal)
+                          |                    |
+                Dosen ketik 1          Dosen koreksi soal,
+                angka per komponen     sistem hitung skor komponen otomatis
+                          |                    |
+                          +--------+-----------+
+                                   v
+                    hitungNilaiAkhir() -- FUNGSI YANG SAMA,
+                    dipanggil dari kedua jalur, TIDAK DIUBAH
+                                   |
+                  +----------------+----------------+
+                  v                                 v
+       nilai_akhir, huruf_mutu          NilaiCpmkMahasiswa (proporsional)
+       (RincianKrsMahasiswa)             -- ditulis otomatis oleh hitungNilaiAkhir,
+                                            lalu DITIMPA oleh Jalur C kalau dipakai
+                                                   |
+                                                   v
+                                hitungDanOverrideNilaiCpmkBottomUp()
+                                -- CUMA dipanggil Jalur C, hitung ulang
+                                   dari soal, override jadi akurat
+```
+
+### Jalur A — lengkap
+
+1. Dosen ketik 1 angka per komponen (`POST /dosen/kelas/:kelasId/nilai/:krsId`).
+2. `inputNilaiMahasiswa` ([penilaian.service.js:37](services/penilaian.service.js#L37)): cek kunci → hapus semua `NilaiEvaluasiMahasiswa` mahasiswa itu → insert ulang yang dikirim.
+3. `hitungNilaiAkhir` ([penilaian.service.js:90](services/penilaian.service.js#L90)): `NilaiAkhir = Σ(skor_komponen × bobot/100)`, cek syarat lulus per komponen, materialisasi CPMK proporsional `Σ(skor×bobotCpmk)/Σ(bobotCpmk)`, tulis ke `RincianKrsMahasiswa` + `NilaiCpmkMahasiswa`.
+4. Karakter: cepat & ringan, tapi CPMK-nya estimasi (asumsi performa rata di semua soal 1 komponen).
+
+### Jalur C — lengkap
+
+1. Koordinator MK susun rubrik soal per komponen (`POST /soal/komponen/:rencanaEvaluasiId`) — nomor, jenis (OBJEKTIF/RUBRIK), skor maksimal, pemetaan ke CPMK (boleh CPMK induk atau sub-CPMK).
+2. Dosen koreksi & input skor per soal (`POST /soal/nilai/:krsId`).
+3. `inputNilaiPerSoal` ([services/soal.service.js](services/soal.service.js)):
+   - Cek kunci (sama seperti Jalur A)
+   - Wipe & replace `NilaiSoalMahasiswa` untuk soal yang dikirim
+   - Hitung `SkorKomponen = Σ(skor_diperoleh)/Σ(skor_maksimal)×100` dari SEMUA soal yang sudah ada nilainya
+   - **[Fix Bagian 6]** Gabungkan komponen lain yang tidak punya soal (Jalur A) ke payload, supaya tidak ikut terhapus
+   - REUSE `inputNilaiMahasiswa` + `hitungNilaiAkhir` (fungsi sama dengan Jalur A, tidak diduplikasi)
+   - `hitungDanOverrideNilaiCpmkBottomUp`: hitung ulang CPMK dari skor soal asli `Σ(skor×bobotPoin/skorMaksimalSoal)/Σ(bobotPoin)`, plus rollup ke CPMK induk kalau perlu (Bagian 6), override `NilaiCpmkMahasiswa` cuma untuk mahasiswa+kelas itu.
+4. Karakter: butuh effort menyusun rubrik dulu, tapi CPMK-nya akurat sesuai performa riil per soal.
+
+### Tabel ringkasan
+
+| Hal | Jalur A | Jalur C |
+|---|---|---|
+| Input | 1 angka/komponen | Banyak angka/soal |
+| Tulis ke `NilaiEvaluasiMahasiswa` | Langsung | Lewat hasil hitung SkorKomponen + gabungan komponen non-soal (fix Bagian 6) |
+| Hitung Nilai Akhir & Huruf Mutu | `hitungNilaiAkhir()` | `hitungNilaiAkhir()` — fungsi sama |
+| Hitung CPMK | Proporsional (di dalam `hitungNilaiAkhir`) | Proporsional dulu (sama), lalu ditimpa jadi bottom-up akurat |
+
+### Yang dibaca laporan/monitoring (tidak peduli jalur mana)
+
+Semua endpoint CPL (`cpl-prodi`, `cpl-mahasiswa`, `cpl-mata-kuliah`, `transkrip-obe`) baca `NilaiCpmkMahasiswa` apa adanya — otomatis dapat versi proporsional (Jalur A) atau akurat (Jalur C) tergantung jalur terakhir yang dipakai mahasiswa itu. `cpmk-mahasiswa` punya 1 cabang tambahan (Bagian 6): kalau MK itu ada data soal sama sekali, baca dari `NilaiCpmkMahasiswa`; kalau tidak, hitung ulang proporsional seperti kode lama.
+
 ## 7. File Baru yang Dibuat (tidak ada file lama yang diedit kecuali poin 6 di atas)
 
 ```

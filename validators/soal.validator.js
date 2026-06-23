@@ -30,6 +30,15 @@ export const validateCreateSoal = [
     validate
 ];
 
+export const validateCreateSoalBatch = [
+    param('rencanaEvaluasiId').isUUID().withMessage('rencanaEvaluasiId tidak valid'),
+    body('daftarSoal').isArray({ min: 1 }).withMessage('daftarSoal harus berupa array, minimal 1 soal'),
+    body('daftarSoal.*.nomor').notEmpty().withMessage('Nomor soal wajib diisi'),
+    body('daftarSoal.*.jenisUnit').optional().isIn(['OBJEKTIF', 'RUBRIK']).withMessage("jenisUnit harus 'OBJEKTIF' atau 'RUBRIK'"),
+    body('daftarSoal.*.skorMaksimal').isFloat({ min: 0 }).withMessage('skorMaksimal harus angka >= 0'),
+    validate
+];
+
 export const validateUpdateSoal = [
     param('soalId').isUUID().withMessage('soalId tidak valid'),
     body('nomor').optional().notEmpty().withMessage('Nomor soal tidak boleh kosong'),
