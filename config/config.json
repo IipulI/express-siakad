@@ -9,14 +9,14 @@
   },
   "test": {
     "username": "postgres",
-    "password": "123456",
+    "password": "yopanC1nt4Fir4",
     "database": "siakad_test",
     "host": "127.0.0.1",
     "dialect": "postgres"
   },
   "production": {
     "username": "postgres",
-    "password": "123456",
+    "password": "yopanC1nt4Fir4",
     "database": "siakad_prod",
     "host": "127.0.0.1",
     "dialect": "postgres"

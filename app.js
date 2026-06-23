@@ -26,6 +26,12 @@ app.get("/", (req, res) => {
     .status(200)
     .json({ message: "Welcome to the Express ES6 Boilerplate API!" });
 });
+
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.path} | Auth: ${req.headers.authorization ? 'ADA' : 'KOSONG'}`);
+  next();
+});
+
 app.use("/api", apiRoutes);
 
 // --- Error Handling Middleware ---
