@@ -33,6 +33,7 @@ import KelompokMataKuliahRouter from "./kelompok-mata-kuliah.router.js";
 import MahasiswaRouter from "./mahasiswa.router.js";
 
 import EkivalensiMataKuliah from "./ekivalensi-mata-kuliah.router.js";
+import SoalRouter from "./soal.route.js";
 
 import CPLUmum from "./cpl-umum.router.js";
 
@@ -110,6 +111,7 @@ router.use("/predikat-kelulusan", PredikatKelulusan)
 router.use("/ekivalensi", Ekivalensi)
 router.use("/mata-kuliah-kurikulum", MkKurikulum)
 router.use("/ekivalensi-mata-kuliah", EkivalensiMataKuliah)
+router.use("/soal", SoalRouter) // Jalur C: penilaian per soal/unit
 router.use("/monitoring", MonitoringRouter)
 
 router.use('/koordinator-mk', koordinatorMkRouter);

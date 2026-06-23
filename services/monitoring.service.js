@@ -1292,29 +1292,73 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
         const mhsList = await sequelize.query(queryMhs, { replacements: { prodiId, angkatan }, type: sequelize.QueryTypes.SELECT });
 
         // 5. TARIK NILAI DARI EVALUASI (AMBIL ID & KODE SEKALIGUS)
+        //
+        // ── Cabang ADITIF (Jalur C — penilaian per soal) ───────────────────
+        // Kalau MK ini punya data di siak_nilai_soal_mahasiswa, berarti
+        // kelasnya pakai Jalur C dan NilaiCpmkMahasiswa SUDAH dimaterialisasi
+        // akurat dari soal (lihat services/soal.service.js). Baca dari sana
+        // langsung, JANGAN hitung ulang proporsional (kode lama di bawah).
+        // Kalau TIDAK ada data Jalur C (mayoritas, semua data lama), jalankan
+        // kode lama persis seperti sebelumnya — TIDAK DIUBAH.
         let scoreData = [];
         if (mhsList.length > 0 && cpmkList.length > 0) {
-            const queryScores = `
-                SELECT
-                    m.id AS mahasiswa_id,
-                    pec.siak_cpmk_id AS cpmk_id_langsung,
-                    cpmk_master.kode AS cpmk_kode,
-                    nem.skor,
-                    pec.bobot_cpmk AS bobot_cpmk
-                FROM siak_mahasiswa m
-                JOIN siak_krs_mahasiswa km ON m.id = km.siak_mahasiswa_id AND km.deleted_at IS NULL
-                JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
+            const cekJalurC = await sequelize.query(`
+                SELECT 1
+                FROM siak_nilai_soal_mahasiswa nsm
+                JOIN siak_rincian_krs_mahasiswa rkm ON nsm.siak_rincian_krs_mahasiswa_id = rkm.id AND rkm.deleted_at IS NULL
                 JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
-                JOIN siak_nilai_evaluasi_mahasiswa nem ON rkm.id = nem.siak_rincian_krs_mahasiswa_id AND nem.deleted_at IS NULL
-                JOIN siak_rencana_evaluasi re ON nem.siak_rencana_evaluasi_id = re.id AND re.deleted_at IS NULL
-                    AND re.siak_periode_akademik_id = kk.siak_periode_akademik_id
-                JOIN siak_pemetaan_evaluasi_cpmk pec ON re.id = pec.siak_rencana_evaluasi_id AND pec.deleted_at IS NULL
-                JOIN siak_capaian_mata_kuliah cpmk_master ON pec.siak_cpmk_id = cpmk_master.id AND cpmk_master.deleted_at IS NULL
                 WHERE kk.siak_mata_kuliah_id = :mataKuliahId
-                  AND m.siak_program_studi_id = :prodiId
-                  AND m.angkatan = :angkatan
-            `;
-            scoreData = await sequelize.query(queryScores, { replacements: { mataKuliahId, prodiId, angkatan }, type: sequelize.QueryTypes.SELECT });
+                  AND nsm.deleted_at IS NULL
+                LIMIT 1
+            `, { replacements: { mataKuliahId }, type: sequelize.QueryTypes.SELECT });
+
+            if (cekJalurC.length > 0) {
+                // Jalur C aktif untuk MK ini — baca nilai CPMK yang sudah akurat
+                const queryScoresJalurC = `
+                    SELECT
+                        m.id AS mahasiswa_id,
+                        ncm.siak_capaian_mata_kuliah_id AS cpmk_id_langsung,
+                        cpmk_master.kode AS cpmk_kode,
+                        ncm.nilai AS skor,
+                        1 AS bobot_cpmk
+                    FROM siak_mahasiswa m
+                    JOIN siak_krs_mahasiswa km ON m.id = km.siak_mahasiswa_id AND km.deleted_at IS NULL
+                    JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
+                    JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
+                    JOIN siak_nilai_cpmk_mahasiswa ncm ON ncm.siak_kelas_kuliah_id = kk.id
+                                                        AND ncm.siak_mahasiswa_id = m.id
+                                                        AND ncm.deleted_at IS NULL
+                    JOIN siak_capaian_mata_kuliah cpmk_master ON ncm.siak_capaian_mata_kuliah_id = cpmk_master.id
+                                                               AND cpmk_master.deleted_at IS NULL
+                    WHERE kk.siak_mata_kuliah_id = :mataKuliahId
+                      AND m.siak_program_studi_id = :prodiId
+                      AND m.angkatan = :angkatan
+                `;
+                scoreData = await sequelize.query(queryScoresJalurC, { replacements: { mataKuliahId, prodiId, angkatan }, type: sequelize.QueryTypes.SELECT });
+            } else {
+                // Jalur A/B (kode lama, TIDAK DIUBAH)
+                const queryScores = `
+                    SELECT
+                        m.id AS mahasiswa_id,
+                        pec.siak_cpmk_id AS cpmk_id_langsung,
+                        cpmk_master.kode AS cpmk_kode,
+                        nem.skor,
+                        pec.bobot_cpmk AS bobot_cpmk
+                    FROM siak_mahasiswa m
+                    JOIN siak_krs_mahasiswa km ON m.id = km.siak_mahasiswa_id AND km.deleted_at IS NULL
+                    JOIN siak_rincian_krs_mahasiswa rkm ON km.id = rkm.siak_krs_mahasiswa_id AND rkm.deleted_at IS NULL
+                    JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
+                    JOIN siak_nilai_evaluasi_mahasiswa nem ON rkm.id = nem.siak_rincian_krs_mahasiswa_id AND nem.deleted_at IS NULL
+                    JOIN siak_rencana_evaluasi re ON nem.siak_rencana_evaluasi_id = re.id AND re.deleted_at IS NULL
+                        AND re.siak_periode_akademik_id = kk.siak_periode_akademik_id
+                    JOIN siak_pemetaan_evaluasi_cpmk pec ON re.id = pec.siak_rencana_evaluasi_id AND pec.deleted_at IS NULL
+                    JOIN siak_capaian_mata_kuliah cpmk_master ON pec.siak_cpmk_id = cpmk_master.id AND cpmk_master.deleted_at IS NULL
+                    WHERE kk.siak_mata_kuliah_id = :mataKuliahId
+                      AND m.siak_program_studi_id = :prodiId
+                      AND m.angkatan = :angkatan
+                `;
+                scoreData = await sequelize.query(queryScores, { replacements: { mataKuliahId, prodiId, angkatan }, type: sequelize.QueryTypes.SELECT });
+            }
         }
 
         // 6. GABUNGKAN DATA & KALKULASI NILAI CPMK ON THE FLY
