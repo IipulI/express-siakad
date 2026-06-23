@@ -6,9 +6,14 @@ export default (sequelize) => {
     class ProfilLulusan extends Model {
         static associate(models) {
             // define assoc
-            this.belongsTo(models.Obe, { 
-                foreignKey: 'siak_obe_id', 
-                as: 'obe' 
+            this.belongsTo(models.Obe, {
+                foreignKey: 'siak_obe_id',
+                as: 'obe'
+            });
+
+            this.hasMany(models.PemetaanPlCpl, {
+                foreignKey: 'siak_profil_lulusan_id',
+                as: 'pemetaanCpl'
             });
         }
     }

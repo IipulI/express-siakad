@@ -198,20 +198,34 @@ export const inputNilaiPerSoal = async (krsId, arrNilaiSoal) => {
         throw new CustomError.BadRequestError("Ada soalId yang tidak ditemukan");
     }
 
+    const soalById = {};
+    daftarSoalDiinput.forEach(s => { soalById[s.id] = s; });
+
+    // Soal OBJEKTIF + jawabanMahasiswa terisi -> skor dihitung sistem (cocok=skorMaksimal,
+    // salah=0), BUKAN diketik manual oleh dosen. Soal lain (RUBRIK, atau OBJEKTIF tanpa
+    // jawabanMahasiswa) tetap pakai skor yang dikirim langsung (manual/partial credit).
+    const dataNilaiSoal = arrNilaiSoal.map(n => {
+        const soal = soalById[n.soalId];
+        const jawabanMahasiswa = n.jawabanMahasiswa ?? null;
+        let skor = parseFloat(n.skor || 0);
+        if (soal?.jenisUnit === 'OBJEKTIF' && jawabanMahasiswa) {
+            skor = jawabanMahasiswa === soal.kunciJawaban ? parseFloat(soal.skorMaksimal) : 0;
+        }
+        return {
+            siakRincianKrsMahasiswaId: krsId,
+            siakSoalId: n.soalId,
+            skorDiperoleh: skor,
+            jawabanMahasiswa
+        };
+    });
+
     await sequelize.transaction(async (trx) => {
         // Wipe & replace, pola sama seperti inputNilaiMahasiswa
         await NilaiSoalMahasiswa.destroy({
             where: { siakRincianKrsMahasiswaId: krsId, siakSoalId: soalIdsDiinput },
             force: true, transaction: trx
         });
-        await NilaiSoalMahasiswa.bulkCreate(
-            arrNilaiSoal.map(n => ({
-                siakRincianKrsMahasiswaId: krsId,
-                siakSoalId: n.soalId,
-                skorDiperoleh: parseFloat(n.skor || 0)
-            })),
-            { transaction: trx }
-        );
+        await NilaiSoalMahasiswa.bulkCreate(dataNilaiSoal, { transaction: trx });
     });
 
     // 1. Hitung SkorKomponen dari SEMUA soal yang sudah ada nilainya untuk krsId ini

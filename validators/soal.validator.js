@@ -55,6 +55,13 @@ export const validateInputNilaiPerSoal = [
     param('krsId').isUUID().withMessage('krsId tidak valid'),
     body('nilaiSoal').isArray({ min: 1 }).withMessage('nilaiSoal harus berupa array, minimal 1 item'),
     body('nilaiSoal.*.soalId').isUUID().withMessage('soalId tidak valid'),
-    body('nilaiSoal.*.skor').isFloat({ min: 0 }).withMessage('skor harus angka >= 0'),
+    // skor opsional kalau jawabanMahasiswa diisi (soal OBJEKTIF) -- skor dihitung sistem dari kunciJawaban
+    body('nilaiSoal.*.skor').optional().isFloat({ min: 0 }).withMessage('skor harus angka >= 0'),
+    body('nilaiSoal.*.jawabanMahasiswa').optional({ nullable: true }).isString().withMessage('jawabanMahasiswa harus string'),
+    body('nilaiSoal').custom((arr) => {
+        const adaYangKosong = arr.some(n => n.skor === undefined && !n.jawabanMahasiswa);
+        if (adaYangKosong) throw new Error('Tiap item nilaiSoal wajib isi skor ATAU jawabanMahasiswa');
+        return true;
+    }),
     validate
 ];

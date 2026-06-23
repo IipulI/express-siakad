@@ -1037,9 +1037,17 @@ export const getManajemenPlByObeId = async (obeId) => {
                 include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }]
             },
             { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
-            { 
-                model: ProfilLulusan, as: 'profilLulusan', 
-                attributes: ['id', 'kode', 'profil', 'deskripsi', 'deskripsiEn', 'profesi'] 
+            {
+                model: ProfilLulusan, as: 'profilLulusan',
+                attributes: ['id', 'kode', 'profil', 'deskripsi', 'deskripsiEn', 'profesi'],
+                include: [{
+                    model: PemetaanPlCpl, as: 'pemetaanCpl',
+                    attributes: ['id', 'bobot'],
+                    include: [{
+                        model: CapaianPembelajaranLulusan, as: 'capaianPembelajaranLulusan',
+                        attributes: ['id', 'kode', 'deskripsi']
+                    }]
+                }]
             }
         ],
         order: [[{ model: ProfilLulusan, as: 'profilLulusan' }, 'kode', 'ASC']]
@@ -1047,13 +1055,27 @@ export const getManajemenPlByObeId = async (obeId) => {
 
     if (!data) throw new CustomError.NotFoundError("Data OBE tidak ditemukan");
 
+    const dataPl = (data.profilLulusan || []).map(pl => {
+        const plJson = pl.toJSON();
+        plJson.pemetaanCpl = (plJson.pemetaanCpl || [])
+            .filter(p => p.capaianPembelajaranLulusan)
+            .map(p => ({
+                pemetaanId: p.id,
+                cplId: p.capaianPembelajaranLulusan.id,
+                kodeCpl: p.capaianPembelajaranLulusan.kode,
+                deskripsiCpl: p.capaianPembelajaranLulusan.deskripsi,
+                bobot: parseFloat(p.bobot || 0)
+            }));
+        return plJson;
+    });
+
     return {
         header: {
             kodeProdi: data.programStudi?.kode || '-',
             programStudi: `${data.programStudi?.jenjang?.jenjang || 'S1'} - ${data.programStudi?.nama || '-'}`,
             tahunKurikulum: data.tahunKurikulum?.tahun || '-'
         },
-        dataPl: data.profilLulusan || []
+        dataPl
     };
 };
 
