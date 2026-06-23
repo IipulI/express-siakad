@@ -1,7 +1,7 @@
 import * as publicService from '../services/public.service.js'
 import ResponseBuilder from "../utils/response.js";
 import { getPagingData } from "../utils/pagination.js";
-import { getAllDosen } from "../services/dosen.service.js"
+import { fetchAllDosen as getAllDosen } from "../services/dosen.service.js"
 
 export const fetchExport = async (req, res, next) => {
     const page = req.query.page ? parseInt(req.query.page) : null;
