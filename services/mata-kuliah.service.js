@@ -142,15 +142,25 @@ export const getDetailMataKuliahObe = async (id) => {
 // =========================================================
 // 3. FIND ALL (Bawaan)
 // =========================================================
-export const findAll = async (page, size, search, order) => {
+export const findAll = async (page, size, search, order, tahunKurikulumId, siakProgramStudiId) => {
     const isPaginated = page !== null && size !== null;
 
     const queryBuilder = {
         attributes: {
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
         },
+        where: {},
         order: [['id', 'DESC']],
     }
+
+    if (search) {
+        queryBuilder.where[Op.or] = [
+            { nama: { [Op.iLike]: `%${search}%` } },
+            { kode: { [Op.iLike]: `%${search}%` } }
+        ];
+    }
+    if (tahunKurikulumId) queryBuilder.where.siakTahunKurikulumId = tahunKurikulumId;
+    if (siakProgramStudiId) queryBuilder.where.siakProgramStudiId = siakProgramStudiId;
 
     if (isPaginated) {
         const { limit, offset } = getPagination(page, size);

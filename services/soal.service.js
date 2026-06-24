@@ -61,16 +61,34 @@ export const createSoal = async (rencanaEvaluasiId, payload, trxLuar) => {
 };
 
 // Bikin BANYAK soal sekaligus dalam 1 komponen evaluasi, 1 transaksi (semua sukses atau semua batal).
-// payload: { daftarSoal: [ {nomor, label, jenisUnit, skorMaksimal, parentSoalId, urutan,
+// payload: { daftarSoal: [ {nomor, label, jenisUnit, skorMaksimal, parentSoalId, parentSoalNomor, urutan,
 //                            pertanyaan, opsiJawaban, kunciJawaban, pemetaanCpmk}, ... ] }
+//
+// Soal beranak dalam 1 batch yang SAMA: karena array diproses berurutan dalam 1 transaksi,
+// soal yang ditulis lebih dulu sudah punya id asli sebelum soal berikutnya diproses. Jadi anak
+// soal bisa referensi induknya cukup pakai `parentSoalNomor` (nomor induk, BUKAN UUID), asalkan
+// induknya ditulis SEBELUM anaknya di array -- tidak perlu lagi POST 2x / GET ulang di antaranya.
 export const createSoalBatch = async (rencanaEvaluasiId, daftarSoalPayload) => {
     if (!Array.isArray(daftarSoalPayload) || daftarSoalPayload.length === 0) {
         throw new CustomError.BadRequestError("daftarSoal harus berupa array, minimal 1 soal");
     }
     return await sequelize.transaction(async (trx) => {
         const hasil = [];
+        const idByNomor = {};
         for (const payload of daftarSoalPayload) {
-            hasil.push(await createSoal(rencanaEvaluasiId, payload, trx));
+            let payloadFinal = payload;
+            if (!payload.parentSoalId && payload.parentSoalNomor) {
+                const parentId = idByNomor[payload.parentSoalNomor];
+                if (!parentId) {
+                    throw new CustomError.BadRequestError(
+                        `parentSoalNomor "${payload.parentSoalNomor}" tidak ditemukan -- pastikan soal induk ditulis SEBELUM anaknya di daftarSoal`
+                    );
+                }
+                payloadFinal = { ...payload, parentSoalId: parentId };
+            }
+            const soalBaru = await createSoal(rencanaEvaluasiId, payloadFinal, trx);
+            idByNomor[payloadFinal.nomor] = soalBaru.id;
+            hasil.push(soalBaru);
         }
         return hasil;
     });

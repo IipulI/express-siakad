@@ -123,6 +123,148 @@ SkorKomponen(TUGAS AKHIR) = (20+22+18+23)/(25+25+25+25)×100 = 83/100×100 = 83,
 
 Komponen "KEHADIRAN" tetap input manual 1 angka seperti Jalur A biasa (tidak perlu rincian unit, karena memang bukan sesuatu yang dinilai per kriteria). Komponen "PRESENTASI MINGGUAN" bisa dipecah per minggu jadi beberapa unit RUBRIK, sama seperti contoh TUGAS AKHIR di atas. **Tidak ada UTS/UAS sama sekali, dan tetap berfungsi penuh.**
 
+## 4C. Contoh Payload Lengkap — Semua Jenis Soal (Endpoint: `POST /soal/komponen/:rencanaEvaluasiId/batch`)
+
+Semua contoh di bawah pakai endpoint yang sama (`createSoalBatch`), cuma isi `daftarSoal` yang berbeda sesuai jenisnya. `rencanaEvaluasiId` di URL = id komponen evaluasi (UTS/UAS/Tugas/dst, dari halaman 5).
+
+### a. Soal PG berdiri sendiri (OBJEKTIF) — auto-grading
+
+```json
+{
+  "daftarSoal": [
+    {
+      "nomor": "1",
+      "jenisUnit": "OBJEKTIF",
+      "skorMaksimal": 10,
+      "pertanyaan": "Ibukota Indonesia adalah?",
+      "opsiJawaban": [
+        { "label": "A", "teks": "Bandung" },
+        { "label": "B", "teks": "Jakarta" },
+        { "label": "C", "teks": "Surabaya" },
+        { "label": "D", "teks": "Medan" }
+      ],
+      "kunciJawaban": "B",
+      "pemetaanCpmk": [
+        { "cpmkId": "uuid-CPMK01", "bobotPoin": 10 }
+      ]
+    }
+  ]
+}
+```
+Saat input nilai (halaman 7C / `POST /soal/nilai/:krsId`), kirim `jawabanMahasiswa` (bukan `skor`) — sistem otomatis cocokkan ke `kunciJawaban`:
+```json
+{ "nilaiSoal": [ { "soalId": "uuid-soal-1", "jawabanMahasiswa": "B" } ] }
+```
+
+### b. Soal Esai berdiri sendiri (RUBRIK) — dinilai manual
+
+```json
+{
+  "daftarSoal": [
+    {
+      "nomor": "2",
+      "jenisUnit": "RUBRIK",
+      "skorMaksimal": 20,
+      "pertanyaan": "Jelaskan perbedaan antara array dan linked list, beserta kelebihan/kekurangannya.",
+      "kunciJawaban": "Acuan dosen: wajib sebut perbedaan struktur memori (kontigu vs tersebar), kompleksitas akses O(1) vs O(n), kompleksitas insert/delete, minimal 1 contoh kasus pakai.",
+      "pemetaanCpmk": [
+        { "cpmkId": "uuid-CPMK02", "bobotPoin": 20 }
+      ]
+    }
+  ]
+}
+```
+`kunciJawaban` di sini cuma catatan rubrik untuk dosen sendiri (BUKAN jawaban yang dicocokkan otomatis seperti PG). Saat input nilai, kirim `skor` langsung (dosen menentukan sendiri 0–20 berdasarkan kualitas jawaban):
+```json
+{ "nilaiSoal": [ { "soalId": "uuid-soal-2", "skor": 15 } ] }
+```
+
+### c. Soal beranak (1 induk + beberapa anak, campur PG & Esai)
+
+**Bisa langsung 1 kali POST** (tidak perlu 2 langkah) — `createSoalBatch` memproses array `daftarSoal` SECARA BERURUTAN dalam 1 transaksi, jadi soal yang ditulis lebih dulu sudah punya `id` asli sebelum soal sesudahnya diproses. Anak soal cukup referensi induknya pakai **`parentSoalNomor`** (nomor induk, BUKAN UUID) — asal **induknya ditulis SEBELUM anaknya** di array:
+
+```json
+{
+  "daftarSoal": [
+    { "nomor": "3", "label": "Studi Kasus: Sistem Antrian Bank", "jenisUnit": "RUBRIK", "skorMaksimal": 0, "pertanyaan": "Bacalah studi kasus berikut, lalu jawab pertanyaan 3a-3c." },
+    {
+      "nomor": "3a", "parentSoalNomor": "3", "label": "Identifikasi entitas", "jenisUnit": "OBJEKTIF",
+      "skorMaksimal": 5,
+      "pertanyaan": "Berapa jumlah entitas utama pada studi kasus?",
+      "opsiJawaban": [{ "label": "A", "teks": "2" }, { "label": "B", "teks": "3" }],
+      "kunciJawaban": "B",
+      "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK03", "bobotPoin": 5 }]
+    },
+    {
+      "nomor": "3b", "parentSoalNomor": "3", "label": "Rancang ERD", "jenisUnit": "RUBRIK",
+      "skorMaksimal": 15,
+      "pertanyaan": "Gambarkan ERD dari studi kasus tersebut.",
+      "kunciJawaban": "Acuan: minimal 3 entitas, relasi benar, kardinalitas tepat.",
+      "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK03", "bobotPoin": 15 }]
+    }
+  ]
+}
+```
+Skor maksimal induk **wajib 0** kalau induk cuma wadah (poin sebenarnya ada di anak-anaknya, biar tidak dobel hitung saat dijumlah ke total komponen). Di tabel/laporan, anak-anak ini tampil terkelompok di bawah induknya (lewat `parentSoalId` yang sistem isi otomatis dari `parentSoalNomor`), tapi dihitung sebagai unit independen.
+
+Kalau induknya soal LAMA yang sudah ada di server dari batch/sesi sebelumnya (bukan di array yang sama), tetap pakai cara lama: isi `parentSoalId` dengan UUID asli (didapat dari `GET /soal/komponen/:rencanaEvaluasiId`).
+
+### d. Bukan soal tertulis — Presentasi/PPT (RUBRIK, tiap kriteria = 1 "soal")
+
+Tidak ada `pertanyaan`/PG di sini — tiap kriteria penilaian presentasi jadi 1 baris "soal" dengan `label` deskriptif. `pertanyaan` bisa diisi deskripsi kriteria, atau dikosongkan.
+
+```json
+{
+  "daftarSoal": [
+    {
+      "nomor": "1", "label": "Penguasaan Materi", "jenisUnit": "RUBRIK",
+      "skorMaksimal": 30, "pertanyaan": "Seberapa dalam mahasiswa memahami materi yang dipresentasikan (bukan cuma membaca slide).",
+      "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK04", "bobotPoin": 30 }]
+    },
+    {
+      "nomor": "2", "label": "Kualitas Slide & Visual", "jenisUnit": "RUBRIK",
+      "skorMaksimal": 20, "pertanyaan": "Kerapian, keterbacaan, dan kesesuaian visual dengan isi.",
+      "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK04", "bobotPoin": 20 }]
+    },
+    {
+      "nomor": "3", "label": "Kemampuan Menjawab Pertanyaan", "jenisUnit": "RUBRIK",
+      "skorMaksimal": 30, "pertanyaan": "Ketepatan & kepercayaan diri menjawab sesi tanya-jawab.",
+      "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK05", "bobotPoin": 30 }]
+    },
+    {
+      "nomor": "4", "label": "Manajemen Waktu", "jenisUnit": "RUBRIK",
+      "skorMaksimal": 20, "pertanyaan": "Presentasi selesai sesuai alokasi waktu yang diberikan.",
+      "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK05", "bobotPoin": 20 }]
+    }
+  ]
+}
+```
+Total skorMaksimal komponen ini = 100. Dosen nilai tiap kriteria pakai `skor` manual seperti soal Esai (poin b).
+
+### e. Tugas/Proyek (RUBRIK, per tahap/deliverable — sama persis pola seperti d)
+
+```json
+{
+  "daftarSoal": [
+    { "nomor": "1", "label": "Analisis Kebutuhan", "jenisUnit": "RUBRIK", "skorMaksimal": 25, "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK06", "bobotPoin": 25 }] },
+    { "nomor": "2", "label": "Desain Arsitektur", "jenisUnit": "RUBRIK", "skorMaksimal": 25, "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK06", "bobotPoin": 25 }] },
+    { "nomor": "3", "label": "Implementasi & Testing", "jenisUnit": "RUBRIK", "skorMaksimal": 30, "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK07", "bobotPoin": 30 }] },
+    { "nomor": "4", "label": "Laporan & Dokumentasi", "jenisUnit": "RUBRIK", "skorMaksimal": 20, "pemetaanCpmk": [{ "cpmkId": "uuid-CPMK07", "bobotPoin": 20 }] }
+  ]
+}
+```
+
+### Ringkasan aturan praktis
+
+| Jenis | `jenisUnit` | `opsiJawaban`/`kunciJawaban` | Cara nilai | Skor parsial? |
+|---|---|---|---|---|
+| PG | `OBJEKTIF` | wajib isi opsi + kunci | kirim `jawabanMahasiswa`, sistem hitung sendiri | Tidak — benar=penuh, salah=0 |
+| Esai | `RUBRIK` | `kunciJawaban` opsional (cuma catatan dosen) | kirim `skor` manual | Bisa |
+| Beranak | (campur) | sesuai jenis anaknya | sesuai jenis anaknya | tergantung jenis anak |
+| Presentasi/PPT/Proyek/Tugas | `RUBRIK` | kosongkan, pakai `label`+`pertanyaan` sbg nama kriteria | kirim `skor` manual per kriteria | Bisa |
+
+Induk soal beranak: **selalu `skorMaksimal: 0`** kalau dia cuma wadah (tidak ikut dinilai sendiri). Kalau induk JUGA mau dinilai terpisah dari anak-anaknya (jarang, tapi boleh), isi `skorMaksimal` > 0 dan beri `pemetaanCpmk` sendiri — sistem akan menghitungnya sebagai unit terpisah, sejajar dengan anak-anaknya.
+
 ## 5. Alur Proses Lengkap
 
 ```

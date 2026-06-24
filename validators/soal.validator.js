@@ -36,6 +36,11 @@ export const validateCreateSoalBatch = [
     body('daftarSoal.*.nomor').notEmpty().withMessage('Nomor soal wajib diisi'),
     body('daftarSoal.*.jenisUnit').optional().isIn(['OBJEKTIF', 'RUBRIK']).withMessage("jenisUnit harus 'OBJEKTIF' atau 'RUBRIK'"),
     body('daftarSoal.*.skorMaksimal').isFloat({ min: 0 }).withMessage('skorMaksimal harus angka >= 0'),
+    // Soal beranak dalam batch yang sama: cukup referensi `nomor` soal induk (bukan UUID),
+    // asalkan induknya ditulis SEBELUM anaknya di array. Alternatif: parentSoalId (UUID asli,
+    // utk referensi soal dari batch/komponen sebelumnya yang sudah ada di server).
+    body('daftarSoal.*.parentSoalNomor').optional({ nullable: true }).isString(),
+    body('daftarSoal.*.parentSoalId').optional({ nullable: true }).isUUID().withMessage('parentSoalId harus UUID'),
     validate
 ];
 

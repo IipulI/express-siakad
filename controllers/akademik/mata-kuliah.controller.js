@@ -8,7 +8,7 @@ export const findAll = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        const data = await MataKuliahService.findAll(page, size);
+        const data = await MataKuliahService.findAll(page, size, req.query.search, undefined, req.query.tahunKurikulumId, req.query.prodiId);
 
         let payload;
         if (data.isPaginated === true) {
