@@ -689,8 +689,12 @@ export const exportPdfCapaianKelas = async (req, res, next) => {
                     cpmkX + i * cpmkW, tY, { width: cpmkW, align: 'center', lineBreak: false });
             });
 
-            doc.font('Helvetica-Bold');
+            const warnaStatusCpmk = mhs.statusCapaian === 'Sudah Memenuhi' ? '#1565C0'
+                : mhs.statusCapaian === 'Belum Memenuhi' ? '#DC2626'
+                : 'black';
+            doc.font('Helvetica-Bold').fillColor(warnaStatusCpmk);
             doc.text(mhs.statusCapaian || '-', statusX, tY, { width: colStatus, align: 'center', lineBreak: false });
+            doc.fillColor('black');
 
             rowY += rowHeight;
         });
@@ -1074,8 +1078,13 @@ export const exportPdfCapaianCplKelas = async (req, res, next) => {
                     cplX + i * cplW, tY, { width: cplW, align: 'center', lineBreak: false });
             });
 
-            doc.font('Helvetica-Bold');
-            doc.text(hitungStatusCapaianCpl(mhs.nilaiCpl, data.targetCpl, data.cplInfo), statusX, tY, { width: colStatus, align: 'center', lineBreak: false });
+            const statusCapaianCpl = hitungStatusCapaianCpl(mhs.nilaiCpl, data.targetCpl, data.cplInfo);
+            const warnaStatusCpl = statusCapaianCpl === 'Sudah Memenuhi' ? '#1565C0'
+                : statusCapaianCpl === 'Belum Memenuhi' ? '#DC2626'
+                : 'black';
+            doc.font('Helvetica-Bold').fillColor(warnaStatusCpl);
+            doc.text(statusCapaianCpl, statusX, tY, { width: colStatus, align: 'center', lineBreak: false });
+            doc.fillColor('black');
 
             rowY += rowHeight;
         });
