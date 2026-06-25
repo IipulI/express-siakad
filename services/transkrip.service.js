@@ -60,8 +60,21 @@ export const getTranskrip = async (mahasiswaId) => {
       raw: true,
     });
 
+    // Dedup per kelas: kalau mahasiswa kebetulan punya >1 baris RincianKrsMahasiswa
+    // untuk kelas yang sama (data KRS duplikat), jangan tampil 2x di transkrip --
+    // prioritaskan baris yang ada nilainya (pola sama dgn getPesertaKelasList).
+    const rincianPerKelas = new Map();
+    rincianKrsMahasiswa.forEach((item) => {
+      const kelasId = item.siakKelasKuliahId;
+      if (!kelasId) return;
+      const existing = rincianPerKelas.get(kelasId);
+      if (!existing || (item.nilaiAkhir != null && existing.nilaiAkhir == null)) {
+        rincianPerKelas.set(kelasId, item);
+      }
+    });
+
     return {
-      rincianKrs: rincianKrsMahasiswa,
+      rincianKrs: Array.from(rincianPerKelas.values()),
     };
   } catch (error) {
     console.log(error);

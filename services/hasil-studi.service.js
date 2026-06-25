@@ -75,9 +75,22 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
     ]
   });
 
+  // Dedup per kelas: kalau mahasiswa kebetulan punya >1 baris RincianKrsMahasiswa
+  // untuk kelas yang sama (data KRS duplikat), jangan tampilkan 2x di KHS -- pakai
+  // pola yang sama dengan getPesertaKelasList (prioritaskan baris yang ada nilainya).
+  const rincianPerKelas = new Map();
+  rincianKrsMahasiswa.forEach((item) => {
+    const kelasId = item.kelasKuliah?.id;
+    if (!kelasId) return;
+    const existing = rincianPerKelas.get(kelasId);
+    if (!existing || (item.nilaiAkhir != null && existing.nilaiAkhir == null)) {
+      rincianPerKelas.set(kelasId, item);
+    }
+  });
+
   return {
     hasilStudi: hasilStudi,
-    rincianKrs: rincianKrsMahasiswa,
+    rincianKrs: Array.from(rincianPerKelas.values()),
   };
 };
 
@@ -92,7 +105,7 @@ export const historyHasilStudi = async (mahasiswaId) => {
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
         },
         where: {
-            siakMahasiswaId: idMahasiswa
+            siakMahasiswaId: mahasiswaId
         },
         order: [['semester', 'ASC']],
         include: [
