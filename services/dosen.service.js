@@ -1,4 +1,5 @@
 import db from "../models/index.js"
+import { Op } from "sequelize";
 import { getPagination } from "../utils/pagination.js";
 
 const {
@@ -10,6 +11,15 @@ export const fetchAllDosen = async (page, size, filter) => {
     const queryBuilder = {
         attributes: ['id', 'nama', 'nidn'],
         order: [['id', 'DESC']]
+    }
+
+    if (filter?.search) {
+        queryBuilder.where = {
+            [Op.or]: [
+                { nama: { [Op.iLike]: `%${filter.search}%` } },
+                { nidn: { [Op.iLike]: `%${filter.search}%` } }
+            ]
+        };
     }
 
     if (isPaginated) {
