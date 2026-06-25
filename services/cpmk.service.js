@@ -397,11 +397,21 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
                 transaction: t
             });
             if (cplPemetaan?.length > 0) {
-                const pivotData = cplPemetaan.map((p) => ({
-                    siakCapaianMataKuliahId: cpmkId,
-                    siakCapaianPembelajaranLulusanId: p.idCpl,
-                    bobotCpl: p.bobotCpl
-                }));
+                const pivotData = cplPemetaan.map((p) => {
+                    // GET-nya balas field "idCpl", tapi terima juga "cplId" (lebih umum dipakai) biar
+                    // tidak gampang ke-skip jadi NULL -> crash 500 constraint violation kalau client kirim cplId.
+                    const idCplAsli = p.idCpl || p.cplId;
+                    if (!idCplAsli) {
+                        throw new CustomError.BadRequestError(
+                            `cplPemetaan punya item tanpa idCpl/cplId (cek baris dengan bobotCpl ${p.bobotCpl})`
+                        );
+                    }
+                    return {
+                        siakCapaianMataKuliahId: cpmkId,
+                        siakCapaianPembelajaranLulusanId: idCplAsli,
+                        bobotCpl: p.bobotCpl
+                    };
+                });
                 await PemetaanCplCpmk.bulkCreate(pivotData, { transaction: t });
             }
         };
