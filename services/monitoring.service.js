@@ -789,31 +789,36 @@ export const getTranskripObeMahasiswa = async (filters) => {
     const { sequelize } = models;
 
     try {
-        // 1. AMBIL INFO OBE
-        const queryInfo = `
-            SELECT o.id AS obe_id, ps.nama AS prodi_nama, tk.tahun AS tahun_kurikulum
-            FROM siak_obe o
-            LEFT JOIN siak_program_studi ps ON o.siak_program_studi_id = ps.id
-            LEFT JOIN siak_tahun_kurikulum tk ON o.siak_tahun_kurikulum_id = tk.id
-            WHERE o.siak_tahun_kurikulum_id = :tahunKurikulumId 
-              AND o.siak_program_studi_id = :prodiId
-              AND o.deleted_at IS NULL
-            LIMIT 1
-        `;
-        const obeData = await sequelize.query(queryInfo, { replacements: { tahunKurikulumId, prodiId }, type: QueryTypes.SELECT });
-        if (!obeData || obeData.length === 0) throw new CustomError.NotFoundError("Data OBE tidak ditemukan.");
-        const infoObe = obeData[0];
-
-        // 2. AMBIL DATA MAHASISWA (Pastikan tidak terhapus)
+        // 1. AMBIL DATA MAHASISWA dulu (Pastikan tidak terhapus) -- dipindah ke atas
+        // supaya prodiId bisa diturunkan dari data mahasiswa kalau caller tidak mengirimnya.
         const queryMhs = `
-            SELECT id, npm, nama, angkatan 
-            FROM siak_mahasiswa 
+            SELECT id, npm, nama, angkatan, siak_program_studi_id
+            FROM siak_mahasiswa
             WHERE id = :mahasiswaId AND deleted_at IS NULL
             LIMIT 1
         `;
         const mhsData = await sequelize.query(queryMhs, { replacements: { mahasiswaId }, type: QueryTypes.SELECT });
         if (!mhsData || mhsData.length === 0) throw new CustomError.NotFoundError("Data Mahasiswa tidak ditemukan.");
         const infoMhs = mhsData[0];
+
+        // 2. AMBIL INFO OBE -- prodiId & tahunKurikulumId OPSIONAL dari caller. Kalau tidak
+        // dikirim, prodiId diturunkan dari mahasiswa, dan OBE dipilih dari kurikulum TERBARU
+        // milik prodi itu (bukan 500 crash karena named replacement kosong).
+        const prodiIdAsli = prodiId || infoMhs.siak_program_studi_id;
+        const queryInfo = `
+            SELECT o.id AS obe_id, ps.nama AS prodi_nama, tk.tahun AS tahun_kurikulum
+            FROM siak_obe o
+            LEFT JOIN siak_program_studi ps ON o.siak_program_studi_id = ps.id
+            LEFT JOIN siak_tahun_kurikulum tk ON o.siak_tahun_kurikulum_id = tk.id
+            WHERE o.siak_program_studi_id = :prodiId
+              AND (:tahunKurikulumId::uuid IS NULL OR o.siak_tahun_kurikulum_id = :tahunKurikulumId)
+              AND o.deleted_at IS NULL
+            ORDER BY tk.tahun DESC
+            LIMIT 1
+        `;
+        const obeData = await sequelize.query(queryInfo, { replacements: { tahunKurikulumId: tahunKurikulumId || null, prodiId: prodiIdAsli }, type: QueryTypes.SELECT });
+        if (!obeData || obeData.length === 0) throw new CustomError.NotFoundError("Data OBE tidak ditemukan.");
+        const infoObe = obeData[0];
 
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
