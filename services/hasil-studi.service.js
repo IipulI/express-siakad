@@ -236,5 +236,18 @@ export const getKkn = async (mahasiswaId) => {
     ]
   });
 
-  return kknMataKuliah;
+  // Dedup per kelas: pola sama dengan getHasilStudi/getTranskrip -- kalau
+  // mahasiswa kebetulan punya >1 baris RincianKrsMahasiswa untuk kelas KKN
+  // yang sama, jangan tampil 2x, prioritaskan baris yang ada nilainya.
+  const kknPerKelas = new Map();
+  kknMataKuliah.forEach((item) => {
+    const kelasId = item.kelasKuliah?.id;
+    if (!kelasId) return;
+    const existing = kknPerKelas.get(kelasId);
+    if (!existing || (item.nilaiAkhir != null && existing.nilaiAkhir == null)) {
+      kknPerKelas.set(kelasId, item);
+    }
+  });
+
+  return Array.from(kknPerKelas.values());
 };
