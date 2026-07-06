@@ -1,6 +1,6 @@
 import models from '../../models/index.js';
 
-const { Mahasiswa } = models;
+const { Mahasiswa, UnitKerja, ProgramStudi } = models;
 
 export const validateNpm = async (req, res) => {
     try {
@@ -17,6 +17,16 @@ export const validateNpm = async (req, res) => {
         const mahasiswa = await Mahasiswa.findOne({
             where: { npm },
             attributes: ['id', 'nama', 'npm'],
+            include: {
+                attributes: ['id', 'kode', 'nama'],
+                model: ProgramStudi,
+                as: 'programStudi',
+                include: {
+                    attributes: ['id', 'kode', 'nama'],
+                    model: UnitKerja,
+                    as: 'unitKerja'
+                }
+            }
         });
 
         if (!mahasiswa) {
@@ -34,6 +44,9 @@ export const validateNpm = async (req, res) => {
             data: {
                 nama: mahasiswa.nama,
                 npm:  mahasiswa.npm,
+                unitId: mahasiswa.programStudi.unitKerja.id,
+                unitName: mahasiswa.programStudi.unitKerja.nama,
+                unitKode: mahasiswa.programStudi.unitKerja.kode,
             },
         });
     } catch (error) {
