@@ -33,6 +33,9 @@ export const getTranskrip = async (mahasiswaId) => {
         "nilaiAkhir",
         "siakKelasKuliahId",
       ],
+      where: {
+        status: { [Op.in]: ['Dikunci', 'Lulus', 'Tidak Lulus'] }
+      },
       include: [
         {
           attributes: ["semester"],

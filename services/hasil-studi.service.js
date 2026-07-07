@@ -51,6 +51,9 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
       "angkaMutu",
       "nilaiAkhir",
     ],
+    where: {
+      status: { [Op.in]: ['Dikunci', 'Lulus', 'Tidak Lulus'] }
+    },
     include: [
       {
         attributes: [],
@@ -199,6 +202,9 @@ export const getKkn = async (mahasiswaId) => {
       "angkaMutu",
       "nilaiAkhir",
     ],
+    where: {
+      status: { [Op.in]: ['Dikunci', 'Lulus', 'Tidak Lulus'] }
+    },
     include: [
       {
         attributes: ['id', 'siakPeriodeAkademikId', 'semester'],
