@@ -5,7 +5,10 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class Fakultas extends Model {
         static associate(models) {
-            // define assoc
+            this.belongsTo(models.UnitKerja, {
+                foreignKey : "siak_unit_kerja_id",
+                as : "unitKerja",
+            })
         }
     }
 
