@@ -8,7 +8,7 @@ export const findAll = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        const data = await MataKuliahService.findAll(page, size, req.query.search, undefined, req.query.tahunKurikulumId, req.query.prodiId);
+        const data = await MataKuliahService.findAll(page, size, req.query.search, undefined, req.query.tahunKurikulumId, req.query.programStudiId);
 
         let payload;
         if (data.isPaginated === true) {
@@ -52,7 +52,7 @@ export const findOne = async (req, res) => {
     }
 }
 
-export const create = async (req, res) => {
+export const create = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res);
 
     try {
@@ -64,19 +64,8 @@ export const create = async (req, res) => {
             .json();
     }
     catch (error) {
-        if(error.message.includes('already exists')) {
-            return responseBuilder
-                .status('failure')
-                .code(409)
-                .message(error.message)
-                .json();
-        }
-
-        responseBuilder
-            .status('failure')
-            .code(500)
-            .message(error.message || 'Terjadi kesalahan yang tidak terduga')
-            .json();
+        console.error(error)
+        next(error)
     }
 }
 

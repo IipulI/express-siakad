@@ -10,7 +10,7 @@ export const findAll = async(page, size, search) => {
 
     const queryBuilder = {
         attributes: {
-            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+            exclude: ['createdAt', 'updatedAt', 'deletedAt', 'siak_program_studi_id']
         },
         order: [['id', 'DESC']]
     }

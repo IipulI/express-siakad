@@ -17,6 +17,7 @@ const {
     ProgramStudi,
     RincianKrsMahasiswa,
     Ruangan,
+    TahunKurikulum,
     UnsurNilai,
     sequelize,
 } = models;
@@ -68,6 +69,17 @@ export const findAll = async (page, size, filter) => {
                 required: Object.keys(mataKuliahWhere).length > 0,
                 model: MataKuliah,
                 as: 'mataKuliah',
+                include: {
+                    attributes: [
+                        'id', 'nama'
+                    ],
+                    model: ProgramStudi,
+                    as: 'programStudi',
+                    include: {
+                        model: Jenjang,
+                        as: 'jenjang'
+                    }
+                }
             },
             {
                 attributes: [
@@ -184,6 +196,19 @@ export const detailClass = async (id) => {
                 ],
                 model: MataKuliah,
                 as: 'mataKuliah',
+                include: [
+                    {
+                        attributes: [
+                            'id', 'nama'
+                        ],
+                        model: ProgramStudi,
+                        as: 'programStudi',
+                    },
+                    {
+                        model: TahunKurikulum,
+                        as: 'tahunKurikulum',
+                    }
+                ]
             },
             {
                 attributes: [
