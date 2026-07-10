@@ -20,7 +20,7 @@ export default (sequelize) => {
             });
 
             this.hasOne(models.ProgramStudi, {
-                foreignKey : "siak_program_studi_id",
+                foreignKey : "siak_unit_kerja_id",
                 as : "programStudi",
             })
         }

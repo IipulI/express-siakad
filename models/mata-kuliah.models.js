@@ -10,11 +10,11 @@ export default (sequelize) => {
                 as: 'tahunKurikulum',
             })
             this.belongsToMany(models.Konsentrasi, {
-            through: models.PemetaanKonsentrasiMk,
-            foreignKey: 'siak_mata_kuliah_id',
-            otherKey: 'siak_konsentrasi_id',
-            as: 'konsentrasi' // 👈 Nama as ini wajib sama dengan include di controller
-        });
+                through: models.PemetaanKonsentrasiMk,
+                foreignKey: 'siak_mata_kuliah_id',
+                otherKey: 'siak_konsentrasi_id',
+                as: 'konsentrasi' // 👈 Nama as ini wajib sama dengan include di controller
+            });
 
             this.belongsTo(models.ProgramStudi, {
                 foreignKey: 'siak_program_studi_id',
@@ -42,54 +42,45 @@ export default (sequelize) => {
                 as: "prasyarat3"
             })
 
+            // Pengembang RPS jadi Many-to-Many pakai tabel pivot
+            // 1. Relasi Koordinator (1-to-1)
+            this.belongsTo(models.Dosen, {
+                foreignKey: 'koordinator_mk_id',
+                as: 'koordinatorMk'
+            });
 
-
-  // Pengembang RPS jadi Many-to-Many pakai tabel pivot
-// 1. Relasi Koordinator (1-to-1)
-    this.belongsTo(models.Dosen, {
-        foreignKey: 'koordinator_mk_id',
-        as: 'koordinatorMk'
-    });
-
- this.belongsToMany(models.Dosen, {
-        through: models.PengembanganRps,
-        foreignKey: 'siakMataKuliahId', // <-- UBAH JADI camelCase
-        otherKey: 'siakDosenId',        // <-- UBAH JADI camelCase
-        as: 'pengembangRps'
-    });
-    // 3. Relasi Pengajar Mata Kuliah (Many-to-Many)
-    this.belongsToMany(models.Dosen, {
-        through: 'siak_pengajar_mata_kuliah',
-        foreignKey: 'siak_mata_kuliah_id',
-        otherKey: 'siak_dosen_id',
-        as: 'pengajarMataKuliah'
-    });
-    // Relasi Pemetaan CPL
-
-
-
-    // Relasi Pemetaan CPL
-    this.belongsToMany(models.CapaianPembelajaranLulusan, {
-        through: models.PemetaanCplMk,
-        foreignKey: 'siakMataKuliahId', // <-- UBAH KE CAMEL CASE
-        otherKey: 'siakCplId',          // <-- UBAH KE CAMEL CASE
-        as: 'cplDipetakan'
-    });
-    this.hasMany(models.CapaianMataKuliah, {
-        foreignKey: 'siak_mata_kuliah_id',
-        as: 'cpmk' // Alias ini yang kita panggil di Service
-    });
-    this.hasMany(models.RencanaPembelajaran, {
-    foreignKey: "siak_mata_kuliah_id",
-    as: "rencanaPembelajaran"
-});
-    this.belongsTo(models.KelompokMataKuliah, {
-    foreignKey: 'siak_kelompok_mata_kuliah_id',
-    as: 'kelompokMk'
-});
-
-
-
+            this.belongsToMany(models.Dosen, {
+                through: models.PengembanganRps,
+                foreignKey: 'siakMataKuliahId', // <-- UBAH JADI camelCase
+                otherKey: 'siakDosenId',        // <-- UBAH JADI camelCase
+                as: 'pengembangRps'
+            });
+            // 3. Relasi Pengajar Mata Kuliah (Many-to-Many)
+            this.belongsToMany(models.Dosen, {
+                through: 'siak_pengajar_mata_kuliah',
+                foreignKey: 'siak_mata_kuliah_id',
+                otherKey: 'siak_dosen_id',
+                as: 'pengajarMataKuliah'
+            });
+            // Relasi Pemetaan CPL
+            this.belongsToMany(models.CapaianPembelajaranLulusan, {
+                through: models.PemetaanCplMk,
+                foreignKey: 'siakMataKuliahId', // <-- UBAH KE CAMEL CASE
+                otherKey: 'siakCplId',          // <-- UBAH KE CAMEL CASE
+                as: 'cplDipetakan'
+            });
+            this.hasMany(models.CapaianMataKuliah, {
+                foreignKey: 'siak_mata_kuliah_id',
+                as: 'cpmk' // Alias ini yang kita panggil di Service
+            });
+            this.hasMany(models.RencanaPembelajaran, {
+                foreignKey: "siak_mata_kuliah_id",
+                as: "rencanaPembelajaran"
+            });
+                this.belongsTo(models.KelompokMataKuliah, {
+                foreignKey: 'siak_kelompok_mata_kuliah_id',
+                as: 'kelompokMk'
+            });
         }
     }
 

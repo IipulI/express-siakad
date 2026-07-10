@@ -52,11 +52,14 @@ export const findOne = async (req, res) => {
     }
 }
 
-export const create = async (req, res) => {
+export const create = async (req, res, next) => {
     const response = new ResponseBuilder(res)
 
+    const request = JSON.parse(req.body.request);
+    const requestKeluarga = JSON.parse(req.body.requestKeluarga);
+
     try {
-        const data = await mahasiswaService.create(req.body)
+        const data = await mahasiswaService.create(request, requestKeluarga)
 
         response
             .status('success')
@@ -65,10 +68,7 @@ export const create = async (req, res) => {
             .json(data)
     }
     catch (error) {
-        response
-            .status('failure')
-            .code(500)
-            .message("Gagal mengambil data")
-            .json(error.message)
+        console.error(error)
+        next(error)
     }
 }

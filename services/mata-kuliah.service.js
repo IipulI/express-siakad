@@ -3,8 +3,14 @@ import models from "../models/index.js";
 import { Op } from 'sequelize';
 
 import * as CustomError from "../utils/custom-error.js";
+import { NotFoundError } from "../utils/custom-error.js";
 
-const { sequelize, MataKuliah } = models;
+const {
+    sequelize,
+    ProgramStudi,
+    MataKuliah,
+    TahunKurikulum,
+} = models;
 
 // =========================================================
 // 1. GET LIST MATA KULIAH OBE (Dipanggil oleh Controller OBE)
@@ -150,6 +156,18 @@ export const findAll = async (page, size, search, order, tahunKurikulumId, siakP
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
         },
         where: {},
+        include: [
+            {
+                attributes: ['id', 'kode', 'nama'],
+                model: ProgramStudi,
+                as: 'programStudi',
+            },
+            {
+                attributes: ['id', 'tahun'],
+                model: TahunKurikulum,
+                as: 'tahunKurikulum',
+            }
+        ],
         order: [['id', 'DESC']],
     }
 
@@ -187,7 +205,41 @@ export const findAll = async (page, size, search, order, tahunKurikulumId, siakP
 }
 
 export const findOne = async (id) => {
-    const cekDataMataKuliah = await MataKuliah.findByPk(id)
+    const cekDataMataKuliah = await MataKuliah.findByPk(id, {
+        include: [
+            {
+                attributes: ['id', 'kode', 'nama'],
+                model: ProgramStudi,
+                as: 'programStudi',
+            },
+            {
+                attributes: ['id', 'tahun'],
+                model: TahunKurikulum,
+                as: 'tahunKurikulum',
+            },
+            {
+                attributes: [
+                    'id', 'nama', 'kode'
+                ],
+                model:MataKuliah,
+                as: 'prasyarat1'
+            },
+            {
+                attributes: [
+                    'id', 'nama', 'kode'
+                ],
+                model:MataKuliah,
+                as: 'prasyarat2'
+            },
+            {
+                attributes: [
+                    'id', 'nama', 'kode'
+                ],
+                model:MataKuliah,
+                as: 'prasyarat3'
+            },
+        ],
+    })
 
     if (!cekDataMataKuliah) {
         throw new NotFoundError("Mata Kuliah tidak dapat ditemukan")
@@ -200,7 +252,9 @@ export const findOne = async (id) => {
 // 5. CREATE MATA KULIAH
 // =========================================================
 export const createMataKuliah = async (mataKuliahData) => {
-    const programStudiExist = await ProgramStudi.findByPk(mataKuliahData.siakProgramStudiId)
+    const programStudiExist = await ProgramStudi.findByPk(mataKuliahData.siakProgramStudiId, {
+        attributes: ['id'],
+    })
     if (!programStudiExist) {
         throw new Error(`Program studi tidak ditemukan`);
     }
@@ -237,6 +291,7 @@ export const createMataKuliah = async (mataKuliahData) => {
             },
             {
                 transaction: t,
+                logging: true
             }
         )
 
@@ -369,7 +424,7 @@ export const deleteMataKuliah = async (id) => {
 const validatePrasyarat = async (mataKuliahData, transaction) => {
     for (let i = 1; i <= 3; i++) {
         const prasyaratId = mataKuliahData[`prasyaratMataKuliah${i}Id`];
-        if (prasyaratId != null) {
+        if (prasyaratId) {
             const prasyarat = await MataKuliah.findByPk(prasyaratId, {
                 transaction,
                 lock: transaction.LOCK

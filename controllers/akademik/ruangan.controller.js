@@ -149,3 +149,22 @@ export const deleteRuangan = async (req, res) => {
       .json();
   }
 };
+
+
+export const monitoringRuangan = async (req, res, next) => {
+    const { tanggal, unitKerjaId } = req.query;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        const data = await ruanganService.getMonitoringRuangan({ tanggal, unitKerjaId });
+
+        responseBuilder
+            .status('success')
+            .code(200)
+            .message("Berhasil Mengambil data")
+            .json(data)
+    } catch (error) {
+        console.error(error);
+        next(error);
+    }
+}

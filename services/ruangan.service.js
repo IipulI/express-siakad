@@ -1,113 +1,239 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { BadRequestError, ConflictError, NotFoundError } from "../utils/custom-error.js";
+import { Op } from "sequelize";
+import { resolveUnitKerjaIds } from "./unit-kerja.service.js";
 
-const { Ruangan, Fakultas } = models;
+const {
+    Dosen,
+    Fakultas,
+    JadwalKuliah,
+    KelasKuliah,
+    MataKuliah,
+    ProgramStudi,
+    Ruangan
+} = models;
 
 export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
+  const isPaginated = page !== null && size !== null;
 
-      const { count, rows } = await Ruangan.findAndCountAll({
-        attributes: [
-          "id",
-          "siakFakultasId",
-          "nama",
-          "ruangan",
-          "kapasitas",
-          "lantai",
-        ],
-        limit,
-        offset,
-        order: [["ruangan", "DESC"]],
-        raw: true,
-      });
+  let queryBuilder = {
+    attributes: [
+      "id",
+      "siakFakultasId",
+      "nama",
+      "ruangan",
+      "kapasitas",
+      "lantai",
+    ],
+    order: [["ruangan", "DESC"]],
+  }
 
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
+  if (isPaginated) {
+    const { limit, offset } = getPagination(page, size);
+    queryBuilder.limit = limit;
+    queryBuilder.offset = offset;
 
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
-    } else {
-      const { count, rows } = await Ruangan.findAndCountAll({
-        attributes: [
-          "id",
-          "siakFakultasId",
-          "nama",
-          "ruangan",
-          "kapasitas",
-          "lantai",
-        ],
-        include: [
-          { model: Fakultas, as: "fakultas", attributes: ["id", "nama"] },
-        ],
-        // raw: true,
-      });
+    const { count, rows } = await Ruangan.findAndCountAll(queryBuilder);
 
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
+    return {
+      count,
+      rows,
+      isPaginated: true,
     }
-  } catch (error) {
-    console.log(error);
-    throw new Error(`Terjadi kesalahan saat menghapus Ruangan: ${error.message}`);
+  } else {
+    const data = await Ruangan.findAll(queryBuilder);
+
+    return {
+      count: data.length,
+      rows: data,
+      isPaginated: false,
+    }
   }
 };
 
 export const createRuangan = async (ruanganData) => {
-  const { siakFakultasId, nama, ruangan, kapasitas, lantai } = ruanganData;
+    const { ruangan } = ruanganData;
 
-  const existingRuangan = await Ruangan.findOne({ where: { ruangan } });
-
-  if (existingRuangan) {
-    throw new Error(`Ruangan dengan nama "${ruangan}" sudah ada`);
-  }
-
-  try {
-    await Ruangan.create({ siakFakultasId, nama, ruangan, kapasitas, lantai });
-  } catch (err) {
-    if (err.name === "SequelizeUniqueConstraintError") {
-      throw new Error(
-        `Duplicate entry: ${err.errors.map((e) => e.message).join(", ")}`
-      );
+    const existingRuangan = await Ruangan.findOne({
+        where: {
+            ruangan
+        }
+    })
+    if (existingRuangan) {
+        throw new ConflictError(`Ruangan : ${ruangan} sudah ada`)
     }
-    throw new Error(`Terjadi kesalahan saat membuat Ruangan: ${err.message}`);
-  }
+
+    return await Ruangan.create(ruanganData);
 };
 
 export const updateRuangan = async (id, updateData) => {
-  try {
-    const ruangan = await Ruangan.findByPk(id);
+    const { siakFakultasId, nama, ruangan, kapasitas, lantai } = updateData;
 
-    if (!ruangan) {
-      return null;
+    const cekDataRuangan = await Ruangan.findByPk(id)
+    if (!cekDataRuangan) {
+        throw new NotFoundError(`Ruangan tidak ditemukan`)
     }
 
-    const [updatedRowsCount] = await Ruangan.update(updateData, {
-      where: { id: id },
-    });
+    const existingRuangan = await Ruangan.findOne({
+        where: {
+            ruangan
+        }
+    })
+    if (existingRuangan && existingRuangan.id !== id) {
+        throw new ConflictError(`Ruangan : ${ruangan} sudah ada.`);
+    }
 
-    return updatedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Terjadi kesalahan saat memperbarui Ruangan: ${error.message}`);
-  }
+    return Ruangan.update({ siakFakultasId, nama, ruangan, kapasitas, lantai }, { where: { id: id } });
 };
 
 export const deleteRuangan = async (id) => {
-  try {
-    const deletedRowsCount = await Ruangan.destroy({
-      where: { id: id },
+    const cekDataRuangan = await Ruangan.findByPk(id)
+    if (!cekDataRuangan) {
+        throw new NotFoundError(`Ruangan tidak ditemukan`)
+    }
+
+    await cekDataRuangan.destroy()
+};
+
+export const getMonitoringRuangan = async ({ hari, unitKerjaId }) => {
+    const { fakultasIds, prodiIds } = await resolveUnitKerjaIds(unitKerjaId);
+
+    const ruanganWhere = {
+        deletedAt: null,
+        [Op.or]: [],
+    };
+
+    if (fakultasIds.length > 0) {
+        ruanganWhere[Op.or].push({ siakFakultasId: { [Op.in]: fakultasIds } });
+    }
+    if (prodiIds.length > 0) {
+        ruanganWhere[Op.or].push({ siakProgramStudiId: { [Op.in]: prodiIds } });
+    }
+
+    if (ruanganWhere[Op.or].length === 0) {
+        return buildResponse({ hari, unitKerjaId, ruanganList: [] });
+    }
+
+    const ruanganList = await Ruangan.findAll({
+        where: ruanganWhere,
+        attributes: ["id", "nama", "ruangan", "kapasitas", "lantai"],
+        include: [
+            {
+                model: Fakultas,
+                as: "fakultas",
+                attributes: ["id", "nama"],
+                required: false,
+            },
+            {
+                model: ProgramStudi,
+                as: "programStudi",
+                attributes: ["id", "nama"],
+                required: false,
+            },
+            {
+                model: JadwalKuliah,
+                as: "jadwalKuliah",
+                required: false,
+                where: {
+                    hari,
+                    deletedAt: null,
+                },
+                attributes: [
+                    "id",
+                    "hari",
+                    "jamMulai",
+                    "jamSelesai",
+                    "jenisPetemuan",
+                    "metodePembelajaran",
+                ],
+                include: [
+                    {
+                        model: KelasKuliah,
+                        as: "kelasKuliah",
+                        attributes: ["id", "nama", "sistemKuliah", "statusKelas"],
+                        include: [
+                            {
+                                model: MataKuliah,
+                                as: "mataKuliah",
+                                attributes: ["id", "nama", "kode", "totalSks"],
+                            },
+                            {
+                                model: ProgramStudi,
+                                as: "programStudi",
+                                attributes: ["id", "nama"],
+                            },
+                        ],
+                    },
+                    {
+                        model: Dosen,
+                        as: "dosen",
+                        attributes: ["id", "nama", "nidn"],
+                        required: false,
+                    },
+                ],
+            },
+        ],
+        order: [
+            ["lantai", "ASC"],
+            ["ruangan", "ASC"],
+            [{ model: JadwalKuliah, as: "jadwalKuliah" }, "jamMulai", "ASC"],
+        ],
     });
 
-    return deletedRowsCount > 0;
-  } catch (error) {
-    throw new Error(`Terjadi kesalahan saat menghapus Ruangan: ${error.message}`);
-  }
+    return buildResponse({ hari, unitKerjaId, ruanganList });
+};
+
+const buildResponse = ({ hari, unitKerjaId, ruanganList }) => {
+    const result = ruanganList.map((ruangan) => {
+        const r = ruangan.toJSON();
+        return {
+            id: r.id,
+            kode: r.ruangan,
+            nama: r.nama,
+            kapasitas: r.kapasitas,
+            lantai: r.lantai,
+            pemilik: r.fakultas
+                ? { jenis: "fakultas", id: r.fakultas.id, nama: r.fakultas.nama }
+                : r.programStudi
+                    ? { jenis: "prodi", id: r.programStudi.id, nama: r.programStudi.nama }
+                    : null,
+            jadwal: r.jadwalKuliah.map((j) => ({
+                id: j.id,
+                jamMulai: j.jamMulai,
+                jamSelesai: j.jamSelesai,
+                jenisPetemuan: j.jenisPetemuan,
+                metodePembelajaran: j.metodePembelajaran,
+                kelas: {
+                    id: j.kelasKuliah.id,
+                    nama: j.kelasKuliah.nama,
+                    sistemKuliah: j.kelasKuliah.sistemKuliah,
+                    mataKuliah: {
+                        id: j.kelasKuliah.mataKuliah.id,
+                        nama: j.kelasKuliah.mataKuliah.nama,
+                        kode: j.kelasKuliah.mataKuliah.kode,
+                        totalSks: j.kelasKuliah.mataKuliah.totalSks,
+                    },
+                    programStudi: {
+                        id: j.kelasKuliah.programStudi.id,
+                        nama: j.kelasKuliah.programStudi.nama,
+                    },
+                },
+                dosen: j.dosen
+                    ? { id: j.dosen.id, nama: j.dosen.nama, nidn: j.dosen.nidn }
+                    : null,
+            })),
+        };
+    });
+
+    return {
+        hari,
+        unitKerjaId,
+        ruangan: result,
+        meta: {
+            totalRuangan: result.length,
+            ruanganTerpakai: result.filter((r) => r.jadwal.length > 0).length,
+            ruanganKosong: result.filter((r) => r.jadwal.length === 0).length,
+        },
+    };
 };
