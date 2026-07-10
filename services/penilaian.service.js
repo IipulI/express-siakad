@@ -41,11 +41,6 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
         err.statusCode = 404;
         throw err;
     }
-    if (rincian.status === 'Dikunci') {
-        const err = new Error('Nilai sudah dikunci, tidak dapat diedit');
-        err.statusCode = 403;
-        throw err;
-    }
     if (rincian.status === 'Lulus' || rincian.status === 'Tidak Lulus') {
         const err = new Error('Nilai sudah difinalisasi dan bersifat permanen, tidak dapat diubah');
         err.statusCode = 403;
@@ -295,6 +290,25 @@ export const hitungNilaiAkhir = async (krsId) => {
                         if (payloadCpmk.length > 0) {
                             await models.NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
                         }
+                    }
+
+                    // Auto-kunci: jika semua mahasiswa di kelas sudah punya nilai_akhir → kunci semua
+                    const [cekRows] = await sequelize.query(
+                        `SELECT COUNT(*) AS total,
+                                SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
+                         FROM siak_rincian_krs_mahasiswa
+                         WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
+                        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+                    );
+                    if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+                        await sequelize.query(
+                            `UPDATE siak_rincian_krs_mahasiswa
+                             SET status = 'Dikunci', updated_at = NOW()
+                             WHERE siak_kelas_kuliah_id = :kelasId
+                               AND (status IS NULL OR status NOT IN ('Dikunci', 'Lulus', 'Tidak Lulus'))
+                               AND deleted_at IS NULL`,
+                            { replacements: { kelasId }, transaction: trx }
+                        );
                     }
                 }
             }
@@ -809,7 +823,6 @@ export const inputNilaiPerCpmk = async (krsId, nilaiCpmkList) => {
     });
     if (!rincian) throw Object.assign(new Error('Data rincian KRS tidak ditemukan'), { statusCode: 404 });
     if (STATUS_FINAL.includes(rincian.status)) throw Object.assign(new Error('Nilai sudah difinalisasi, tidak dapat diubah'), { statusCode: 403 });
-    if (rincian.status === 'Dikunci') throw Object.assign(new Error('Nilai sudah dikunci, tidak dapat diedit'), { statusCode: 403 });
 
     const kelasId = rincian.siakKelasKuliahId;
     const mahasiswaId = rincian.krsMahasiswa?.siakMahasiswaId;
@@ -894,6 +907,25 @@ export const inputNilaiPerCpmk = async (krsId, nilaiCpmkList) => {
              WHERE id = :krsId`,
             { replacements: { nilaiAkhir, hurufMutu, angkaMutu, krsId }, transaction: trx }
         );
+
+        // Auto-kunci: jika semua mahasiswa di kelas sudah punya nilai_akhir → kunci semua
+        const [cekRows] = await sequelize.query(
+            `SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
+             FROM siak_rincian_krs_mahasiswa
+             WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
+            { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+        );
+        if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+            await sequelize.query(
+                `UPDATE siak_rincian_krs_mahasiswa
+                 SET status = 'Dikunci', updated_at = NOW()
+                 WHERE siak_kelas_kuliah_id = :kelasId
+                   AND (status IS NULL OR status NOT IN ('Dikunci', 'Lulus', 'Tidak Lulus'))
+                   AND deleted_at IS NULL`,
+                { replacements: { kelasId }, transaction: trx }
+            );
+        }
 
         return { krsId, nilaiAkhir, hurufMutu, angkaMutu, adaCpmkGagal };
     });

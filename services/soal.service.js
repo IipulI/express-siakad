@@ -4,7 +4,7 @@ import * as penilaianService from './penilaian.service.js';
 
 const { sequelize, Soal, PemetaanSoalCpmk, NilaiSoalMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, CapaianMataKuliah, NilaiCpmkMahasiswa, RencanaEvaluasi, NilaiEvaluasiMahasiswa } = models;
 
-const STATUS_FINAL_ATAU_KUNCI = ['Dikunci', 'Lulus', 'Tidak Lulus'];
+const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 
 // ============================================================================
 // 1. CRUD SOAL (rubrik unit penilaian per komponen evaluasi)
@@ -203,7 +203,7 @@ export const inputNilaiPerSoal = async (krsId, arrNilaiSoal) => {
     });
     if (!rincian) throw new CustomError.NotFoundError("Data rincian KRS tidak ditemukan");
     if (STATUS_FINAL_ATAU_KUNCI.includes(rincian.status)) {
-        throw new CustomError.ForbiddenError("Nilai sudah dikunci/difinalisasi, tidak dapat diubah lewat Jalur C");
+        throw new CustomError.ForbiddenError("Nilai sudah dikunci/difinalisasi, tidak dapat diubah");
     }
 
     const kelasId = rincian.siakKelasKuliahId;
