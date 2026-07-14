@@ -22,3 +22,14 @@ export const validatePostNilaiDariCbt = [
     body('daftarNilai.*.breakdown.*.pemetaanCpmk.*.bobotPoin').isFloat({ gt: 0 }).withMessage('bobotPoin harus angka > 0'),
     validate
 ];
+
+export const validateRencanaEvaluasiIdParam = [
+    param('rencanaEvaluasiId').isUUID().withMessage('rencanaEvaluasiId tidak valid'),
+    validate
+];
+
+export const validateResetKomponenCbt = [
+    param('rencanaEvaluasiId').isUUID().withMessage('rencanaEvaluasiId tidak valid'),
+    param('krsId').isUUID().withMessage('krsId tidak valid'),
+    validate
+];

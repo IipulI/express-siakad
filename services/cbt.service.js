@@ -3,7 +3,7 @@ import * as CustomError from '../utils/custom-error.js';
 import * as penilaianService from './penilaian.service.js';
 
 const {
-    sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, CapaianMataKuliah,
+    sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
     NilaiCpmkMahasiswa, NilaiEvaluasiMahasiswa, NilaiSubcpmkEvaluasiMahasiswa
 } = models;
 
@@ -110,6 +110,139 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
     }
 
     return hasil;
+};
+
+// ============================================================================
+// GET — lihat nilai yang sudah masuk dari CBT untuk 1 komponen evaluasi,
+// per mahasiswa, plus nilai Sub-CPMK hasil hitung dari agregat yang tersimpan.
+// Sekaligus deteksi kalau ada RencanaEvaluasi LAIN dengan metode+jenis+periode
+// yang SAMA (indikasi komponen duplikat -- lihat pertanyaan "nilai duplikat
+// 1 periode": kalau ada baris kembar begini dan data kesebar ke keduanya,
+// rollup CPMK bisa dobel hitung. Fungsi ini cuma memperingatkan, tidak
+// otomatis menggabungkan -- perlu keputusan manual mana yang dipertahankan).
+// ============================================================================
+export const getNilaiDariCbt = async (rencanaEvaluasiId) => {
+    const rencanaEvaluasi = await RencanaEvaluasi.findByPk(rencanaEvaluasiId);
+    if (!rencanaEvaluasi) throw new CustomError.NotFoundError("Komponen evaluasi tidak ditemukan");
+
+    const duplikat = await RencanaEvaluasi.findAll({
+        where: {
+            siakMataKuliahId: rencanaEvaluasi.siakMataKuliahId,
+            siakPeriodeAkademikId: rencanaEvaluasi.siakPeriodeAkademikId,
+            metodeEvaluasi: rencanaEvaluasi.metodeEvaluasi,
+            jenisEvaluasi: rencanaEvaluasi.jenisEvaluasi
+        },
+        attributes: ['id', 'createdAt']
+    });
+    const peringatanDuplikat = duplikat.length > 1
+        ? `Ada ${duplikat.length} komponen "${rencanaEvaluasi.metodeEvaluasi}" utk MK+periode yang sama (id: ${duplikat.map(d => d.id).join(', ')}) -- kemungkinan konfigurasi duplikat, cek manual sebelum lanjut.`
+        : null;
+
+    const semuaAgregat = await NilaiSubcpmkEvaluasiMahasiswa.findAll({
+        where: { siakRencanaEvaluasiId: rencanaEvaluasiId },
+        include: [{ model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['kode'] }]
+    });
+    const semuaNilaiKomponen = await NilaiEvaluasiMahasiswa.findAll({
+        where: { siakRencanaEvaluasiId: rencanaEvaluasiId }
+    });
+
+    const krsIds = [...new Set([
+        ...semuaAgregat.map(n => n.siakRincianKrsMahasiswaId),
+        ...semuaNilaiKomponen.map(n => n.siakRincianKrsMahasiswaId)
+    ])];
+    const daftarRincian = await RincianKrsMahasiswa.findAll({
+        where: { id: krsIds },
+        include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', include: [{ model: Mahasiswa, as: 'mahasiswa', attributes: ['nama', 'npm'] }] }]
+    });
+    const rincianMap = {};
+    daftarRincian.forEach(r => { rincianMap[r.id] = r; });
+
+    const perMahasiswa = {};
+    krsIds.forEach(krsId => {
+        const r = rincianMap[krsId];
+        perMahasiswa[krsId] = {
+            krsId,
+            nim: r?.krsMahasiswa?.mahasiswa?.npm || '-',
+            nama: r?.krsMahasiswa?.mahasiswa?.nama || '-',
+            nilaiAkhirKomponen: null,
+            breakdown: []
+        };
+    });
+    semuaNilaiKomponen.forEach(n => {
+        if (perMahasiswa[n.siakRincianKrsMahasiswaId]) {
+            perMahasiswa[n.siakRincianKrsMahasiswaId].nilaiAkhirKomponen = parseFloat(n.skor);
+        }
+    });
+    semuaAgregat.forEach(n => {
+        const totalBobot = parseFloat(n.totalBobot || 0);
+        const skorTerbobot = parseFloat(n.skorTerbobot || 0);
+        perMahasiswa[n.siakRincianKrsMahasiswaId]?.breakdown.push({
+            cpmkId: n.siakCpmkId,
+            cpmkKode: n.capaianMataKuliah?.kode || '(kode tidak ditemukan)',
+            nilaiKomponenIni: totalBobot > 0 ? Math.round((skorTerbobot / totalBobot) * 10000) / 100 : 0
+        });
+    });
+
+    return {
+        komponen: { id: rencanaEvaluasi.id, metodeEvaluasi: rencanaEvaluasi.metodeEvaluasi, jenisEvaluasi: rencanaEvaluasi.jenisEvaluasi },
+        peringatanDuplikat,
+        mahasiswa: Object.values(perMahasiswa)
+    };
+};
+
+// ============================================================================
+// RESET per komponen (BUKAN reset seluruh nilai mahasiswa) -- hapus kontribusi
+// Jalur D untuk 1 mahasiswa di 1 komponen evaluasi SAJA, lalu hitung ulang nilai
+// akhir & CPMK dari komponen-komponen LAIN yang masih tersisa. Berguna khusus
+// buat beresin kasus komponen duplikat: reset yang duplikatnya SAJA, tanpa
+// ganggu komponen yang benar.
+// ============================================================================
+export const resetNilaiKomponenCbt = async (krsId, rencanaEvaluasiId) => {
+    const rincian = await RincianKrsMahasiswa.findByPk(krsId, {
+        include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
+    });
+    if (!rincian) throw new CustomError.NotFoundError(`Rincian KRS ${krsId} tidak ditemukan`);
+    if (STATUS_FINAL_ATAU_KUNCI.includes(rincian.status)) {
+        throw new CustomError.ForbiddenError(`Nilai mahasiswa (krsId ${krsId}) sudah dikunci/difinalisasi, tidak dapat direset`);
+    }
+    const kelasId = rincian.siakKelasKuliahId;
+    const mahasiswaId = rincian.krsMahasiswa?.siakMahasiswaId;
+
+    await sequelize.transaction(async (trx) => {
+        await NilaiSubcpmkEvaluasiMahasiswa.destroy({
+            where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
+            force: true, transaction: trx
+        });
+        await NilaiEvaluasiMahasiswa.destroy({
+            where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
+            force: true, transaction: trx
+        });
+    });
+
+    // Hitung ulang dari komponen yang TERSISA saja. Kalau ternyata sudah tidak ada
+    // komponen tersisa sama sekali, jangan panggil hitungNilaiAkhir (itu bakal nulis
+    // 0/huruf E -- kelihatan kayak "gagal", padahal harusnya "belum dinilai").
+    // Balikin ke NULL, konsisten dengan resetNilaiMahasiswa/resetNilaiKelas.
+    const sisaKomponen = await NilaiEvaluasiMahasiswa.findAll({ where: { siakRincianKrsMahasiswaId: krsId } });
+
+    if (sisaKomponen.length === 0) {
+        await RincianKrsMahasiswa.update(
+            { nilaiAkhir: null, hurufMutu: null, angkaMutu: null },
+            { where: { id: krsId } }
+        );
+        await NilaiCpmkMahasiswa.destroy({
+            where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaId },
+            force: true
+        });
+        return { krsId, totalSkor: null, hurufMutu: null, angkaMutu: null, nilaiCpmk: [], pesan: `Komponen ini berhasil direset, tidak ada komponen lain tersisa -- status kembali Belum Dinilai` };
+    }
+
+    const payloadKomponen = sisaKomponen.map(n => ({ komposisiId: n.siakRencanaEvaluasiId, skor: parseFloat(n.skor) }));
+    await penilaianService.inputNilaiMahasiswa(krsId, payloadKomponen);
+    const hasilAkhir = await penilaianService.hitungNilaiAkhir(krsId);
+    const nilaiCpmk = await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
+
+    return { krsId, ...hasilAkhir, nilaiCpmk, pesan: `Komponen ini berhasil direset utk mahasiswa ${krsId}` };
 };
 
 // ============================================================================
