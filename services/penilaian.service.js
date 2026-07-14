@@ -6,7 +6,7 @@ const {
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
     ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
-    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi
+    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi, NilaiSubcpmkEvaluasiMahasiswa
 } = models;
 
 export const DEFAULT_SKALA = [
@@ -1015,6 +1015,13 @@ export const resetNilaiMahasiswa = async (rincianKrsId) => {
             WHERE siak_rincian_krs_mahasiswa_id = :rincianKrsId
         `, { replacements: { rincianKrsId }, transaction: trx });
 
+        // Jalur D (integrasi CBT) -- breakdown per Sub-CPMK per komponen, harus ikut
+        // dibersihkan supaya tidak jadi data basi yang mencemari hitungan berikutnya.
+        await sequelize.query(`
+            DELETE FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+            WHERE siak_rincian_krs_mahasiswa_id = :rincianKrsId
+        `, { replacements: { rincianKrsId }, transaction: trx });
+
         if (mhsId) {
             await sequelize.query(`
                 DELETE FROM siak_nilai_cpmk_mahasiswa
@@ -1037,6 +1044,68 @@ export const resetNilaiMahasiswa = async (rincianKrsId) => {
     return { pesan: 'Nilai mahasiswa berhasil direset ke Belum Dinilai' };
 };
 
+// Reset beberapa mahasiswa terpilih sekaligus (subset, bukan 1 dan bukan semua kelas).
+// rincianKrsIds: array of UUID.
+export const resetNilaiBeberapa = async (rincianKrsIds) => {
+    if (!Array.isArray(rincianKrsIds) || rincianKrsIds.length === 0) {
+        throw new Error('rincianKrsIds wajib array, minimal 1 id');
+    }
+
+    const daftarRkm = await RincianKrsMahasiswa.findAll({ where: { id: rincianKrsIds } });
+    if (daftarRkm.length === 0) throw new Error('Tidak ada Rincian KRS yang cocok dengan id yang dikirim');
+
+    const krsIds = [...new Set(daftarRkm.map(r => r.siakKrsMahasiswaId || r.siak_krs_mahasiswa_id))];
+    const daftarKrs = await KrsMahasiswa.findAll({ where: { id: krsIds } });
+    const mhsIdByKrsId = {};
+    daftarKrs.forEach(k => { mhsIdByKrsId[k.id] = k.siakMahasiswaId || k.siak_mahasiswa_id; });
+
+    // Pasangan (kelasId, mahasiswaId) unik -- dipakai buat hapus NilaiCpmkMahasiswa per mahasiswa
+    const pasanganKelasMhs = [...new Map(daftarRkm.map(r => {
+        const kelasId = r.siakKelasKuliahId || r.siak_kelas_kuliah_id;
+        const krsId = r.siakKrsMahasiswaId || r.siak_krs_mahasiswa_id;
+        const mhsId = mhsIdByKrsId[krsId];
+        return [`${kelasId}|${mhsId}`, { kelasId, mhsId }];
+    }).filter(([, v]) => v.mhsId)).values()];
+
+    const idsValid = daftarRkm.map(r => r.id);
+
+    let jumlahMhs = 0;
+    await sequelize.transaction(async (trx) => {
+        await sequelize.query(`
+            DELETE FROM siak_nilai_evaluasi_mahasiswa
+            WHERE siak_rincian_krs_mahasiswa_id IN (:ids)
+        `, { replacements: { ids: idsValid }, transaction: trx });
+
+        await sequelize.query(`
+            DELETE FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+            WHERE siak_rincian_krs_mahasiswa_id IN (:ids)
+        `, { replacements: { ids: idsValid }, transaction: trx });
+
+        for (const { kelasId, mhsId } of pasanganKelasMhs) {
+            await sequelize.query(`
+                DELETE FROM siak_nilai_cpmk_mahasiswa
+                WHERE siak_kelas_kuliah_id = :kelasId
+                  AND siak_mahasiswa_id = :mhsId
+            `, { replacements: { kelasId, mhsId }, transaction: trx });
+        }
+
+        const [res] = await sequelize.query(`
+            UPDATE siak_rincian_krs_mahasiswa
+            SET nilai_akhir = NULL,
+                huruf_mutu  = NULL,
+                angka_mutu  = NULL,
+                status      = 'Disetujui',
+                updated_at  = NOW()
+            WHERE id IN (:ids)
+              AND deleted_at IS NULL
+            RETURNING id
+        `, { replacements: { ids: idsValid }, transaction: trx });
+        jumlahMhs = res.length;
+    });
+
+    return { reset: jumlahMhs, pesan: `${jumlahMhs} mahasiswa terpilih direset ke Belum Dinilai (nilai & CPMK dihapus)` };
+};
+
 export const resetNilaiKelas = async (kelasId) => {
     let jumlahMhs = 0;
     await sequelize.transaction(async (trx) => {
@@ -1044,6 +1113,15 @@ export const resetNilaiKelas = async (kelasId) => {
             DELETE FROM siak_nilai_evaluasi_mahasiswa nem
             USING siak_rincian_krs_mahasiswa rkm
             WHERE nem.siak_rincian_krs_mahasiswa_id = rkm.id
+              AND rkm.siak_kelas_kuliah_id = :kelasId
+        `, { replacements: { kelasId }, transaction: trx });
+
+        // Jalur D (integrasi CBT) -- breakdown per Sub-CPMK per komponen, harus ikut
+        // dibersihkan supaya tidak jadi data basi yang mencemari hitungan berikutnya.
+        await sequelize.query(`
+            DELETE FROM siak_nilai_subcpmk_evaluasi_mahasiswa nsc
+            USING siak_rincian_krs_mahasiswa rkm
+            WHERE nsc.siak_rincian_krs_mahasiswa_id = rkm.id
               AND rkm.siak_kelas_kuliah_id = :kelasId
         `, { replacements: { kelasId }, transaction: trx });
 

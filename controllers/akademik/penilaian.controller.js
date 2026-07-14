@@ -307,6 +307,14 @@ export const resetNilaiKelas = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+export const resetNilaiBeberapa = async (req, res, next) => {
+    try {
+        const { rincianKrsIds } = req.body;
+        const result = await penilaianService.resetNilaiBeberapa(rincianKrsIds);
+        return new ResponseBuilder(res).code(200).message(result.pesan).json(result);
+    } catch (error) { next(error); }
+};
+
 export const getLaporanPerkuliahan = async (req, res, next) => {
     try {
         const data = await penilaianService.getDataLaporanPerkuliahan(req.params.kelasId);

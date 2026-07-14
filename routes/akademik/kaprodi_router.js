@@ -84,5 +84,6 @@ router.get('/kelas/:krsId/rapor-obe/export', async (req, res, next) => {
 router.patch('/kelas/:kelasId/nilai/reset-finalisasi', PenilaianController.resetFinalisasiKelas);
 router.delete('/kelas/:kelasId/nilai/:rincianKrsId/reset', PenilaianController.resetNilaiMahasiswa);
 router.delete('/kelas/:kelasId/nilai/reset-semua', PenilaianController.resetNilaiKelas);
+router.post('/kelas/:kelasId/nilai/reset-beberapa', PenilaianController.resetNilaiBeberapa); // body: { rincianKrsIds: [...] }
 
 export default router;
