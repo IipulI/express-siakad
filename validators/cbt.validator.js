@@ -12,8 +12,13 @@ export const validatePostNilaiDariCbt = [
     body('daftarNilai').isArray({ min: 1 }).withMessage('daftarNilai harus berupa array, minimal 1 mahasiswa'),
     body('daftarNilai.*.krsId').isUUID().withMessage('krsId tidak valid'),
     body('daftarNilai.*.nilaiAkhir').isFloat({ min: 0, max: 100 }).withMessage('nilaiAkhir harus angka 0-100'),
-    body('daftarNilai.*.breakdown').isArray({ min: 1 }).withMessage('breakdown harus berupa array, minimal 1 Sub-CPMK'),
-    body('daftarNilai.*.breakdown.*.cpmkId').isUUID().withMessage('cpmkId tidak valid'),
-    body('daftarNilai.*.breakdown.*.skorMentah').isFloat({ min: 0, max: 100 }).withMessage('skorMentah harus angka 0-100'),
+    // breakdown = daftar unit penilaian (soal PG/esai, kriteria presentasi, tahap
+    // proyek, dst -- generik). Ephemeral, tidak disimpan permanen di NL-SIAK.
+    body('daftarNilai.*.breakdown').isArray({ min: 1 }).withMessage('breakdown harus berupa array, minimal 1 unit penilaian'),
+    body('daftarNilai.*.breakdown.*.skorDiperoleh').isFloat({ min: 0 }).withMessage('skorDiperoleh harus angka >= 0'),
+    body('daftarNilai.*.breakdown.*.skorMaksimal').isFloat({ gt: 0 }).withMessage('skorMaksimal harus angka > 0'),
+    body('daftarNilai.*.breakdown.*.pemetaanCpmk').isArray({ min: 1 }).withMessage('pemetaanCpmk harus berupa array, minimal 1 CPMK/Sub-CPMK'),
+    body('daftarNilai.*.breakdown.*.pemetaanCpmk.*.cpmkId').isUUID().withMessage('cpmkId tidak valid'),
+    body('daftarNilai.*.breakdown.*.pemetaanCpmk.*.bobotPoin').isFloat({ gt: 0 }).withMessage('bobotPoin harus angka > 0'),
     validate
 ];

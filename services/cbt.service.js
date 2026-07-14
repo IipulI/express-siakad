@@ -4,23 +4,35 @@ import * as penilaianService from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, CapaianMataKuliah,
-    NilaiCpmkMahasiswa, NilaiEvaluasiMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, PemetaanEvaluasiCpmk
+    NilaiCpmkMahasiswa, NilaiEvaluasiMahasiswa, NilaiSubcpmkEvaluasiMahasiswa
 } = models;
 
 const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 
 // ============================================================================
-// JALUR D — Integrasi CBT (soal & koreksi dilakukan di CBT, bukan di NL-SIAK)
+// JALUR D — Integrasi CBT (soal & koreksi/cek-benar-salah dilakukan di CBT,
+// NL-SIAK TIDAK PERNAH menyimpan soal secara permanen)
 //
-// Beda dengan Jalur C: NL-SIAK tidak menyimpan struktur soal sama sekali.
-// CBT sudah mengagregasi sendiri nilai mentah per Sub-CPMK per komponen,
-// jadi granularitas terkecil yang NL-SIAK terima adalah "per komponen per
-// Sub-CPMK", bukan "per soal". Filosofi tetap sama seperti Jalur C:
-// 100% aditif, wipe & replace, reuse inputNilaiMahasiswa/hitungNilaiAkhir,
-// override NilaiCpmkMahasiswa dengan rollup ke CPMK induk untuk sub-CPMK.
+// Rumus identik dengan Jalur C ("Nilai per soal x bobotnya / total bobot
+// subcpmk" -- arahan asli), cuma sumbernya beda: Jalur C baca dari tabel
+// siak_soal yang persisten, Jalur D baca dari `breakdown` yang dikirim CBT
+// SEKALI PAKAI di tiap request (unit/soal, esai, kriteria presentasi, tahap
+// proyek -- generik, lihat RENCANA-PENILAIAN-PER-SOAL.md bagian "unit
+// penilaian generik"). Tidak ada tabel Soal yang disentuh sama sekali.
+//
+// Yang disimpan ke siak_nilai_subcpmk_evaluasi_mahasiswa BUKAN breakdown
+// mentahnya, tapi HASIL AGREGASI per (krs, komponen, cpmkId): skorTerbobot +
+// totalBobot -- supaya bisa digabung matematis dengan komponen lain (UTS,
+// UAS, Tugas, dst) saat rollup ke nilai Sub-CPMK/CPMK final.
 // ============================================================================
 
-// payload per mahasiswa: { krsId, nilaiAkhir, breakdown: [{ cpmkId, skorMentah }] }
+// payload per mahasiswa: {
+//   krsId, nilaiAkhir,
+//   breakdown: [{ skorDiperoleh, skorMaksimal, pemetaanCpmk: [{cpmkId, bobotPoin}] }]
+// }
+// -- 1 entri breakdown = 1 unit penilaian (soal PG/esai, 1 kriteria presentasi,
+//    1 tahap proyek, dst). bobotPoin = poin dari skorMaksimal unit ini yang
+//    dialokasikan ke CPMK/Sub-CPMK tsb (kalau 1 unit = 1 CPMK, bobotPoin = skorMaksimal).
 export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasiswa) => {
     const rencanaEvaluasi = await RencanaEvaluasi.findByPk(rencanaEvaluasiId);
     if (!rencanaEvaluasi) throw new CustomError.NotFoundError("Komponen evaluasi tidak ditemukan");
@@ -41,28 +53,43 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
         const mahasiswaId = rincian.krsMahasiswa?.siakMahasiswaId;
         if (!mahasiswaId) throw new CustomError.NotFoundError(`Data mahasiswa untuk krsId ${krsId} tidak ditemukan`);
 
-        // 1. Wipe & replace breakdown Sub-CPMK utk (krsId, komponen ini) --
-        //    resend dari CBT (mis. dosen minta koreksi ulang) otomatis MENGGANTIKAN
-        //    data lama, bukan menumpuk jadi duplikat.
+        // 1. Reduksi breakdown (per unit/soal, ephemeral) jadi agregat per cpmkId
+        //    UNTUK KOMPONEN INI SAJA -- rumus identik hitungDanOverrideNilaiCpmkBottomUp
+        //    di soal.service.js (Jalur C), cuma sumbernya array dari request, bukan query DB.
+        const agregatKomponenIni = {}; // { cpmkId: { skorTerbobot, totalBobot } }
+        (breakdown || []).forEach(unit => {
+            const skor = parseFloat(unit.skorDiperoleh || 0);
+            const maksUnit = parseFloat(unit.skorMaksimal || 0);
+            (unit.pemetaanCpmk || []).forEach(p => {
+                const bobotPoin = parseFloat(p.bobotPoin || 0);
+                if (maksUnit <= 0 || bobotPoin <= 0 || !p.cpmkId) return;
+                const skorTerbobotIni = skor * (bobotPoin / maksUnit);
+                if (!agregatKomponenIni[p.cpmkId]) agregatKomponenIni[p.cpmkId] = { skorTerbobot: 0, totalBobot: 0 };
+                agregatKomponenIni[p.cpmkId].skorTerbobot += skorTerbobotIni;
+                agregatKomponenIni[p.cpmkId].totalBobot += bobotPoin;
+            });
+        });
+
+        // 2. Wipe & replace hasil agregat komponen ini -- resend dari CBT (mis. dosen
+        //    minta koreksi ulang) otomatis MENGGANTIKAN data lama, bukan menumpuk.
         await sequelize.transaction(async (trx) => {
             await NilaiSubcpmkEvaluasiMahasiswa.destroy({
                 where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
                 force: true, transaction: trx
             });
-            if (breakdown?.length > 0) {
-                await NilaiSubcpmkEvaluasiMahasiswa.bulkCreate(
-                    breakdown.map(b => ({
-                        siakRincianKrsMahasiswaId: krsId,
-                        siakRencanaEvaluasiId: rencanaEvaluasiId,
-                        siakCpmkId: b.cpmkId,
-                        skorMentah: parseFloat(b.skorMentah || 0)
-                    })),
-                    { transaction: trx }
-                );
+            const payloadAgregat = Object.entries(agregatKomponenIni).map(([cpmkId, agg]) => ({
+                siakRincianKrsMahasiswaId: krsId,
+                siakRencanaEvaluasiId: rencanaEvaluasiId,
+                siakCpmkId: cpmkId,
+                skorTerbobot: agg.skorTerbobot,
+                totalBobot: agg.totalBobot
+            }));
+            if (payloadAgregat.length > 0) {
+                await NilaiSubcpmkEvaluasiMahasiswa.bulkCreate(payloadAgregat, { transaction: trx });
             }
         });
 
-        // 2. Gabungkan komponen lain yang sudah ada (Jalur A/D komponen lain) supaya
+        // 3. Gabungkan komponen lain yang sudah ada (Jalur A/D komponen lain) supaya
         //    TIDAK ikut terhapus saat inputNilaiMahasiswa menulis ulang -- sama persis
         //    mitigasi yang dipakai Jalur C (lihat RENCANA-PENILAIAN-PER-SOAL.md Bagian 6).
         const nilaiEksisting = await NilaiEvaluasiMahasiswa.findAll({ where: { siakRincianKrsMahasiswaId: krsId } });
@@ -71,12 +98,12 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
             .map(n => ({ komposisiId: n.siakRencanaEvaluasiId, skor: parseFloat(n.skor) }));
         payloadKomponen.push({ komposisiId: rencanaEvaluasiId, skor: parseFloat(nilaiAkhir || 0) });
 
-        // 3. REUSE fungsi lama yang sudah ada -- TIDAK DIUBAH SATU BARIS PUN
+        // 4. REUSE fungsi lama yang sudah ada -- TIDAK DIUBAH SATU BARIS PUN
         await penilaianService.inputNilaiMahasiswa(krsId, payloadKomponen);
         const hasilAkhir = await penilaianService.hitungNilaiAkhir(krsId);
 
-        // 4. Hitung Nilai CPMK akurat dari breakdown Sub-CPMK (lintas semua komponen
-        //    MK ini), lalu override NilaiCpmkMahasiswa -- sama pola dengan Jalur C.
+        // 5. Gabungkan agregat LINTAS SEMUA KOMPONEN (UTS+UAS+Tugas, dst), rollup ke
+        //    CPMK induk, lalu override NilaiCpmkMahasiswa -- sama pola dengan Jalur C.
         const nilaiCpmkAkurat = await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
 
         hasil.push({ krsId, ...hasilAkhir, nilaiCpmk: nilaiCpmkAkurat });
@@ -86,30 +113,24 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
 };
 
 // ============================================================================
-// Kalkulasi Nilai CPMK dari breakdown per-komponen (bukan per-soal seperti
-// Jalur C), plus rollup ke CPMK induk untuk Sub-CPMK -- replikasi persis
-// mitigasi yang sama di soal.service.js (hitungDanOverrideNilaiCpmkBottomUp).
+// Gabungkan agregat (skorTerbobot, totalBobot) yang sudah dihitung per komponen
+// LINTAS SEMUA KOMPONEN evaluasi mahasiswa ini, plus rollup ke CPMK induk untuk
+// Sub-CPMK -- replikasi persis mitigasi yang sama di soal.service.js
+// (hitungDanOverrideNilaiCpmkBottomUp). Tidak butuh bobotCpmk dari Rencana
+// Evaluasi sama sekali -- bobot sudah melekat di tiap unit sejak Langkah 1.
 // ============================================================================
 const hitungDanOverrideNilaiCpmkDariKomponen = async (krsId, kelasId, mahasiswaId) => {
-    const semuaNilaiSubcpmk = await NilaiSubcpmkEvaluasiMahasiswa.findAll({
+    const semuaAgregat = await NilaiSubcpmkEvaluasiMahasiswa.findAll({
         where: { siakRincianKrsMahasiswaId: krsId }
     });
-    if (semuaNilaiSubcpmk.length === 0) return [];
+    if (semuaAgregat.length === 0) return [];
 
-    const rencanaEvaluasiIds = [...new Set(semuaNilaiSubcpmk.map(n => n.siakRencanaEvaluasiId))];
-    const pemetaan = await PemetaanEvaluasiCpmk.findAll({ where: { siakRencanaEvaluasiId: rencanaEvaluasiIds } });
-    const bobotMap = {}; // { `${rencanaEvaluasiId}|${cpmkId}` : bobotCpmk }
-    pemetaan.forEach(p => { bobotMap[`${p.siakRencanaEvaluasiId}|${p.siakCpmkId}`] = parseFloat(p.bobotCpmk || 0); });
-
-    // Pass 1: agregasi langsung ke cpmkId APA ADANYA (boleh CPMK induk, boleh sub-CPMK)
+    // Pass 1: gabungkan lintas komponen ke cpmkId APA ADANYA (boleh CPMK induk, boleh sub-CPMK)
     const agregatLangsung = {}; // { cpmkId: { skorTerbobot, totalBobot } }
-    semuaNilaiSubcpmk.forEach(n => {
-        const bobotCpmk = bobotMap[`${n.siakRencanaEvaluasiId}|${n.siakCpmkId}`];
-        if (!bobotCpmk || bobotCpmk <= 0) return; // komponen ini tidak memetakan Sub-CPMK ini -> abaikan
-        const skor = parseFloat(n.skorMentah || 0);
+    semuaAgregat.forEach(n => {
         if (!agregatLangsung[n.siakCpmkId]) agregatLangsung[n.siakCpmkId] = { skorTerbobot: 0, totalBobot: 0 };
-        agregatLangsung[n.siakCpmkId].skorTerbobot += skor * bobotCpmk;
-        agregatLangsung[n.siakCpmkId].totalBobot += bobotCpmk;
+        agregatLangsung[n.siakCpmkId].skorTerbobot += parseFloat(n.skorTerbobot || 0);
+        agregatLangsung[n.siakCpmkId].totalBobot += parseFloat(n.totalBobot || 0);
     });
 
     const cpmkIdsLangsung = Object.keys(agregatLangsung);
@@ -142,7 +163,7 @@ const hitungDanOverrideNilaiCpmkDariKomponen = async (krsId, kelasId, mahasiswaI
         siakKelasKuliahId: kelasId,
         siakMahasiswaId: mahasiswaId,
         siakCapaianMataKuliahId: cpmkId,
-        nilai: agg.totalBobot > 0 ? Math.round((agg.skorTerbobot / agg.totalBobot) * 100) / 100 : 0
+        nilai: agg.totalBobot > 0 ? Math.round((agg.skorTerbobot / agg.totalBobot) * 10000) / 100 : 0
     }));
 
     await sequelize.transaction(async (trx) => {

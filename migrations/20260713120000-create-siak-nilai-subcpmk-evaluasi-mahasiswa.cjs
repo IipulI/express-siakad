@@ -38,8 +38,18 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
       },
-      skor_mentah: {
-        type: Sequelize.DECIMAL(5, 2),
+      // Pecahan (skor_terbobot / total_bobot), BUKAN persentase jadi -- supaya kontribusi
+      // dari komponen ini (mis. UTS) bisa digabung matematis dengan komponen lain (UAS,
+      // Tugas, dst) saat rollup ke nilai Sub-CPMK/CPMK final. Dihitung dari breakdown per
+      // unit/soal yang dikirim CBT sekali pakai (lihat services/cbt.service.js) -- tidak
+      // ada unit/soal yang disimpan permanen di tabel ini, cuma hasil agregasinya.
+      skor_terbobot: {
+        type: Sequelize.DECIMAL(10, 4),
+        allowNull: false,
+        defaultValue: 0
+      },
+      total_bobot: {
+        type: Sequelize.DECIMAL(10, 4),
         allowNull: false,
         defaultValue: 0
       },
