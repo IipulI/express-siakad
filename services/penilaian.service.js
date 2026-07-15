@@ -86,6 +86,29 @@ export const hitungNilaiAkhir = async (krsId) => {
     try {
         const { sequelize } = models;
         return await sequelize.transaction(async (trx) => {
+            // GUARD Jalur D: kalau krsId ini sudah punya breakdown dari integrasi CBT
+            // (siak_nilai_subcpmk_evaluasi_mahasiswa), nilai_akhir/huruf_mutu & CPMK-nya
+            // sudah dikelola sendiri oleh simpanNilaiAkhirDariCbt & hitungDanOverrideNilaiCpmkDariKomponen
+            // (services/cbt.service.js) -- JANGAN dihitung ulang di sini. Tanpa guard ini,
+            // input komponen lain lewat endpoint lama (mis. Kehadiran manual, yang tidak
+            // pernah menulis ke siak_nilai_evaluasi_mahasiswa untuk UTS/UAS Jalur D) akan
+            // menghitung nilai_akhir dari komponen yang tidak lengkap DAN menghapus semua
+            // NilaiCpmkMahasiswa Jalur D tanpa menggantinya (lihat bagian 5 di bawah).
+            const jalurD = await sequelize.query(
+                `SELECT 1 FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+                 WHERE siak_rincian_krs_mahasiswa_id = :krsId AND deleted_at IS NULL LIMIT 1`,
+                { replacements: { krsId }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+            );
+            if (jalurD.length > 0) {
+                const existing = await models.RincianKrsMahasiswa.findByPk(krsId, { transaction: trx });
+                return {
+                    krsId,
+                    totalSkor: existing ? parseFloat(existing.nilaiAkhir || 0) : 0,
+                    hurufMutu: existing?.hurufMutu ?? null,
+                    angkaMutu: existing ? parseFloat(existing.angkaMutu || 0) : 0
+                };
+            }
+
             // 1. Ambil nilai evaluasi mahasiswa (tanpa include CPMK dulu — pakai raw SQL)
             const listNilai = await models.NilaiEvaluasiMahasiswa.findAll({
                 where: { siakRincianKrsMahasiswaId: krsId },
