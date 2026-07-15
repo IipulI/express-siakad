@@ -24,15 +24,13 @@ export const validatePostNilaiDariCbt = [
     validate
 ];
 
-// Nilai akhir + huruf mutu + angka mutu MK -- sync langsung dari CBT, tanpa
-// dihitung ulang. Tidak butuh rencanaEvaluasiId sama sekali (ini level MK,
-// bukan level komponen).
+// Nilai akhir MK -- sync langsung dari CBT, tanpa dihitung ulang. Tidak butuh
+// rencanaEvaluasiId (ini level MK, bukan level komponen). Huruf mutu & angka
+// mutu TIDAK dikirim CBT -- diturunkan otomatis dari skala penilaian NL-SIAK.
 export const validatePostNilaiAkhirDariCbt = [
     body('daftarNilai').isArray({ min: 1 }).withMessage('daftarNilai harus berupa array, minimal 1 mahasiswa'),
     body('daftarNilai.*.krsId').isUUID().withMessage('krsId tidak valid'),
     body('daftarNilai.*.nilaiAkhir').isFloat({ min: 0, max: 100 }).withMessage('nilaiAkhir harus angka 0-100'),
-    body('daftarNilai.*.hurufMutu').isString().notEmpty().withMessage('hurufMutu wajib diisi'),
-    body('daftarNilai.*.angkaMutu').isFloat({ min: 0, max: 4 }).withMessage('angkaMutu harus angka 0-4'),
     validate
 ];
 

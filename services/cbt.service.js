@@ -1,5 +1,6 @@
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
+import { DEFAULT_SKALA, getGrade } from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
@@ -112,15 +113,23 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
 };
 
 // ============================================================================
-// SINKRON nilai akhir + huruf mutu + angka mutu MK dari CBT -- LANGSUNG tulis
-// ke RincianKrsMahasiswa, TIDAK dihitung ulang dari komponen sama sekali.
-// Ini terpisah total dari simpanNilaiKomponenDariCbt supaya tidak ada resiko
-// 1 fungsi menimpa hasil fungsi lain.
+// SINKRON nilai akhir MK dari CBT -- LANGSUNG tulis ke RincianKrsMahasiswa,
+// TIDAK dihitung ulang dari komponen sama sekali. Ini terpisah total dari
+// simpanNilaiKomponenDariCbt supaya tidak ada resiko 1 fungsi menimpa hasil
+// fungsi lain.
+//
+// CBT cuma kirim `nilaiAkhir` (angka 0-100) -- huruf mutu & angka mutu
+// (A/AB/B/dst) TIDAK perlu dikirim CBT, itu diturunkan otomatis dari tabel
+// skala penilaian NL-SIAK sendiri (siak_skala_penilaian per prodi+kurikulum,
+// fallback DEFAULT_SKALA kalau belum ada) -- reuse logika yang sama persis
+// dengan hitungNilaiAkhir (Jalur A) di penilaian.service.js, cuma sumber
+// nilaiAkhir-nya dari CBT, bukan dihitung dari Σ komponen×bobot.
 // ============================================================================
 export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
     const hasil = [];
     for (const item of daftarMahasiswa) {
-        const { krsId, nilaiAkhir, hurufMutu, angkaMutu } = item;
+        const { krsId, nilaiAkhir } = item;
+        const nilaiAkhirNum = parseFloat(nilaiAkhir);
 
         const rincian = await RincianKrsMahasiswa.findByPk(krsId);
         if (!rincian) throw new CustomError.NotFoundError(`Rincian KRS ${krsId} tidak ditemukan`);
@@ -128,18 +137,46 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
             throw new CustomError.ForbiddenError(`Nilai mahasiswa (krsId ${krsId}) sudah dikunci/difinalisasi, tidak dapat diubah dari CBT`);
         }
 
+        const { hurufMutu, angkaMutu } = await resolveHurufMutu(krsId, nilaiAkhirNum);
+
         await RincianKrsMahasiswa.update(
-            {
-                nilaiAkhir: parseFloat(nilaiAkhir),
-                hurufMutu: hurufMutu,
-                angkaMutu: parseFloat(angkaMutu)
-            },
+            { nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu },
             { where: { id: krsId } }
         );
 
-        hasil.push({ krsId, nilaiAkhir, hurufMutu, angkaMutu });
+        hasil.push({ krsId, nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu });
     }
     return hasil;
+};
+
+// Telusuri prodi+kurikulum dari krsId, tarik skala penilaian yang berlaku
+// (fallback DEFAULT_SKALA kalau MK/prodi itu belum punya skala sendiri di
+// database), lalu cocokkan nilaiAkhir ke skala itu -- identik langkah 3 di
+// hitungNilaiAkhir (penilaian.service.js), diringkas jadi 1 fungsi kecil.
+const resolveHurufMutu = async (krsId, nilaiAkhir) => {
+    const trace = await sequelize.query(`
+        SELECT mk.siak_program_studi_id AS prodi_id,
+               mk.siak_tahun_kurikulum_id AS kurikulum_id
+        FROM siak_rincian_krs_mahasiswa rkm
+        LEFT JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+        LEFT JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
+        WHERE rkm.id = :krsId LIMIT 1
+    `, { replacements: { krsId }, type: sequelize.QueryTypes.SELECT });
+
+    let skala = DEFAULT_SKALA;
+    if (trace?.[0]?.prodi_id && trace?.[0]?.kurikulum_id) {
+        const rows = await sequelize.query(`
+            SELECT huruf_mutu AS "hurufMutu", angka_mutu AS "angkaMutu", nilai_min AS "nilaiMin"
+            FROM siak_skala_penilaian
+            WHERE siak_program_studi_id = :prodiId
+              AND siak_tahun_kurikulum_id = :kurikulumId
+              AND deleted_at IS NULL
+            ORDER BY nilai_min DESC
+        `, { replacements: { prodiId: trace[0].prodi_id, kurikulumId: trace[0].kurikulum_id }, type: sequelize.QueryTypes.SELECT });
+        if (rows.length > 0) skala = rows;
+    }
+
+    return getGrade(nilaiAkhir, skala);
 };
 
 // ============================================================================
