@@ -1,13 +1,24 @@
 import * as cbtService from '../../services/cbt.service.js';
 import ResponseBuilder from "../../utils/response.js";
 
-// Jalur D — terima nilai akhir komponen + breakdown nilai mentah per Sub-CPMK dari CBT
+// Jalur D — terima breakdown nilai mentah per Sub-CPMK dari CBT (per komponen).
+// TIDAK ADA nilaiAkhir di sini -- itu lewat postNilaiAkhirDariCbt, sengaja dipisah.
 export const postNilaiDariCbt = async (req, res, next) => {
     try {
         const { rencanaEvaluasiId } = req.params;
         const { daftarNilai } = req.body;
         const data = await cbtService.simpanNilaiKomponenDariCbt(rencanaEvaluasiId, daftarNilai);
         return new ResponseBuilder(res).code(200).message(`Nilai dari CBT berhasil disimpan untuk ${data.length} mahasiswa`).json(data);
+    } catch (error) { next(error); }
+};
+
+// Jalur D — sinkron nilai akhir + huruf mutu + angka mutu MK dari CBT, langsung
+// tulis ke RincianKrsMahasiswa TANPA dihitung ulang dari komponen.
+export const postNilaiAkhirDariCbt = async (req, res, next) => {
+    try {
+        const { daftarNilai } = req.body;
+        const data = await cbtService.simpanNilaiAkhirDariCbt(daftarNilai);
+        return new ResponseBuilder(res).code(200).message(`Nilai akhir dari CBT berhasil disinkron untuk ${data.length} mahasiswa`).json(data);
     } catch (error) { next(error); }
 };
 

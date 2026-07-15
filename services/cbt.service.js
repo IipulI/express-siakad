@@ -1,10 +1,9 @@
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
-import * as penilaianService from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
-    NilaiCpmkMahasiswa, NilaiEvaluasiMahasiswa, NilaiSubcpmkEvaluasiMahasiswa
+    NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa
 } = models;
 
 const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
@@ -13,12 +12,21 @@ const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 // JALUR D — Integrasi CBT (soal & koreksi/cek-benar-salah dilakukan di CBT,
 // NL-SIAK TIDAK PERNAH menyimpan soal secara permanen)
 //
-// Rumus identik dengan Jalur C ("Nilai per soal x bobotnya / total bobot
-// subcpmk" -- arahan asli), cuma sumbernya beda: Jalur C baca dari tabel
-// siak_soal yang persisten, Jalur D baca dari `breakdown` yang dikirim CBT
-// SEKALI PAKAI di tiap request (unit/soal, esai, kriteria presentasi, tahap
-// proyek -- generik, lihat RENCANA-PENILAIAN-PER-SOAL.md bagian "unit
-// penilaian generik"). Tidak ada tabel Soal yang disentuh sama sekali.
+// Revisi 2026-07-16 (hasil konsultasi Pak Fitrah + Virza): nilai akhir & huruf
+// mutu/angka mutu MK itu MURNI hasil hitungan CBT sendiri -- NL-SIAK cuma GET
+// dan simpan apa adanya (lihat simpanNilaiAkhirDariCbt), TIDAK dihitung ulang
+// dari komponen (hitungNilaiAkhir Jalur A TIDAK dipanggil sama sekali di jalur
+// ini). Yang di-input NL-SIAK dari CBT cuma breakdown Sub-CPMK per komponen,
+// dipakai KHUSUS buat hitung capaian CPMK -- 2 hal ini sengaja dipisah total
+// supaya tidak ada 1 fungsi yang bisa menimpa hasil punya fungsi lain (akar
+// masalah bug sebelumnya: hitungNilaiAkhir menimpa NilaiCpmkMahasiswa balik
+// jadi proporsional tiap kali dipanggil, walau sudah ada hitungan akurat).
+//
+// Rumus breakdown identik Jalur C ("Nilai per soal x bobotnya / total bobot
+// subcpmk" -- arahan asli Pak Fitrah), cuma sumbernya beda: Jalur C baca dari
+// tabel siak_soal yang persisten, Jalur D baca dari `breakdown` yang dikirim
+// CBT SEKALI PAKAI di tiap request (unit/soal, esai, kriteria presentasi,
+// tahap proyek -- generik). Tidak ada tabel Soal yang disentuh sama sekali.
 //
 // Yang disimpan ke siak_nilai_subcpmk_evaluasi_mahasiswa BUKAN breakdown
 // mentahnya, tapi HASIL AGREGASI per (krs, komponen, cpmkId): skorTerbobot +
@@ -27,19 +35,21 @@ const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 // ============================================================================
 
 // payload per mahasiswa: {
-//   krsId, nilaiAkhir,
+//   krsId,
 //   breakdown: [{ skorDiperoleh, skorMaksimal, pemetaanCpmk: [{cpmkId, bobotPoin}] }]
 // }
 // -- 1 entri breakdown = 1 unit penilaian (soal PG/esai, 1 kriteria presentasi,
 //    1 tahap proyek, dst). bobotPoin = poin dari skorMaksimal unit ini yang
 //    dialokasikan ke CPMK/Sub-CPMK tsb (kalau 1 unit = 1 CPMK, bobotPoin = skorMaksimal).
+//
+// TIDAK ADA nilaiAkhir di sini -- itu urusan simpanNilaiAkhirDariCbt terpisah.
 export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasiswa) => {
     const rencanaEvaluasi = await RencanaEvaluasi.findByPk(rencanaEvaluasiId);
     if (!rencanaEvaluasi) throw new CustomError.NotFoundError("Komponen evaluasi tidak ditemukan");
 
     const hasil = [];
     for (const item of daftarMahasiswa) {
-        const { krsId, nilaiAkhir, breakdown } = item;
+        const { krsId, breakdown } = item;
 
         const rincian = await RincianKrsMahasiswa.findByPk(krsId, {
             include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
@@ -89,26 +99,46 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
             }
         });
 
-        // 3. Gabungkan komponen lain yang sudah ada (Jalur A/D komponen lain) supaya
-        //    TIDAK ikut terhapus saat inputNilaiMahasiswa menulis ulang -- sama persis
-        //    mitigasi yang dipakai Jalur C (lihat RENCANA-PENILAIAN-PER-SOAL.md Bagian 6).
-        const nilaiEksisting = await NilaiEvaluasiMahasiswa.findAll({ where: { siakRincianKrsMahasiswaId: krsId } });
-        const payloadKomponen = nilaiEksisting
-            .filter(n => n.siakRencanaEvaluasiId !== rencanaEvaluasiId)
-            .map(n => ({ komposisiId: n.siakRencanaEvaluasiId, skor: parseFloat(n.skor) }));
-        payloadKomponen.push({ komposisiId: rencanaEvaluasiId, skor: parseFloat(nilaiAkhir || 0) });
-
-        // 4. REUSE fungsi lama yang sudah ada -- TIDAK DIUBAH SATU BARIS PUN
-        await penilaianService.inputNilaiMahasiswa(krsId, payloadKomponen);
-        const hasilAkhir = await penilaianService.hitungNilaiAkhir(krsId);
-
-        // 5. Gabungkan agregat LINTAS SEMUA KOMPONEN (UTS+UAS+Tugas, dst), rollup ke
+        // 3. Gabungkan agregat LINTAS SEMUA KOMPONEN (UTS+UAS+Tugas, dst), rollup ke
         //    CPMK induk, lalu override NilaiCpmkMahasiswa -- sama pola dengan Jalur C.
+        //    TIDAK ADA panggilan ke inputNilaiMahasiswa/hitungNilaiAkhir di sini --
+        //    nilai akhir MK sepenuhnya urusan simpanNilaiAkhirDariCbt.
         const nilaiCpmkAkurat = await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
 
-        hasil.push({ krsId, ...hasilAkhir, nilaiCpmk: nilaiCpmkAkurat });
+        hasil.push({ krsId, nilaiCpmk: nilaiCpmkAkurat });
     }
 
+    return hasil;
+};
+
+// ============================================================================
+// SINKRON nilai akhir + huruf mutu + angka mutu MK dari CBT -- LANGSUNG tulis
+// ke RincianKrsMahasiswa, TIDAK dihitung ulang dari komponen sama sekali.
+// Ini terpisah total dari simpanNilaiKomponenDariCbt supaya tidak ada resiko
+// 1 fungsi menimpa hasil fungsi lain.
+// ============================================================================
+export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
+    const hasil = [];
+    for (const item of daftarMahasiswa) {
+        const { krsId, nilaiAkhir, hurufMutu, angkaMutu } = item;
+
+        const rincian = await RincianKrsMahasiswa.findByPk(krsId);
+        if (!rincian) throw new CustomError.NotFoundError(`Rincian KRS ${krsId} tidak ditemukan`);
+        if (STATUS_FINAL_ATAU_KUNCI.includes(rincian.status)) {
+            throw new CustomError.ForbiddenError(`Nilai mahasiswa (krsId ${krsId}) sudah dikunci/difinalisasi, tidak dapat diubah dari CBT`);
+        }
+
+        await RincianKrsMahasiswa.update(
+            {
+                nilaiAkhir: parseFloat(nilaiAkhir),
+                hurufMutu: hurufMutu,
+                angkaMutu: parseFloat(angkaMutu)
+            },
+            { where: { id: krsId } }
+        );
+
+        hasil.push({ krsId, nilaiAkhir, hurufMutu, angkaMutu });
+    }
     return hasil;
 };
 
@@ -142,14 +172,8 @@ export const getNilaiDariCbt = async (rencanaEvaluasiId) => {
         where: { siakRencanaEvaluasiId: rencanaEvaluasiId },
         include: [{ model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['kode'] }]
     });
-    const semuaNilaiKomponen = await NilaiEvaluasiMahasiswa.findAll({
-        where: { siakRencanaEvaluasiId: rencanaEvaluasiId }
-    });
 
-    const krsIds = [...new Set([
-        ...semuaAgregat.map(n => n.siakRincianKrsMahasiswaId),
-        ...semuaNilaiKomponen.map(n => n.siakRincianKrsMahasiswaId)
-    ])];
+    const krsIds = [...new Set(semuaAgregat.map(n => n.siakRincianKrsMahasiswaId))];
     const daftarRincian = await RincianKrsMahasiswa.findAll({
         where: { id: krsIds },
         include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', include: [{ model: Mahasiswa, as: 'mahasiswa', attributes: ['nama', 'npm'] }] }]
@@ -164,14 +188,12 @@ export const getNilaiDariCbt = async (rencanaEvaluasiId) => {
             krsId,
             nim: r?.krsMahasiswa?.mahasiswa?.npm || '-',
             nama: r?.krsMahasiswa?.mahasiswa?.nama || '-',
-            nilaiAkhirKomponen: null,
+            // Nilai akhir MK (bukan per komponen) -- murni sync dari CBT via
+            // simpanNilaiAkhirDariCbt, ditampilkan di sini apa adanya buat referensi.
+            nilaiAkhirMk: r ? (r.nilaiAkhir !== null ? parseFloat(r.nilaiAkhir) : null) : null,
+            hurufMutuMk: r ? r.hurufMutu : null,
             breakdown: []
         };
-    });
-    semuaNilaiKomponen.forEach(n => {
-        if (perMahasiswa[n.siakRincianKrsMahasiswaId]) {
-            perMahasiswa[n.siakRincianKrsMahasiswaId].nilaiAkhirKomponen = parseFloat(n.skor);
-        }
     });
     semuaAgregat.forEach(n => {
         const totalBobot = parseFloat(n.totalBobot || 0);
@@ -192,10 +214,11 @@ export const getNilaiDariCbt = async (rencanaEvaluasiId) => {
 
 // ============================================================================
 // RESET per komponen (BUKAN reset seluruh nilai mahasiswa) -- hapus kontribusi
-// Jalur D untuk 1 mahasiswa di 1 komponen evaluasi SAJA, lalu hitung ulang nilai
-// akhir & CPMK dari komponen-komponen LAIN yang masih tersisa. Berguna khusus
-// buat beresin kasus komponen duplikat: reset yang duplikatnya SAJA, tanpa
-// ganggu komponen yang benar.
+// breakdown Sub-CPMK Jalur D untuk 1 mahasiswa di 1 komponen evaluasi SAJA,
+// lalu hitung ulang CPMK dari komponen-komponen LAIN yang masih tersisa. Tidak
+// menyentuh nilai akhir MK sama sekali (itu terpisah, lihat simpanNilaiAkhirDariCbt).
+// Berguna khusus buat beresin kasus komponen duplikat: reset yang duplikatnya
+// SAJA, tanpa ganggu komponen yang benar.
 // ============================================================================
 export const resetNilaiKomponenCbt = async (krsId, rencanaEvaluasiId) => {
     const rincian = await RincianKrsMahasiswa.findByPk(krsId, {
@@ -208,41 +231,14 @@ export const resetNilaiKomponenCbt = async (krsId, rencanaEvaluasiId) => {
     const kelasId = rincian.siakKelasKuliahId;
     const mahasiswaId = rincian.krsMahasiswa?.siakMahasiswaId;
 
-    await sequelize.transaction(async (trx) => {
-        await NilaiSubcpmkEvaluasiMahasiswa.destroy({
-            where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
-            force: true, transaction: trx
-        });
-        await NilaiEvaluasiMahasiswa.destroy({
-            where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
-            force: true, transaction: trx
-        });
+    await NilaiSubcpmkEvaluasiMahasiswa.destroy({
+        where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
+        force: true
     });
 
-    // Hitung ulang dari komponen yang TERSISA saja. Kalau ternyata sudah tidak ada
-    // komponen tersisa sama sekali, jangan panggil hitungNilaiAkhir (itu bakal nulis
-    // 0/huruf E -- kelihatan kayak "gagal", padahal harusnya "belum dinilai").
-    // Balikin ke NULL, konsisten dengan resetNilaiMahasiswa/resetNilaiKelas.
-    const sisaKomponen = await NilaiEvaluasiMahasiswa.findAll({ where: { siakRincianKrsMahasiswaId: krsId } });
-
-    if (sisaKomponen.length === 0) {
-        await RincianKrsMahasiswa.update(
-            { nilaiAkhir: null, hurufMutu: null, angkaMutu: null },
-            { where: { id: krsId } }
-        );
-        await NilaiCpmkMahasiswa.destroy({
-            where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaId },
-            force: true
-        });
-        return { krsId, totalSkor: null, hurufMutu: null, angkaMutu: null, nilaiCpmk: [], pesan: `Komponen ini berhasil direset, tidak ada komponen lain tersisa -- status kembali Belum Dinilai` };
-    }
-
-    const payloadKomponen = sisaKomponen.map(n => ({ komposisiId: n.siakRencanaEvaluasiId, skor: parseFloat(n.skor) }));
-    await penilaianService.inputNilaiMahasiswa(krsId, payloadKomponen);
-    const hasilAkhir = await penilaianService.hitungNilaiAkhir(krsId);
     const nilaiCpmk = await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
 
-    return { krsId, ...hasilAkhir, nilaiCpmk, pesan: `Komponen ini berhasil direset utk mahasiswa ${krsId}` };
+    return { krsId, nilaiCpmk, pesan: `Komponen ini berhasil direset utk mahasiswa ${krsId}` };
 };
 
 // ============================================================================
@@ -256,58 +252,63 @@ const hitungDanOverrideNilaiCpmkDariKomponen = async (krsId, kelasId, mahasiswaI
     const semuaAgregat = await NilaiSubcpmkEvaluasiMahasiswa.findAll({
         where: { siakRincianKrsMahasiswaId: krsId }
     });
-    if (semuaAgregat.length === 0) return [];
 
-    // Pass 1: gabungkan lintas komponen ke cpmkId APA ADANYA (boleh CPMK induk, boleh sub-CPMK)
-    const agregatLangsung = {}; // { cpmkId: { skorTerbobot, totalBobot } }
-    semuaAgregat.forEach(n => {
-        if (!agregatLangsung[n.siakCpmkId]) agregatLangsung[n.siakCpmkId] = { skorTerbobot: 0, totalBobot: 0 };
-        agregatLangsung[n.siakCpmkId].skorTerbobot += parseFloat(n.skorTerbobot || 0);
-        agregatLangsung[n.siakCpmkId].totalBobot += parseFloat(n.totalBobot || 0);
-    });
-
-    const cpmkIdsLangsung = Object.keys(agregatLangsung);
-    if (cpmkIdsLangsung.length === 0) return [];
-
-    // Cek parentId tiap CPMK yang disentuh langsung (mitigasi rollup sub-CPMK)
-    const daftarCpmk = await CapaianMataKuliah.findAll({
-        where: { id: cpmkIdsLangsung },
-        attributes: ['id', 'parentId']
-    });
-    const parentMap = {};
-    daftarCpmk.forEach(c => { parentMap[c.id] = c.parentId; });
-
-    // Pass 2: rollup ke CPMK induk untuk sub-CPMK yang induknya belum disentuh langsung
-    const agregatRollup = {};
-    cpmkIdsLangsung.forEach(cpmkId => {
-        const parentId = parentMap[cpmkId];
-        if (!parentId) return;
-        if (!agregatRollup[parentId]) agregatRollup[parentId] = { skorTerbobot: 0, totalBobot: 0 };
-        agregatRollup[parentId].skorTerbobot += agregatLangsung[cpmkId].skorTerbobot;
-        agregatRollup[parentId].totalBobot += agregatLangsung[cpmkId].totalBobot;
-    });
-    Object.entries(agregatRollup).forEach(([parentId, agg]) => {
-        if (!agregatLangsung[parentId]) agregatLangsung[parentId] = { skorTerbobot: 0, totalBobot: 0 };
-        agregatLangsung[parentId].skorTerbobot += agg.skorTerbobot;
-        agregatLangsung[parentId].totalBobot += agg.totalBobot;
-    });
-
-    const payloadCpmk = Object.entries(agregatLangsung).map(([cpmkId, agg]) => ({
-        siakKelasKuliahId: kelasId,
-        siakMahasiswaId: mahasiswaId,
-        siakCapaianMataKuliahId: cpmkId,
-        nilai: agg.totalBobot > 0 ? Math.round((agg.skorTerbobot / agg.totalBobot) * 10000) / 100 : 0
-    }));
-
+    // Selalu wipe dulu -- kalau semuaAgregat kosong (komponen terakhir baru
+    // direset), NilaiCpmkMahasiswa mahasiswa ini juga harus ikut kosong,
+    // bukan dibiarkan basi dengan angka lama.
     await sequelize.transaction(async (trx) => {
         await NilaiCpmkMahasiswa.destroy({
             where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaId },
             force: true, transaction: trx
         });
+
+        if (semuaAgregat.length === 0) return;
+
+        // Pass 1: gabungkan lintas komponen ke cpmkId APA ADANYA (boleh CPMK induk, boleh sub-CPMK)
+        const agregatLangsung = {}; // { cpmkId: { skorTerbobot, totalBobot } }
+        semuaAgregat.forEach(n => {
+            if (!agregatLangsung[n.siakCpmkId]) agregatLangsung[n.siakCpmkId] = { skorTerbobot: 0, totalBobot: 0 };
+            agregatLangsung[n.siakCpmkId].skorTerbobot += parseFloat(n.skorTerbobot || 0);
+            agregatLangsung[n.siakCpmkId].totalBobot += parseFloat(n.totalBobot || 0);
+        });
+
+        const cpmkIdsLangsung = Object.keys(agregatLangsung);
+
+        // Cek parentId tiap CPMK yang disentuh langsung (mitigasi rollup sub-CPMK)
+        const daftarCpmk = await CapaianMataKuliah.findAll({
+            where: { id: cpmkIdsLangsung },
+            attributes: ['id', 'parentId'],
+            transaction: trx
+        });
+        const parentMap = {};
+        daftarCpmk.forEach(c => { parentMap[c.id] = c.parentId; });
+
+        // Pass 2: rollup ke CPMK induk untuk sub-CPMK yang induknya belum disentuh langsung
+        const agregatRollup = {};
+        cpmkIdsLangsung.forEach(cpmkId => {
+            const parentId = parentMap[cpmkId];
+            if (!parentId) return;
+            if (!agregatRollup[parentId]) agregatRollup[parentId] = { skorTerbobot: 0, totalBobot: 0 };
+            agregatRollup[parentId].skorTerbobot += agregatLangsung[cpmkId].skorTerbobot;
+            agregatRollup[parentId].totalBobot += agregatLangsung[cpmkId].totalBobot;
+        });
+        Object.entries(agregatRollup).forEach(([parentId, agg]) => {
+            if (!agregatLangsung[parentId]) agregatLangsung[parentId] = { skorTerbobot: 0, totalBobot: 0 };
+            agregatLangsung[parentId].skorTerbobot += agg.skorTerbobot;
+            agregatLangsung[parentId].totalBobot += agg.totalBobot;
+        });
+
+        const payloadCpmk = Object.entries(agregatLangsung).map(([cpmkId, agg]) => ({
+            siakKelasKuliahId: kelasId,
+            siakMahasiswaId: mahasiswaId,
+            siakCapaianMataKuliahId: cpmkId,
+            nilai: agg.totalBobot > 0 ? Math.round((agg.skorTerbobot / agg.totalBobot) * 10000) / 100 : 0
+        }));
+
         if (payloadCpmk.length > 0) {
             await NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
         }
     });
 
-    return payloadCpmk;
+    return await NilaiCpmkMahasiswa.findAll({ where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaId } });
 };
