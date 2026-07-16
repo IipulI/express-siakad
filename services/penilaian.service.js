@@ -83,27 +83,28 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
 
 // 3. KALKULATOR HASIL AKHIR OBE (VERSI DINAMIS SKALA NILAI)
 export const hitungNilaiAkhir = async (krsId) => {
-    // GUARD Jalur D: kalau krsId ini sudah punya breakdown dari integrasi CBT
-    // (siak_nilai_subcpmk_evaluasi_mahasiswa), nilai_akhir/huruf_mutu MK itu MURNI
-    // otoritas CBT (simpanNilaiAkhirDariCbt) -- JANGAN dihitung ulang di sini. Tapi
-    // komponen yang TETAP diinput manual di NL-SIAK (arahan Pak Fitrah: Kehadiran
-    // tidak bisa lewat CBT, harus manual, dikali bobot per Sub-CPMK dibagi total
-    // bobot Sub-CPMK -- rumus proporsional lama) TETAP harus ikut kehitung ke CPMK,
-    // digabung dengan breakdown CBT lewat rumus penjumlahan yang sama (lihat
-    // gabungKontribusiManualKeJalurD & hitungDanOverrideNilaiCpmkDariKomponen).
-    // Tanpa guard ini, endpoint lama akan menghitung nilai_akhir dari komponen yang
-    // tidak lengkap DAN menghapus semua NilaiCpmkMahasiswa Jalur D tanpa pengganti.
-    const jalurD = await sequelize.query(
+    // GUARD Jalur D: nilai_akhir/huruf_mutu MK di-skip HANYA kalau CBT betulan
+    // sudah kirim data (sumber='CBT' di siak_nilai_subcpmk_evaluasi_mahasiswa) --
+    // itu murni otoritas CBT (simpanNilaiAkhirDariCbt), JANGAN dihitung ulang.
+    // CPMK-nya sendiri SELALU digabung lewat "ledger" yang sama (lihat
+    // tulisManualRowsKeLedger di bawah + hitungDanOverrideNilaiCpmkDariKomponen),
+    // baik ada data CBT atau tidak -- supaya urutan Kehadiran/komponen manual vs
+    // breakdown CBT masuk duluan TIDAK masalah (fix bug order-dependency
+    // 2026-07-16: sebelumnya kalau Kehadiran diinput SEBELUM CBT kirim breakdown,
+    // begitu breakdown CBT masuk, kontribusi Kehadiran hilang total karena
+    // ditulis ke 2 tempat berbeda yang tidak saling tahu).
+    const jalurDCbt = await sequelize.query(
         `SELECT 1 FROM siak_nilai_subcpmk_evaluasi_mahasiswa
-         WHERE siak_rincian_krs_mahasiswa_id = :krsId AND deleted_at IS NULL LIMIT 1`,
+         WHERE siak_rincian_krs_mahasiswa_id = :krsId AND sumber = 'CBT' AND deleted_at IS NULL LIMIT 1`,
         { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
     );
-    if (jalurD.length > 0) {
+    if (jalurDCbt.length > 0) {
         return await gabungKontribusiManualKeJalurD(krsId);
     }
 
+    let hasil;
     try {
-        return await sequelize.transaction(async (trx) => {
+        hasil = await sequelize.transaction(async (trx) => {
             // 1. Ambil nilai evaluasi mahasiswa (tanpa include CPMK dulu — pakai raw SQL)
             const listNilai = await models.NilaiEvaluasiMahasiswa.findAll({
                 where: { siakRincianKrsMahasiswaId: krsId },
@@ -232,83 +233,27 @@ export const hitungNilaiAkhir = async (krsId) => {
             );
 
             // ====================================================================
-            // 5. SIMPAN KE TABEL MATERIALIZED (NILAI CPMK) MENGGUNAKAN RAW SQL
+            // 5. TULIS KONTRIBUSI KE LEDGER (siak_nilai_subcpmk_evaluasi_mahasiswa,
+            //    sumber='MANUAL') -- rollup ke siak_nilai_cpmk_mahasiswa yang
+            //    sesungguhnya dilakukan SETELAH transaksi ini commit, lewat
+            //    hitungDanOverrideNilaiCpmkDariKomponen (baca ledger, gabung
+            //    MANUAL+CBT kalau ada keduanya). Dulu di sini langsung tulis ke
+            //    siak_nilai_cpmk_mahasiswa -- diganti (2026-07-16) supaya
+            //    kontribusi manual selalu tercatat di tempat yang sama dibaca
+            //    Jalur D, tidak peduli urutan masuknya.
             // ====================================================================
             const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId, {
                 include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa' }],
                 transaction: trx
             });
 
+            let kelasId = null, mhsId = null;
             if (rincianKrs && rincianKrs.krsMahasiswa) {
-                const kelasId = rincianKrs.siakKelasKuliahId;
-                const mhsId = rincianKrs.krsMahasiswa.siakMahasiswaId;
+                kelasId = rincianKrs.siakKelasKuliahId;
+                mhsId = rincianKrs.krsMahasiswa.siakMahasiswaId;
 
                 if (kelasId && mhsId) {
-                    // Hapus nilai CPMK lama untuk mahasiswa ini di kelas ini
-                    await sequelize.query(
-                        `DELETE FROM siak_nilai_cpmk_mahasiswa
-                          WHERE siak_kelas_kuliah_id = :kelasId
-                            AND siak_mahasiswa_id   = :mhsId`,
-                        { replacements: { kelasId, mhsId }, transaction: trx }
-                    );
-
-                    const rencanaEvaluasiIds = listNilai
-                        .map(n => n.siak_rencana_evaluasi_id || n.siakRencanaEvaluasiId)
-                        .filter(Boolean);
-
-                    if (rencanaEvaluasiIds.length > 0) {
-                        const pemetaanRows = await sequelize.query(
-                            `SELECT pec.siak_rencana_evaluasi_id AS rencana_evaluasi_id,
-                                    pec.siak_cpmk_id             AS cpmk_id,
-                                    pec.bobot_cpmk               AS bobot_cpmk
-                             FROM siak_pemetaan_evaluasi_cpmk pec
-                             WHERE pec.siak_rencana_evaluasi_id IN (:rencanaEvaluasiIds)
-                               AND pec.deleted_at IS NULL`,
-                            {
-                                replacements: { rencanaEvaluasiIds },
-                                type: sequelize.QueryTypes.SELECT,
-                                transaction: trx
-                            }
-                        );
-
-                        // Build map rencanaEvaluasiId -> [{ cpmkId, bobotCpmk }]
-                        const pemetaanMap = {};
-                        pemetaanRows.forEach(row => {
-                            if (!pemetaanMap[row.rencana_evaluasi_id]) pemetaanMap[row.rencana_evaluasi_id] = [];
-                            pemetaanMap[row.rencana_evaluasi_id].push({
-                                cpmkId: row.cpmk_id,
-                                bobotCpmk: parseFloat(row.bobot_cpmk || 0)
-                            });
-                        });
-
-                        const raporCPMK = {}; // { cpmkId: { skorTerbobot, totalBobot } }
-
-                        listNilai.forEach(nilai => {
-                            if (!nilai.rencanaEvaluasi) return;
-
-                            const rencanaEvaluasiId = nilai.siak_rencana_evaluasi_id || nilai.siakRencanaEvaluasiId;
-                            const skor = parseFloat(nilai.skor || 0);
-
-                            (pemetaanMap[rencanaEvaluasiId] || []).forEach(({ cpmkId, bobotCpmk }) => {
-                                if (!raporCPMK[cpmkId]) raporCPMK[cpmkId] = { skorTerbobot: 0, totalBobot: 0 };
-                                raporCPMK[cpmkId].skorTerbobot += skor * bobotCpmk;
-                                raporCPMK[cpmkId].totalBobot += bobotCpmk;
-                            });
-                        });
-
-                        const payloadCpmk = Object.entries(raporCPMK).map(([cpmkId, item]) => ({
-                            siakKelasKuliahId: kelasId,
-                            siakMahasiswaId: mhsId,
-                            siakCapaianMataKuliahId: cpmkId,
-                            nilai: item.totalBobot > 0
-                                ? Math.round((item.skorTerbobot / item.totalBobot) * 100) / 100
-                                : 0
-                        }));
-
-                        if (payloadCpmk.length > 0) {
-                            await models.NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
-                        }
-                    }
+                    await tulisManualRowsKeLedger(krsId, listNilai, trx);
 
                     // Auto-kunci: jika semua mahasiswa di kelas sudah punya nilai_akhir → kunci semua
                     const [cekRows] = await sequelize.query(
@@ -331,11 +276,20 @@ export const hitungNilaiAkhir = async (krsId) => {
                 }
             }
 
-            return { krsId, totalSkor, hurufMutu, angkaMutu };
+            return { krsId, totalSkor, hurufMutu, angkaMutu, kelasId, mhsId };
         });
     } catch (error) {
         throw new Error("Gagal kalkulasi nilai: " + error.message);
     }
+
+    // Rollup CPMK gabungan (MANUAL yang baru ditulis + CBT kalau ada) -- di LUAR
+    // transaksi di atas dengan sengaja, karena fungsi ini buka transaksi sendiri
+    // dan harus baca data yang sudah ter-commit.
+    if (hasil.kelasId && hasil.mhsId) {
+        await hitungDanOverrideNilaiCpmkDariKomponen(krsId, hasil.kelasId, hasil.mhsId);
+    }
+    const { kelasId: _kelasId, mhsId: _mhsId, ...hasilBersih } = hasil;
+    return hasilBersih;
 }
 
 // ============================================================================
@@ -413,15 +367,74 @@ export const hitungDanOverrideNilaiCpmkDariKomponen = async (krsId, kelasId, mah
 };
 
 // ============================================================================
-// Dipanggil oleh hitungNilaiAkhir kalau krsId sudah pakai Jalur D. Komponen yang
-// TETAP diinput manual di NL-SIAK (arahan Pak Fitrah 2026-07-16: "Kehadiran gak
-// bisa dari sistem Virza, harus di tempat lu langsung. Ambil nilai akhir kehadiran,
-// dikali bobot per Sub-CPMK dibagi total Sub-CPMK") ditulis sebagai UNIT tambahan
-// ke siak_nilai_subcpmk_evaluasi_mahasiswa (sumber='MANUAL', bukan 'CBT'), lalu
-// di-rollup ULANG bareng breakdown CBT lewat hitungDanOverrideNilaiCpmkDariKomponen
-// -- rumusnya identik (skor x bobotCpmk / totalBobot), cuma sumber datanya beda.
-// nilai_akhir/huruf_mutu MK TIDAK disentuh sama sekali (tetap murni dari CBT).
+// Tulis kontribusi komponen yang diinput manual (mis. Kehadiran, arahan Pak
+// Fitrah 2026-07-16: "Kehadiran gak bisa dari sistem Virza, harus di tempat lu
+// langsung. Ambil nilai akhir kehadiran, dikali bobot per Sub-CPMK dibagi total
+// Sub-CPMK") sebagai UNIT ke siak_nilai_subcpmk_evaluasi_mahasiswa
+// (sumber='MANUAL', bukan 'CBT'). MENGGANTI seluruh baris MANUAL lama utk krsId
+// ini (supaya re-input tidak numpuk), TIDAK menyentuh baris sumber='CBT'.
+// Dipakai baik oleh alur non-CBT (hitungNilaiAkhir) maupun alur CBT
+// (gabungKontribusiManualKeJalurD) -- supaya kontribusi manual SELALU ada di
+// ledger yang sama, tidak peduli urutan CBT vs manual masuk duluan.
+//
+// PENTING soal skala: hitungDanOverrideNilaiCpmkDariKomponen mengasumsikan setiap
+// baris sudah dalam konvensi Jalur D (skorTerbobot/totalBobot adalah PECAHAN
+// 0..1, lalu di-kali 100 di akhir -- lihat Rumus 1: w = S x (B/M)). Skor manual
+// (mis. Kehadiran) itu sendiri sudah dalam skala 0-100 (S/M dengan M=100), jadi
+// bobotCpmk-nya HARUS dibagi 100 dulu supaya hasil gabungannya konsisten --
+// kalau tidak, hasil akhir bisa jauh di atas 100 (bobotCpmk lama itu skala
+// "persen dari 100 total", bukan skala "poin" spt Jalur D).
 // ============================================================================
+const tulisManualRowsKeLedger = async (krsId, listNilai, trx) => {
+    await NilaiSubcpmkEvaluasiMahasiswa.destroy({
+        where: { siakRincianKrsMahasiswaId: krsId, sumber: 'MANUAL' },
+        force: true, transaction: trx
+    });
+
+    if (listNilai.length === 0) return;
+
+    const rencanaEvaluasiIds = listNilai
+        .map(n => n.siak_rencana_evaluasi_id || n.siakRencanaEvaluasiId)
+        .filter(Boolean);
+    if (rencanaEvaluasiIds.length === 0) return;
+
+    const pemetaanRows = await sequelize.query(
+        `SELECT pec.siak_rencana_evaluasi_id AS rencana_evaluasi_id,
+                pec.siak_cpmk_id AS cpmk_id, pec.bobot_cpmk AS bobot_cpmk
+         FROM siak_pemetaan_evaluasi_cpmk pec
+         WHERE pec.siak_rencana_evaluasi_id IN (:rencanaEvaluasiIds) AND pec.deleted_at IS NULL`,
+        { replacements: { rencanaEvaluasiIds }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+    );
+    const pemetaanMap = {};
+    pemetaanRows.forEach(row => {
+        if (!pemetaanMap[row.rencana_evaluasi_id]) pemetaanMap[row.rencana_evaluasi_id] = [];
+        pemetaanMap[row.rencana_evaluasi_id].push({ cpmkId: row.cpmk_id, bobotCpmk: parseFloat(row.bobot_cpmk || 0) });
+    });
+
+    const payloadManual = [];
+    listNilai.forEach(nilai => {
+        const rencanaEvaluasiId = nilai.siak_rencana_evaluasi_id || nilai.siakRencanaEvaluasiId;
+        const skor = parseFloat(nilai.skor || 0);
+        (pemetaanMap[rencanaEvaluasiId] || []).forEach(({ cpmkId, bobotCpmk }) => {
+            payloadManual.push({
+                siakRincianKrsMahasiswaId: krsId,
+                siakRencanaEvaluasiId: rencanaEvaluasiId,
+                siakCpmkId: cpmkId,
+                skorTerbobot: skor * (bobotCpmk / 100),
+                totalBobot: bobotCpmk,
+                sumber: 'MANUAL'
+            });
+        });
+    });
+
+    if (payloadManual.length > 0) {
+        await NilaiSubcpmkEvaluasiMahasiswa.bulkCreate(payloadManual, { transaction: trx });
+    }
+};
+
+// Dipanggil oleh hitungNilaiAkhir kalau krsId sudah punya data CBT (sumber='CBT').
+// nilai_akhir/huruf_mutu MK TIDAK disentuh sama sekali (tetap murni dari CBT) --
+// cuma tulis kontribusi manual ke ledger lalu rollup ulang gabung dgn CBT.
 const gabungKontribusiManualKeJalurD = async (krsId) => {
     const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId, {
         include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa' }]
@@ -439,54 +452,7 @@ const gabungKontribusiManualKeJalurD = async (krsId) => {
     });
 
     await sequelize.transaction(async (trx) => {
-        // Hapus dulu kontribusi manual LAMA (supaya re-input Kehadiran tidak numpuk),
-        // tapi JANGAN sentuh baris sumber='CBT' milik Jalur D.
-        await NilaiSubcpmkEvaluasiMahasiswa.destroy({
-            where: { siakRincianKrsMahasiswaId: krsId, sumber: 'MANUAL' },
-            force: true, transaction: trx
-        });
-
-        if (listNilai.length === 0) return;
-
-        const rencanaEvaluasiIds = listNilai.map(n => n.siakRencanaEvaluasiId);
-        const pemetaanRows = await sequelize.query(
-            `SELECT pec.siak_rencana_evaluasi_id AS rencana_evaluasi_id,
-                    pec.siak_cpmk_id AS cpmk_id, pec.bobot_cpmk AS bobot_cpmk
-             FROM siak_pemetaan_evaluasi_cpmk pec
-             WHERE pec.siak_rencana_evaluasi_id IN (:rencanaEvaluasiIds) AND pec.deleted_at IS NULL`,
-            { replacements: { rencanaEvaluasiIds }, type: sequelize.QueryTypes.SELECT, transaction: trx }
-        );
-        const pemetaanMap = {};
-        pemetaanRows.forEach(row => {
-            if (!pemetaanMap[row.rencana_evaluasi_id]) pemetaanMap[row.rencana_evaluasi_id] = [];
-            pemetaanMap[row.rencana_evaluasi_id].push({ cpmkId: row.cpmk_id, bobotCpmk: parseFloat(row.bobot_cpmk || 0) });
-        });
-
-        // PENTING soal skala: hitungDanOverrideNilaiCpmkDariKomponen mengasumsikan setiap
-        // baris di siak_nilai_subcpmk_evaluasi_mahasiswa sudah dalam konvensi Jalur D
-        // (skorTerbobot/totalBobot adalah PECAHAN 0..1, lalu di-kali 100 di akhir -- lihat
-        // Rumus 1: w = S x (B/M)). Skor manual (mis. Kehadiran) itu sendiri sudah dalam
-        // skala 0-100 (S/M dengan M=100), jadi bobotCpmk-nya HARUS dibagi 100 dulu supaya
-        // hasil gabungannya konsisten -- kalau tidak, hasil akhir bisa jauh di atas 100
-        // (bobotCpmk lama itu skala "persen dari 100 total", bukan skala "poin" spt Jalur D).
-        const payloadManual = [];
-        listNilai.forEach(nilai => {
-            const skor = parseFloat(nilai.skor || 0);
-            (pemetaanMap[nilai.siakRencanaEvaluasiId] || []).forEach(({ cpmkId, bobotCpmk }) => {
-                payloadManual.push({
-                    siakRincianKrsMahasiswaId: krsId,
-                    siakRencanaEvaluasiId: nilai.siakRencanaEvaluasiId,
-                    siakCpmkId: cpmkId,
-                    skorTerbobot: skor * (bobotCpmk / 100),
-                    totalBobot: bobotCpmk,
-                    sumber: 'MANUAL'
-                });
-            });
-        });
-
-        if (payloadManual.length > 0) {
-            await NilaiSubcpmkEvaluasiMahasiswa.bulkCreate(payloadManual, { transaction: trx });
-        }
+        await tulisManualRowsKeLedger(krsId, listNilai, trx);
     });
 
     // Rollup ulang CPMK dari SEMUA sumber (CBT + MANUAL) utk krsId ini.
