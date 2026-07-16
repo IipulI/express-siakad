@@ -1,6 +1,6 @@
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
-import { DEFAULT_SKALA, getGrade } from './penilaian.service.js';
+import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen } from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
@@ -278,74 +278,7 @@ export const resetNilaiKomponenCbt = async (krsId, rencanaEvaluasiId) => {
     return { krsId, nilaiCpmk, pesan: `Komponen ini berhasil direset utk mahasiswa ${krsId}` };
 };
 
-// ============================================================================
-// Gabungkan agregat (skorTerbobot, totalBobot) yang sudah dihitung per komponen
-// LINTAS SEMUA KOMPONEN evaluasi mahasiswa ini, plus rollup ke CPMK induk untuk
-// Sub-CPMK -- replikasi persis mitigasi yang sama di soal.service.js
-// (hitungDanOverrideNilaiCpmkBottomUp). Tidak butuh bobotCpmk dari Rencana
-// Evaluasi sama sekali -- bobot sudah melekat di tiap unit sejak Langkah 1.
-// ============================================================================
-const hitungDanOverrideNilaiCpmkDariKomponen = async (krsId, kelasId, mahasiswaId) => {
-    const semuaAgregat = await NilaiSubcpmkEvaluasiMahasiswa.findAll({
-        where: { siakRincianKrsMahasiswaId: krsId }
-    });
-
-    // Selalu wipe dulu -- kalau semuaAgregat kosong (komponen terakhir baru
-    // direset), NilaiCpmkMahasiswa mahasiswa ini juga harus ikut kosong,
-    // bukan dibiarkan basi dengan angka lama.
-    await sequelize.transaction(async (trx) => {
-        await NilaiCpmkMahasiswa.destroy({
-            where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaId },
-            force: true, transaction: trx
-        });
-
-        if (semuaAgregat.length === 0) return;
-
-        // Pass 1: gabungkan lintas komponen ke cpmkId APA ADANYA (boleh CPMK induk, boleh sub-CPMK)
-        const agregatLangsung = {}; // { cpmkId: { skorTerbobot, totalBobot } }
-        semuaAgregat.forEach(n => {
-            if (!agregatLangsung[n.siakCpmkId]) agregatLangsung[n.siakCpmkId] = { skorTerbobot: 0, totalBobot: 0 };
-            agregatLangsung[n.siakCpmkId].skorTerbobot += parseFloat(n.skorTerbobot || 0);
-            agregatLangsung[n.siakCpmkId].totalBobot += parseFloat(n.totalBobot || 0);
-        });
-
-        const cpmkIdsLangsung = Object.keys(agregatLangsung);
-
-        // Cek parentId tiap CPMK yang disentuh langsung (mitigasi rollup sub-CPMK)
-        const daftarCpmk = await CapaianMataKuliah.findAll({
-            where: { id: cpmkIdsLangsung },
-            attributes: ['id', 'parentId'],
-            transaction: trx
-        });
-        const parentMap = {};
-        daftarCpmk.forEach(c => { parentMap[c.id] = c.parentId; });
-
-        // Pass 2: rollup ke CPMK induk untuk sub-CPMK yang induknya belum disentuh langsung
-        const agregatRollup = {};
-        cpmkIdsLangsung.forEach(cpmkId => {
-            const parentId = parentMap[cpmkId];
-            if (!parentId) return;
-            if (!agregatRollup[parentId]) agregatRollup[parentId] = { skorTerbobot: 0, totalBobot: 0 };
-            agregatRollup[parentId].skorTerbobot += agregatLangsung[cpmkId].skorTerbobot;
-            agregatRollup[parentId].totalBobot += agregatLangsung[cpmkId].totalBobot;
-        });
-        Object.entries(agregatRollup).forEach(([parentId, agg]) => {
-            if (!agregatLangsung[parentId]) agregatLangsung[parentId] = { skorTerbobot: 0, totalBobot: 0 };
-            agregatLangsung[parentId].skorTerbobot += agg.skorTerbobot;
-            agregatLangsung[parentId].totalBobot += agg.totalBobot;
-        });
-
-        const payloadCpmk = Object.entries(agregatLangsung).map(([cpmkId, agg]) => ({
-            siakKelasKuliahId: kelasId,
-            siakMahasiswaId: mahasiswaId,
-            siakCapaianMataKuliahId: cpmkId,
-            nilai: agg.totalBobot > 0 ? Math.round((agg.skorTerbobot / agg.totalBobot) * 10000) / 100 : 0
-        }));
-
-        if (payloadCpmk.length > 0) {
-            await NilaiCpmkMahasiswa.bulkCreate(payloadCpmk, { transaction: trx });
-        }
-    });
-
-    return await NilaiCpmkMahasiswa.findAll({ where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaId } });
-};
+// hitungDanOverrideNilaiCpmkDariKomponen dipindah ke services/penilaian.service.js
+// (2026-07-16) supaya bisa dipakai bareng oleh gabungKontribusiManualKeJalurD di
+// sana juga (kasus Kehadiran manual + breakdown CBT digabung jadi 1 CPMK) -- lihat
+// import di atas.
