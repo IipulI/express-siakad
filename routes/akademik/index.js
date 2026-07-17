@@ -39,6 +39,7 @@ import JenisTinggalRouter from "./jenis-tinggal.router.js";
 
 import EkivalensiMataKuliah from "./ekivalensi-mata-kuliah.router.js";
 import SoalRouter from "./soal.route.js";
+import CbtRouter from "./cbt.route.js";
 
 import CPLUmum from "./cpl-umum.router.js";
 
@@ -127,6 +128,7 @@ router.use("/ekivalensi", Ekivalensi)
 router.use("/mata-kuliah-kurikulum", MkKurikulum)
 router.use("/ekivalensi-mata-kuliah", EkivalensiMataKuliah)
 router.use("/soal", SoalRouter) // Jalur C: penilaian per soal/unit
+router.use("/cbt", CbtRouter) // Jalur D: integrasi CBT (soal & koreksi di CBT, NL-SIAK terima hasil agregat)
 router.use("/monitoring", MonitoringRouter)
 
 router.use('/koordinator-mk', koordinatorMkRouter);

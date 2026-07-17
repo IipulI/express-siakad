@@ -1298,27 +1298,35 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
 
         // 5. TARIK NILAI DARI EVALUASI (AMBIL ID & KODE SEKALIGUS)
         //
-        // ── Cabang ADITIF (Jalur C — penilaian per soal) ───────────────────
-        // Kalau MK ini punya data di siak_nilai_soal_mahasiswa, berarti
-        // kelasnya pakai Jalur C dan NilaiCpmkMahasiswa SUDAH dimaterialisasi
-        // akurat dari soal (lihat services/soal.service.js). Baca dari sana
-        // langsung, JANGAN hitung ulang proporsional (kode lama di bawah).
-        // Kalau TIDAK ada data Jalur C (mayoritas, semua data lama), jalankan
-        // kode lama persis seperti sebelumnya — TIDAK DIUBAH.
+        // ── Cabang ADITIF (Jalur C — per soal, atau Jalur D — integrasi CBT) ──
+        // Kalau MK ini punya data di siak_nilai_soal_mahasiswa (Jalur C) ATAU
+        // siak_nilai_subcpmk_evaluasi_mahasiswa (Jalur D), berarti NilaiCpmkMahasiswa
+        // SUDAH dimaterialisasi akurat (lihat services/soal.service.js dan
+        // services/cbt.service.js). Baca dari sana langsung, JANGAN hitung ulang
+        // proporsional (kode lama di bawah). Kalau TIDAK ada data Jalur C/D
+        // (mayoritas, semua data lama), jalankan kode lama persis seperti
+        // sebelumnya — TIDAK DIUBAH.
         let scoreData = [];
         if (mhsList.length > 0 && cpmkList.length > 0) {
-            const cekJalurC = await sequelize.query(`
+            const cekJalurCatauD = await sequelize.query(`
                 SELECT 1
                 FROM siak_nilai_soal_mahasiswa nsm
                 JOIN siak_rincian_krs_mahasiswa rkm ON nsm.siak_rincian_krs_mahasiswa_id = rkm.id AND rkm.deleted_at IS NULL
                 JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
                 WHERE kk.siak_mata_kuliah_id = :mataKuliahId
                   AND nsm.deleted_at IS NULL
+                UNION ALL
+                SELECT 1
+                FROM siak_nilai_subcpmk_evaluasi_mahasiswa nsc
+                JOIN siak_rincian_krs_mahasiswa rkm ON nsc.siak_rincian_krs_mahasiswa_id = rkm.id AND rkm.deleted_at IS NULL
+                JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id AND kk.deleted_at IS NULL
+                WHERE kk.siak_mata_kuliah_id = :mataKuliahId
+                  AND nsc.deleted_at IS NULL
                 LIMIT 1
             `, { replacements: { mataKuliahId }, type: sequelize.QueryTypes.SELECT });
 
-            if (cekJalurC.length > 0) {
-                // Jalur C aktif untuk MK ini — baca nilai CPMK yang sudah akurat
+            if (cekJalurCatauD.length > 0) {
+                // Jalur C atau D aktif untuk MK ini — baca nilai CPMK yang sudah akurat
                 const queryScoresJalurC = `
                     SELECT
                         m.id AS mahasiswa_id,
