@@ -34,29 +34,76 @@ export const findAll = async (page, size, filter) => {
     let kelasKuliahWhere = {}
     let mataKuliahWhere = {}
     let dosenWhere = {}
+    let dosenNipNidnWhere = {}
+    let activePeriodWhere = {}
+    let mahasiswaInclude = null
 
-    if (filter.siakPeriodeAkademikId !== undefined) {
+    if (filter.siakPeriodeAkademikId !== undefined && filter.siakPeriodeAkademikId !== '') {
         kelasKuliahWhere.siakPeriodeAkademikId = filter.siakPeriodeAkademikId
     }
-    if (filter.siakProgramStudiId !== undefined) {
+    if (filter.siakProgramStudiId !== undefined && filter.siakProgramStudiId !== '') {
         kelasKuliahWhere.siakProgramStudiId = filter.siakProgramStudiId
     }
     // if (filter.siakSistemKuliahId !== undefined) {
     //     kelasKuliahWhere.siakSistemKuliahId = filter.siakSistemKuliahId
     // }
-    if (filter.siakTahunKurikulumId !== undefined) {
+    if (filter.siakTahunKurikulumId !== undefined && filter.siakTahunKurikulumId !== '') {
         mataKuliahWhere.siakTahunKurikulumId = filter.siakTahunKurikulumId
     }
-    if (filter.siakDosenId !== undefined) {
+    if (filter.siakDosenId !== undefined && filter.siakDosenId !== '') {
         dosenWhere.id = filter.siakDosenId
     }
-    if (filter.search !== undefined) {
+    if (filter.search !== undefined && filter.search !== '') {
         mataKuliahWhere.nama = { [Op.iLike]: `%${filter.search}%` }
+    }
+    if (filter.nip !== undefined && filter.nip !== '') {
+        dosenNipNidnWhere.nip = filter.nip
+    }
+    if (filter.nidn !== undefined && filter.nidn !== '') {
+        dosenNipNidnWhere.nidn = filter.nidn
+    }
+    if (filter.isActive !== undefined && filter.isActive !== '') {
+        activePeriodWhere.status = filter.isActive === "true" ? { [Op.iLike]: "Aktif" } : { [Op.iLike]: "Inaktif" }
+    }
+    if (filter.npm !== undefined && filter.npm !== '') {
+        const mahasiswa = await Mahasiswa.findOne({
+            attributes: ['id'],
+            where: { npm: filter.npm }
+        })
+
+        mahasiswaInclude = {
+            attributes: ['id', 'siakKrsMahasiswaId', 'siakKelasKuliahId'],
+            model: RincianKrsMahasiswa,
+            as: 'rincianKrsMahasiswa',
+            required: false,
+            include: {
+                attributes: ['id', 'siakMahasiswaId', 'status'],
+                model: KrsMahasiswa,
+                as: 'krsMahasiswa',
+                required: false,
+                include: {
+                    attributes: ['id', 'npm'],
+                    model: Mahasiswa,
+                    as: 'mahasiswa',
+                    required: true,
+                    where: { npm: filter.npm },
+                }
+            }
+        }
+    }
+
+    if (Object.keys(dosenWhere).length > 0 || Object.keys(dosenNipNidnWhere).length > 0) {
+        dosenWhere = {
+            [Op.or]: [
+                ...(Object.keys(dosenWhere).length > 0 ? [dosenWhere] : []),
+                ...(Object.keys(dosenNipNidnWhere).length > 0 ? [dosenNipNidnWhere] : [])
+            ]
+        }
     }
 
     let kelasKuliahQueryBuilder = {
         attributes: [
-            'id', 'siakMataKuliahId', 'siakPeriodeAkademikId', 'siakProgramStudiId',
+            'id', 'siakMataKuliahId', 'siakPeriodeAkademikId',
             'nama', 'kapasitas', 'jumlah_peminat', 'sistem_kuliah', 'status_kelas'
         ],
         where: kelasKuliahWhere,
@@ -82,36 +129,34 @@ export const findAll = async (page, size, filter) => {
                 }
             },
             {
-                attributes: [
-                    'id', 'nama',
-                ],
+                where: activePeriodWhere,
+                required: Object.keys(activePeriodWhere).length > 0,
+                attributes: ['id', 'nama'],
                 model: PeriodeAkademik,
                 as: 'periodeAkademik'
             },
             {
-                attributes: [
-                    'id', 'hari', 'jamMulai', 'jamSelesai', 'jenisPertemuan', 'metodePembelajaran'
-                ],
+                attributes: ['id', 'hari', 'jamMulai', 'jamSelesai', 'jenisPertemuan', 'metodePembelajaran'],
                 model: JadwalKuliah,
                 as: 'jadwalKuliah',
-                separate: true,
+                separate: Object.keys(dosenWhere).length === 0,
+                required: Object.keys(dosenWhere).length > 0,
                 include: [
                     {
-                        attributes: [
-                            'id', 'nama', 'nidn'
-                        ],
+                        where: dosenWhere,
+                        required: Object.keys(dosenWhere).length > 0,
+                        attributes: ['id', 'nama', 'nidn'],
                         model: Dosen,
                         as: 'dosen'
                     },
                     {
-                        attributes: [
-                            'id', 'nama', 'ruangan'
-                        ],
+                        attributes: ['id', 'nama', 'ruangan'],
                         model: Ruangan,
                         as: 'ruangan'
                     }
                 ]
-            }
+            },
+            ...(mahasiswaInclude ? [mahasiswaInclude] : [])
         ]
     }
 
@@ -141,18 +186,18 @@ export const findAll = async (page, size, filter) => {
 
 export const createClass = async (payload) => {
     try {
-        const { 
-            siakMataKuliahId, 
-            siakPeriodeAkademikId, 
+        const {
+            siakMataKuliahId,
+            siakPeriodeAkademikId,
             namaKelas, // For backward compatibility or if they use namaKelas
             nama,      // The actual field name in their new JSON example might be 'nama'
-            kapasitas, 
-            sistem_kuliah, 
-            jumlah_pertemuan, 
-            tanggal_mulai, 
-            tanggal_selesai 
+            kapasitas,
+            sistem_kuliah,
+            jumlah_pertemuan,
+            tanggal_mulai,
+            tanggal_selesai
         } = payload;
-        
+
         // Cari MK untuk dapetin prodi
         const mk = await MataKuliah.findByPk(siakMataKuliahId);
         if (!mk) throw new Error("Mata Kuliah tidak ditemukan");
@@ -170,7 +215,7 @@ export const createClass = async (payload) => {
             tanggalMulai: tanggal_mulai,
             tanggalSelesai: tanggal_selesai
         });
-        
+
         return newClass;
     } catch (error) {
         throw new Error(`Gagal membuat kelas: ${error.message}`);

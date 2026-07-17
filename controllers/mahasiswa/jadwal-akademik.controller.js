@@ -1,7 +1,7 @@
 import * as jadwalService from '../../services/jadwal-akademik.service.js'
 import ResponseBuilder from "../../utils/response.js";
 
-export const getWeeklySchedule = async (req, res) => {
+export const getWeeklySchedule = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
     const user = req.user
 
@@ -15,9 +15,26 @@ export const getWeeklySchedule = async (req, res) => {
             .json(data)
     }
     catch (error) {
+        next(error)
+    }
+}
+
+export const getDailySchedule = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+    const hari = req.query.hari
+    const periodeId = req.query.periodeId
+    const user = req.user
+
+    try {
+        const data = await jadwalService.getDailyScheduleStudent(user.mahasiswa.id, periodeId, hari)
+
         responseBuilder
-            .status('failure')
-            .status(500)
-            .message(error.message || "An error occured")
+            .status('success')
+            .code(200)
+            .message("berhasil mengambil data")
+            .json(data)
+    } catch (error) {
+        console.error(error)
+        next(error)
     }
 }

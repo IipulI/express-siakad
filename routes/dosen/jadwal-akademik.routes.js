@@ -3,6 +3,6 @@ import * as jadwalAkademikController from  "../../controllers/dosen/jadwal-akade
 
 const router = Router();
 
-router.get('/minggu', jadwalAkademikController.getWeeklySchedule)
+router.get('/', jadwalAkademikController.getWeeklySchedule)
 
 export default router;
