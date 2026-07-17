@@ -971,6 +971,21 @@ export const inputNilaiPerCpmk = async (krsId, nilaiCpmkList) => {
     if (!rincian) throw Object.assign(new Error('Data rincian KRS tidak ditemukan'), { statusCode: 404 });
     if (STATUS_FINAL.includes(rincian.status)) throw Object.assign(new Error('Nilai sudah difinalisasi, tidak dapat diubah'), { statusCode: 403 });
 
+    // GUARD Jalur D: kalau mata kuliah ini sudah punya data breakdown dari CBT (sumber='CBT'),
+    // TOLAK input manual per CPMK -- supaya tidak diam-diam menimpa nilai_akhir & NilaiCpmkMahasiswa
+    // yang sudah dihitung/disinkron dari CBT (lihat guard yang sama di hitungNilaiAkhir).
+    const jalurDCbt = await sequelize.query(
+        `SELECT 1 FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+         WHERE siak_rincian_krs_mahasiswa_id = :krsId AND sumber = 'CBT' AND deleted_at IS NULL LIMIT 1`,
+        { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (jalurDCbt.length > 0) {
+        throw Object.assign(
+            new Error('Nilai mata kuliah ini dikelola dari sistem CBT eksternal (Jalur D), tidak dapat diinput manual per CPMK'),
+            { statusCode: 403 }
+        );
+    }
+
     const kelasId = rincian.siakKelasKuliahId;
     const mahasiswaId = rincian.krsMahasiswa?.siakMahasiswaId;
     if (!mahasiswaId) throw new Error('Data mahasiswa tidak ditemukan');

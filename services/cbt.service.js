@@ -81,6 +81,29 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
             });
         });
 
+        // 1.5. Kalau breakdown dikirim tapi SEMUA unit ke-skip (bobotPoin <= 0, skorMaksimal <= 0,
+        //      atau cpmkId kosong), agregatKomponenIni bakal kosong -- ini hampir pasti data yang
+        //      belum bener dari CBT (mis. bobotPoin lupa diisi/ke-default 0), jadi TOLAK daripada
+        //      diam-diam nyimpen kosong.
+        if ((breakdown || []).length > 0 && Object.keys(agregatKomponenIni).length === 0) {
+            throw new CustomError.BadRequestError(
+                `Breakdown (krsId ${krsId}) dikirim tapi tidak ada satupun unit yang valid -- cek bobotPoin (harus > 0), skorMaksimal (harus > 0), dan cpmkId tiap unit`
+            );
+        }
+
+        // 1.6. Total bobot poin (lintas semua CPMK) dari breakdown mahasiswa ini TIDAK BOLEH
+        //      melebihi bobot evaluasi komponen ini (%) -- aturan yang sama dengan Jalur C
+        //      (lihat validasiTotalBobotPoinKomponen di soal.service.js), supaya bobot poin
+        //      yang dikirim CBT tetap konsisten dengan rancangan RPS, bukan angka sembarangan.
+        const totalBobotPoinKiriman = Object.values(agregatKomponenIni)
+            .reduce((sum, agg) => sum + agg.totalBobot, 0);
+        const bobotEvaluasi = parseFloat(rencanaEvaluasi.bobot || 0);
+        if (totalBobotPoinKiriman > bobotEvaluasi + 0.01) {
+            throw new CustomError.BadRequestError(
+                `Total bobot poin breakdown (krsId ${krsId}) adalah ${totalBobotPoinKiriman}, tidak boleh melebihi bobot evaluasi komponen ini (${bobotEvaluasi})`
+            );
+        }
+
         // 2. Wipe & replace hasil agregat komponen ini -- resend dari CBT (mis. dosen
         //    minta koreksi ulang) otomatis MENGGANTIKAN data lama, bukan menumpuk.
         await sequelize.transaction(async (trx) => {

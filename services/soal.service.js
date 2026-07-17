@@ -7,6 +7,33 @@ const { sequelize, Soal, PemetaanSoalCpmk, NilaiSoalMahasiswa, RincianKrsMahasis
 const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 
 // ============================================================================
+// Total bobot poin SELURUH soal (lintas CPMK) dalam 1 Rencana Evaluasi wajib
+// TIDAK MELEBIHI bobot evaluasi (%) komponen itu sendiri -- mengikuti metode
+// dari dosen (bobot poin = porsi skor maksimal soal terhadap skor maksimal
+// komponen, dikali bobot evaluasi komponen), supaya total bobot poin per
+// komponen otomatis konsisten dengan rancangan RPS (contoh: UTS 25% -> total
+// bobot poin seluruh soal UTS = 25). excludeSoalId dipakai saat updateSoal
+// supaya bobot poin lama soal yang sedang diedit tidak dihitung dobel.
+// ============================================================================
+const validasiTotalBobotPoinKomponen = async (rencanaEvaluasiId, bobotEvaluasi, tambahanBobotPoin, excludeSoalId, trx) => {
+    const [row] = await sequelize.query(
+        `SELECT COALESCE(SUM(psc.bobot_poin), 0) AS total
+         FROM siak_pemetaan_soal_cpmk psc
+         JOIN siak_soal s ON psc.siak_soal_id = s.id
+         WHERE s.siak_rencana_evaluasi_id = :rencanaEvaluasiId
+           AND s.deleted_at IS NULL AND psc.deleted_at IS NULL
+           AND (:excludeSoalId::uuid IS NULL OR s.id != :excludeSoalId)`,
+        { replacements: { rencanaEvaluasiId, excludeSoalId: excludeSoalId || null }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+    );
+    const totalSetelah = parseFloat(row.total) + tambahanBobotPoin;
+    if (totalSetelah > parseFloat(bobotEvaluasi) + 0.01) {
+        throw new CustomError.BadRequestError(
+            `Total bobot poin seluruh soal pada komponen ini (${totalSetelah}) tidak boleh melebihi bobot evaluasi komponen (${bobotEvaluasi})`
+        );
+    }
+};
+
+// ============================================================================
 // 1. CRUD SOAL (rubrik unit penilaian per komponen evaluasi)
 // ============================================================================
 
@@ -28,6 +55,8 @@ export const createSoal = async (rencanaEvaluasiId, payload, trxLuar) => {
     }
 
     const eksekusi = async (trx) => {
+        await validasiTotalBobotPoinKomponen(rencanaEvaluasiId, rencana.bobot, totalBobotPoin, null, trx);
+
         const soal = await Soal.create({
             siakRencanaEvaluasiId: rencanaEvaluasiId,
             parentSoalId: payload.parentSoalId || null,
@@ -101,8 +130,9 @@ export const updateSoal = async (soalId, payload) => {
     const skorMaksimal = payload.skorMaksimal !== undefined ? parseFloat(payload.skorMaksimal) : parseFloat(soal.skorMaksimal);
     const pemetaanCpmk = Array.isArray(payload.pemetaanCpmk) ? payload.pemetaanCpmk : null;
 
+    let totalBobotPoin = 0;
     if (pemetaanCpmk) {
-        const totalBobotPoin = pemetaanCpmk.reduce((sum, p) => sum + parseFloat(p.bobotPoin || 0), 0);
+        totalBobotPoin = pemetaanCpmk.reduce((sum, p) => sum + parseFloat(p.bobotPoin || 0), 0);
         if (totalBobotPoin > skorMaksimal + 0.01) {
             throw new CustomError.BadRequestError(
                 `Total bobot poin CPMK (${totalBobotPoin}) tidak boleh melebihi skor maksimal soal (${skorMaksimal})`
@@ -111,6 +141,11 @@ export const updateSoal = async (soalId, payload) => {
     }
 
     return await sequelize.transaction(async (trx) => {
+        if (pemetaanCpmk) {
+            const rencana = await RencanaEvaluasi.findByPk(soal.siakRencanaEvaluasiId, { transaction: trx });
+            await validasiTotalBobotPoinKomponen(soal.siakRencanaEvaluasiId, rencana.bobot, totalBobotPoin, soalId, trx);
+        }
+
         await soal.update({
             nomor: payload.nomor ?? soal.nomor,
             label: payload.label ?? soal.label,
