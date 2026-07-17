@@ -1,5 +1,6 @@
 import db from '../models/index.js'
 import { Op, Sequelize } from 'sequelize'
+import { BadRequestError, NotFoundError } from "../utils/custom-error.js";
 
 const {
     Dosen,
@@ -26,31 +27,39 @@ export const getWeeklyScheduleStudent = async (mahasiswaId) => {
 
     // 2. Fetch KRS and its details (Only for 'Disetujui' or 'Final' status if needed)
     const krsHeader = await KrsMahasiswa.findOne({
+        attributes: ['id', 'status'],
         where: {
             siakMahasiswaId: mahasiswaId,
-            siakPeriodeAkademikId: activePeriod.id
-            // status: 'Disetujui' // Optional: Uncomment if you only want approved schedules
+            siakPeriodeAkademikId: activePeriod.id,
+            status: 'Disetujui'
         },
         include: [{
+            attributes: ['id', 'siakKelasKuliahId'],
             model: RincianKrsMahasiswa,
             as: 'rincianKrsMahasiswa',
             include: [{
+                attributes: ['id', 'siakMataKuliahId', 'nama'],
                 model: KelasKuliah,
                 as: 'kelasKuliah',
                 include: [
-                    { model: MataKuliah, as: 'mataKuliah' },
+                    { attributes: ['id', 'kode', 'nama', 'totalSks'], model: MataKuliah, as: 'mataKuliah' },
                     {
+                        attributes: ['id', 'siakDosenId', 'siakRuanganId', 'hari', 'jamMulai', 'jamSelesai'],
                         model: JadwalKuliah,
                         as: 'jadwalKuliah',
                         include: [
-                            { model: Dosen, as: 'dosen' },
-                            { model: Ruangan, as: 'ruangan' }
+                            { attributes: ['id', 'nama'], model : Dosen, as: 'dosen' },
+                            { attributes: ['id', 'nama', 'ruangan'], model: Ruangan, as: 'ruangan' }
                         ]
                     }
                 ]
             }]
         }]
     });
+
+    if (krsHeader && krsHeader.status !== 'Disetujui') {
+        throw new BadRequestError('KRS belum disetujui');
+    }
 
     if (!krsHeader) {
         return { message: "Belum ada KRS untuk periode ini", schedule: {} };
@@ -100,6 +109,88 @@ export const getWeeklyScheduleStudent = async (mahasiswaId) => {
     };
 };
 
+export const getDailyScheduleStudent = async (mahasiswaId, periodeId, hari) => {
+    // 1. Get the Active Period
+    let activePeriod
+    if (periodeId !== undefined && periodeId !== '') {
+        activePeriod = await PeriodeAkademik.findByPk(periodeId)
+    } else {
+        activePeriod = await PeriodeAkademik.findOne({
+            where: { status: 'Aktif' },
+        });
+    }
+
+    if (!activePeriod) {
+        throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
+    }
+
+    // 2. Fetch KRS and its details (Only for 'Disetujui' or 'Final' status if needed)
+    const krsHeader = await KrsMahasiswa.findOne({
+        attributes: ['id', 'status'],
+        where: {
+            siakMahasiswaId: mahasiswaId,
+            siakPeriodeAkademikId: activePeriod.id,
+            status: 'Disetujui'
+        },
+        include: {
+            attributes: ['id', 'siakKelasKuliahId'],
+            model: RincianKrsMahasiswa,
+            as: 'rincianKrsMahasiswa',
+            include: {
+                attributes: ['id', 'siakMataKuliahId', 'nama'],
+                model: KelasKuliah,
+                as: 'kelasKuliah',
+                include: [
+                    { attributes: ['id', 'kode', 'nama', 'totalSks'], model: MataKuliah, as: 'mataKuliah' },
+                    {
+                        attributes: ['id', 'siakDosenId', 'siakRuanganId', 'hari', 'jamMulai', 'jamSelesai'],
+                        model: JadwalKuliah,
+                        as: 'jadwalKuliah',
+                        include: [
+                            { attributes: ['id', 'nama'], model : Dosen, as: 'dosen' },
+                            { attributes: ['id', 'nama', 'ruangan'], model: Ruangan, as: 'ruangan' }
+                        ]
+                    }
+                ]
+            }
+        }
+    });
+
+    if (!krsHeader) {
+        throw new NotFoundError('KRS tidak ditemukan');
+    }
+
+    if (krsHeader && krsHeader.status !== 'Disetujui') {
+        throw new BadRequestError('KRS belum disetujui');
+    }
+
+    const schedule = [];
+
+    krsHeader.rincianKrsMahasiswa.forEach(rincian => {
+        const kelas = rincian.kelasKuliah;
+        const mk = kelas.mataKuliah;
+
+        if (kelas.jadwalKuliah && kelas.jadwalKuliah.length > 0) {
+            kelas.jadwalKuliah.forEach(jadwal => {
+                schedule.push({
+                    id: jadwal.id,
+                    hari: jadwal.hari,
+                    jamMulai: jadwal.jamMulai,
+                    jamSelesai: jadwal.jamSelesai,
+                    namaMataKuliah: mk.nama,
+                    kode: mk.kode,
+                    kelas: kelas.nama,
+                    dosen: jadwal.dosen?.nama || 'N/A',
+                    ruangan: jadwal.ruangan?.nama || 'TBA',
+                    sks: mk.totalSks
+                })
+            })
+        }
+    })
+
+    return schedule
+}
+
 export const getWeeklyScheduleLecturer = async (dosenId) => {
     const activePeriod = await PeriodeAkademik.findOne({
         where: { status: 'Aktif' },
@@ -111,6 +202,7 @@ export const getWeeklyScheduleLecturer = async (dosenId) => {
 
     const jadwalKuliah = await JadwalKuliah.findAll({
         where: {
+            jenisPertemuan: 'Kuliah',
             siakDosenId: dosenId,
         },
         include: [
@@ -121,12 +213,22 @@ export const getWeeklyScheduleLecturer = async (dosenId) => {
                     siakPeriodeAkademikId: activePeriod.id,
                 },
                 include: [
-                    { model: MataKuliah, as: 'mataKuliah' },
+                    {
+                        attributes: ['id', 'kode', 'nama', 'totalSks'],
+                        model: MataKuliah,
+                        as: 'mataKuliah'
+                    },
                 ]
             },
             {
+                attributes: ['id', 'nama'],
                 model: Ruangan,
                 as: 'ruangan',
+            },
+            {
+                attributes: ['id', 'nama'],
+                model: Dosen,
+                as: 'dosen',
             }
         ]
     })
@@ -156,7 +258,8 @@ export const getWeeklyScheduleLecturer = async (dosenId) => {
             kode: mk?.kode || 'N/A',
             kelas: kelas?.nama || 'N/A',
             ruangan: jadwal.ruangan?.nama || 'TBA',
-            sks: mk?.totalSks || 0
+            sks: mk?.totalSks || 0,
+            dosen: jadwal.dosen?.nama || 'N/A',
         });
     });
 
@@ -164,6 +267,8 @@ export const getWeeklyScheduleLecturer = async (dosenId) => {
     days.forEach(day => {
         schedule[day].sort((a, b) => a.jamMulai.localeCompare(b.jamMulai));
     });
+
+    return schedule
 
     return {
         totalSks: totalSksTeaching,

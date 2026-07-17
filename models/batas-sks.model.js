@@ -31,6 +31,11 @@ export default (sequelize) => {
             batasSks: {
                 type: DataTypes.INTEGER,
                 field: 'batas_sks'
+            },
+            isDefault: {
+                type: DataTypes.BOOLEAN,
+                field: 'is_default',
+                defaultValue: false
             }
         },
         {

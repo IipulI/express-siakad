@@ -2,7 +2,7 @@ import * as KelasKuliahService from '../../services/kelas-kuliah.service.js';
 import ResponseBuilder from "../../utils/response.js";
 import {getPagingData} from "../../utils/pagination.js";
 
-export const findAll = async (req, res) => {
+export const findAll = async (req, res, next) => {
     const page = req.query.page ?? 1;
     const size = req.query.size ?? 10;
     const responseBuilder = new ResponseBuilder(res);
@@ -13,12 +13,21 @@ export const findAll = async (req, res) => {
         siakSistemKuliahId : req.query.siakSistemKuliahId,
         siakTahunKurikulumId: req.query.siakTahunKurikulumId,
         search: req.query.search,
+        npm: req.query.npm,
+        nip: req.query.nip,
+        nidn: req.query.nidn,
+        isActive: req.query.isActive,
     }
 
     try {
         const classes = await KelasKuliahService.findAll(page, size, filter);
 
-        const payload = getPagingData(classes, page, size);
+        let payload
+        if (classes.isPaginated === true) {
+            payload = getPagingData(classes, page, size);
+        } else {
+            payload = classes
+        }
 
         return responseBuilder
             .code(200)
@@ -26,10 +35,8 @@ export const findAll = async (req, res) => {
             .json(payload)
     }
     catch (error) {
-        return responseBuilder
-            .status('failure')
-            .code(500)
-            .message(error.message || "Kesalahan yang tidak terduga")
+        console.error(error);
+        next(error);
     }
 }
 
