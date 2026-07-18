@@ -199,6 +199,35 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
             { where: { id: krsId } }
         );
 
+        // Auto-kunci per-kelas -- pola identik Jalur A (hitungNilaiAkhir) &
+        // Jalur B (inputNilaiPerCpmk): begitu SEMUA mahasiswa di kelas ini sudah
+        // punya nilai_akhir (dari CBT), seluruh kelas otomatis dikunci bareng,
+        // supaya nilai kebuka di KHS/Transkrip (hasil-studi.service.js &
+        // transkrip.service.js sama-sama syarat status IN Dikunci/Lulus/Tidak
+        // Lulus). Sebelumnya jalur ini TIDAK PERNAH auto-kunci sama sekali --
+        // nilai bisa masuk penuh tapi mahasiswa gak pernah lihat di KHS sampai
+        // ada yang kunci manual.
+        const kelasId = rincian.siakKelasKuliahId;
+        if (kelasId) {
+            const [cekRows] = await sequelize.query(
+                `SELECT COUNT(*) AS total,
+                        SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
+                 FROM siak_rincian_krs_mahasiswa
+                 WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
+                { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+            );
+            if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+                await sequelize.query(
+                    `UPDATE siak_rincian_krs_mahasiswa
+                     SET status = 'Dikunci', updated_at = NOW()
+                     WHERE siak_kelas_kuliah_id = :kelasId
+                       AND (status IS NULL OR status NOT IN ('Dikunci', 'Lulus', 'Tidak Lulus'))
+                       AND deleted_at IS NULL`,
+                    { replacements: { kelasId } }
+                );
+            }
+        }
+
         hasil.push({ krsId, nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu });
     }
     return hasil;
