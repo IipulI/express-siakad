@@ -1,6 +1,6 @@
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
-import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen } from './penilaian.service.js';
+import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap } from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
@@ -225,6 +225,22 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
                        AND deleted_at IS NULL`,
                     { replacements: { kelasId } }
                 );
+
+                // Kelas ini baru saja lengkap & terkunci -- utk TIAP mahasiswanya, cek
+                // apa SEMUA kelas lain dia di periode yang sama JUGA sudah selesai; kalau
+                // iya, hitung & simpan HasilStudi (IPS/IPK) periode itu (lihat komentar
+                // lengkap di definisi updateHasilStudiJikaPeriodeLengkap).
+                const pesertaKelas = await sequelize.query(
+                    `SELECT km.siak_mahasiswa_id AS "mahasiswaId", kk.siak_periode_akademik_id AS "periodeId"
+                     FROM siak_rincian_krs_mahasiswa rkm
+                     JOIN siak_krs_mahasiswa km ON rkm.siak_krs_mahasiswa_id = km.id
+                     JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+                     WHERE rkm.siak_kelas_kuliah_id = :kelasId AND rkm.deleted_at IS NULL`,
+                    { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+                );
+                for (const p of pesertaKelas) {
+                    await updateHasilStudiJikaPeriodeLengkap(p.mahasiswaId, p.periodeId);
+                }
             }
         }
 

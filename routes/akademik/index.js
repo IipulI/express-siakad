@@ -53,6 +53,10 @@ import kaprodiRouter from './kaprodi_router.js';
 const router = Router();
 
 // --- PORTAL ---
+// PENTING: /mahasiswa/hasil-studi HARUS didaftar SEBELUM /mahasiswa -- kalau
+// kebalik, route /mahasiswa/:id (MahasiswaRouter) keburu nangkep duluan (nganggep
+// "hasil-studi" itu :id, error invalid UUID) sebelum sempat sampai ke HasilStudiRouter.
+router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
 router.use("/mahasiswa", MahasiswaRouter)
 // Todo : Dosen (pegawai)
 router.use('/pengumuman', PengumumanRouter)
@@ -116,8 +120,6 @@ router.use("/kebutuhan-khusus", KebutuhanKhususRouter);
 // --- PENGATURAN ---
 router.use("/tahun-ajaran", TahunAjaranRouter);
 router.use("/periode-akademik", PeriodeAkademikRouter);
-
-router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
 
 router.use("/template-evaluasi", TemplateEvaluasi)
 router.use("/grup-mk", GrupMk)
