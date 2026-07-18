@@ -1,5 +1,6 @@
 import models from "../models/index.js";
 import { Op } from 'sequelize';
+import { getCpmkColumnsForMataKuliah } from './cpmk.service.js';
 
 const {
     sequelize, PemetaanEvaluasiCpmk,
@@ -849,9 +850,18 @@ export const kunciNilaiSatuMahasiswa = async (rincianKrsId, action = 'kunci') =>
 const GRADE_LULUS = ['A', 'AB', 'B', 'BC', 'C', 'CD'];
 
 export const finalisasiNilaiKelas = async (kelasId) => {
+    const kelas = await KelasKuliah.findByPk(kelasId, { attributes: ['id', 'siakMataKuliahId'] });
+    if (!kelas) throw new Error('Kelas tidak ditemukan');
+
+    // Leaf-level CPMK/Sub-CPMK + target -- sumber sama persis dengan laporan
+    // monitoring (getLaporanCpmkPerMahasiswa), supaya "harus mengulang CPMK mana"
+    // di sini konsisten dengan yang ditampilkan di laporan.
+    const { columns: cpmkList } = await getCpmkColumnsForMataKuliah(kelas.siakMataKuliahId);
+
     const rincianList = await RincianKrsMahasiswa.findAll({
         where: { siak_kelas_kuliah_id: kelasId },
-        attributes: ['id', 'status', 'huruf_mutu', 'hurufMutu']
+        attributes: ['id', 'status', 'huruf_mutu', 'hurufMutu'],
+        include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
     });
 
     if (rincianList.length === 0) throw new Error('Tidak ada mahasiswa di kelas ini');
@@ -863,15 +873,45 @@ export const finalisasiNilaiKelas = async (kelasId) => {
 
     const yangBisaFinal = rincianList.filter(r => !STATUS_FINAL.includes(r.status));
 
+    const mahasiswaIds = [...new Set(yangBisaFinal.map(r => r.krsMahasiswa?.siakMahasiswaId).filter(Boolean))];
+    const semuaNilaiCpmk = await NilaiCpmkMahasiswa.findAll({
+        where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaIds },
+        include: [{ model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['kode'] }]
+    });
+
     let jumlahLulus = 0;
     let jumlahTidakLulus = 0;
+    const daftarPerluMengulangCpmk = [];
 
     for (const r of yangBisaFinal) {
         const grade = r.hurufMutu || r.huruf_mutu;
-        const isLulus = GRADE_LULUS.includes(grade);
+        const mahasiswaId = r.krsMahasiswa?.siakMahasiswaId;
+
+        // Cek tiap CPMK/Sub-CPMK terhadap target -- kalau ada yang di bawah target,
+        // mahasiswa WAJIB mengulang CPMK itu walau nilai akhir MK-nya sendiri sudah
+        // di atas passing grade (termasuk nilai akhir dari CBT/Jalur D, yang TIDAK
+        // disentuh sama sekali di sini -- huruf_mutu/nilai_akhir tetap murni dari
+        // sumbernya masing-masing, cuma status kelulusan MK yang dipengaruhi).
+        const nilaiMhs = semuaNilaiCpmk.filter(n => String(n.siakMahasiswaId) === String(mahasiswaId));
+        const cpmkGagal = [];
+        cpmkList.forEach(cpmk => {
+            const match = nilaiMhs.find(n =>
+                String(n.siakCapaianMataKuliahId) === String(cpmk.id) ||
+                String(n.capaianMataKuliah?.kode || '').toUpperCase() === String(cpmk.kode).toUpperCase()
+            );
+            if (match && parseFloat(match.nilai) < cpmk.target) {
+                cpmkGagal.push({ kode: cpmk.kode, nilai: parseFloat(match.nilai), target: cpmk.target });
+            }
+        });
+
+        const isLulus = GRADE_LULUS.includes(grade) && cpmkGagal.length === 0;
         await r.update({ status: isLulus ? 'Lulus' : 'Tidak Lulus' });
         if (isLulus) jumlahLulus++;
         else jumlahTidakLulus++;
+
+        if (cpmkGagal.length > 0) {
+            daftarPerluMengulangCpmk.push({ rincianKrsId: r.id, mahasiswaId, cpmkGagal });
+        }
     }
 
     return {
@@ -879,7 +919,9 @@ export const finalisasiNilaiKelas = async (kelasId) => {
         jumlahLulus,
         jumlahTidakLulus,
         jumlahSudahFinalSebelumnya: rincianList.length - yangBisaFinal.length,
+        daftarPerluMengulangCpmk,
         pesan: `Finalisasi selesai. ${jumlahLulus} lulus, ${jumlahTidakLulus} tidak lulus.`
+            + (daftarPerluMengulangCpmk.length > 0 ? ` ${daftarPerluMengulangCpmk.length} mahasiswa punya CPMK di bawah target, wajib mengulang.` : '')
     };
 };
 const getMetadataKelas = async (kelasId) => {
