@@ -44,9 +44,28 @@ const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 //    dialokasikan ke CPMK/Sub-CPMK tsb (kalau 1 unit = 1 CPMK, bobotPoin = skorMaksimal).
 //
 // TIDAK ADA nilaiAkhir di sini -- itu urusan simpanNilaiAkhirDariCbt terpisah.
+// Kata kunci komponen non-soal (Kehadiran/Partisipasi/dst) -- CBT tidak punya data
+// ini sama sekali (arahan Pak Fitrah: presensi diinput manual langsung di NL-SIAK),
+// jadi breakdown soal TIDAK BOLEH masuk ke komponen jenis ini. metodeEvaluasi &
+// jenisEvaluasi itu teks bebas (tidak ada enum baku -- dibuktikan data produksi
+// pakai 'KEHADIRAN' & 'PARTISIPASI' utk hal yang sama), jadi deteksinya best-effort
+// kata kunci case-insensitive, bukan exact-match.
+const KATA_KUNCI_KOMPONEN_NON_SOAL = ['kehadiran', 'partisipasi', 'presensi', 'keaktifan', 'absen'];
+const isKomponenNonSoal = (rencanaEvaluasi) => {
+    const teks = `${rencanaEvaluasi.metodeEvaluasi || ''} ${rencanaEvaluasi.jenisEvaluasi || ''}`.toLowerCase();
+    return KATA_KUNCI_KOMPONEN_NON_SOAL.some(kw => teks.includes(kw));
+};
+
 export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasiswa) => {
     const rencanaEvaluasi = await RencanaEvaluasi.findByPk(rencanaEvaluasiId);
     if (!rencanaEvaluasi) throw new CustomError.NotFoundError("Komponen evaluasi tidak ditemukan");
+    if (isKomponenNonSoal(rencanaEvaluasi)) {
+        throw new CustomError.BadRequestError(
+            `Komponen "${rencanaEvaluasi.metodeEvaluasi} (${rencanaEvaluasi.jenisEvaluasi})" terdeteksi sebagai komponen non-soal `
+            + `(Kehadiran/Partisipasi/dst) -- CBT tidak punya data ini, tidak boleh dikirim breakdown soal ke sini. `
+            + `Input manual langsung di NL-SIAK, bukan lewat /cbt/komponen/:id/nilai.`
+        );
+    }
 
     const hasil = [];
     for (const item of daftarMahasiswa) {
