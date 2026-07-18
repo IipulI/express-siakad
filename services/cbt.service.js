@@ -67,6 +67,19 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
         // 1. Reduksi breakdown (per unit/soal, ephemeral) jadi agregat per cpmkId
         //    UNTUK KOMPONEN INI SAJA -- rumus identik hitungDanOverrideNilaiCpmkBottomUp
         //    di soal.service.js (Jalur C), cuma sumbernya array dari request, bukan query DB.
+        // Skor diperoleh tidak boleh melebihi skor maksimal unit itu sendiri -- data
+        // seperti ini hampir pasti salah kirim dari CBT (skor kebalik/typo), dan kalau
+        // dibiarkan bisa bikin Nilai CPMK di atas 100.
+        (breakdown || []).forEach((unit, idx) => {
+            const skor = parseFloat(unit.skorDiperoleh || 0);
+            const maksUnit = parseFloat(unit.skorMaksimal || 0);
+            if (skor > maksUnit + 0.01) {
+                throw new CustomError.BadRequestError(
+                    `Breakdown (krsId ${krsId}) unit ke-${idx + 1}: skorDiperoleh (${skor}) tidak boleh melebihi skorMaksimal (${maksUnit})`
+                );
+            }
+        });
+
         const agregatKomponenIni = {}; // { cpmkId: { skorTerbobot, totalBobot } }
         (breakdown || []).forEach(unit => {
             const skor = parseFloat(unit.skorDiperoleh || 0);
