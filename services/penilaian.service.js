@@ -1,12 +1,13 @@
 import models from "../models/index.js";
 import { Op } from 'sequelize';
+import { getCpmkColumnsForMataKuliah } from './cpmk.service.js';
 
 const {
     sequelize, PemetaanEvaluasiCpmk,
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
     ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
-    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi, NilaiSubcpmkEvaluasiMahasiswa
+    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi, NilaiSubcpmkEvaluasiMahasiswa, HasilStudi
 } = models;
 
 export const DEFAULT_SKALA = [
@@ -842,6 +843,92 @@ export const kunciNilaiSatuMahasiswa = async (rincianKrsId, action = 'kunci') =>
 };
 
 // ====================================================================
+// AUTO-GENERATE HasilStudi (IPS/IPK per periode) -- SEBELUM INI, tidak ada
+// satupun kode yang menulis ke tabel siak_hasil_studi (cuma dibaca di
+// KHS/Transkrip/Dashboard/dst) -- 323 baris yang ada di produksi itu murni
+// data seed lama (semua created_at sama persis), gak nyambung ke periode
+// aktif manapun. Akibatnya walau status RincianKrsMahasiswa sudah Dikunci,
+// KHS periode itu TETAP kosong karena baris ringkasannya sendiri gak ada.
+//
+// Dipanggil tiap kali 1 kelas selesai auto-kunci (lihat cbt.service.js &
+// hitungNilaiAkhir/inputNilaiPerCpmk) -- utk TIAP mahasiswa di kelas itu, cek:
+// apa SEMUA kelas lain mahasiswa itu di periode yang SAMA juga sudah
+// Dikunci/Lulus/Tidak Lulus? Kalau iya (baru compute-able), hitung IPS
+// (rata-rata angkaMutu tertimbang SKS, se-periode itu SAJA) dan IPK (rata-rata
+// tertimbang SKS, SEMUA periode yang sudah final -- dihitung ulang dari
+// RincianKrsMahasiswa asli, BUKAN dari HasilStudi seed lama yang gak akurat),
+// lalu upsert 1 baris HasilStudi.
+// ====================================================================
+const STATUS_LOCKED_ATAU_FINAL = ['Dikunci', 'Lulus', 'Tidak Lulus'];
+const GRADE_LULUS_SKS = ['A', 'AB', 'B', 'BC', 'C', 'CD'];
+
+export const updateHasilStudiJikaPeriodeLengkap = async (mahasiswaId, periodeId) => {
+    if (!mahasiswaId || !periodeId) return;
+
+    const krsMhs = await KrsMahasiswa.findOne({
+        where: { siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: periodeId }
+    });
+    if (!krsMhs) return;
+
+    // Semua kelas yang diambil mahasiswa ini DI PERIODE INI SAJA
+    const rincianPeriodeIni = await sequelize.query(`
+        SELECT rkm.status, rkm.angka_mutu AS "angkaMutu", rkm.huruf_mutu AS "hurufMutu", mk.total_sks AS "totalSks"
+        FROM siak_rincian_krs_mahasiswa rkm
+        JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+        JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
+        WHERE rkm.siak_krs_mahasiswa_id = :krsMhsId AND rkm.deleted_at IS NULL
+    `, { replacements: { krsMhsId: krsMhs.id }, type: sequelize.QueryTypes.SELECT });
+
+    if (rincianPeriodeIni.length === 0) return;
+
+    // Belum semua kelas di periode ini Dikunci/final -> belum bisa dihitung, keluar diam-diam
+    const semuaLengkap = rincianPeriodeIni.every(r => STATUS_LOCKED_ATAU_FINAL.includes(r.status));
+    if (!semuaLengkap) return;
+
+    let totalBobotSemester = 0, totalSksSemester = 0, sksLulusSemester = 0;
+    rincianPeriodeIni.forEach(r => {
+        const sks = parseInt(r.totalSks || 0);
+        totalSksSemester += sks;
+        totalBobotSemester += parseFloat(r.angkaMutu || 0) * sks;
+        if (GRADE_LULUS_SKS.includes(r.hurufMutu)) sksLulusSemester += sks;
+    });
+    const ips = totalSksSemester > 0 ? Math.round((totalBobotSemester / totalSksSemester) * 100) / 100 : 0;
+
+    // IPK kumulatif: dihitung ULANG dari SEMUA RincianKrsMahasiswa mahasiswa ini
+    // yang sudah final di SEMUA periode (bukan lanjutin dari HasilStudi lama --
+    // supaya konsisten 1 sumber data, gak campur sama seed dummy yang gak akurat).
+    const rincianSemuaPeriode = await sequelize.query(`
+        SELECT rkm.angka_mutu AS "angkaMutu", mk.total_sks AS "totalSks"
+        FROM siak_rincian_krs_mahasiswa rkm
+        JOIN siak_krs_mahasiswa km ON rkm.siak_krs_mahasiswa_id = km.id
+        JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+        JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
+        WHERE km.siak_mahasiswa_id = :mahasiswaId
+          AND rkm.status IN ('Dikunci', 'Lulus', 'Tidak Lulus')
+          AND rkm.deleted_at IS NULL AND km.deleted_at IS NULL
+    `, { replacements: { mahasiswaId }, type: sequelize.QueryTypes.SELECT });
+
+    let totalBobotKumulatif = 0, totalSksKumulatif = 0;
+    rincianSemuaPeriode.forEach(r => {
+        const sks = parseInt(r.totalSks || 0);
+        totalSksKumulatif += sks;
+        totalBobotKumulatif += parseFloat(r.angkaMutu || 0) * sks;
+    });
+    const ipk = totalSksKumulatif > 0 ? Math.round((totalBobotKumulatif / totalSksKumulatif) * 100) / 100 : 0;
+
+    const existing = await HasilStudi.findOne({
+        where: { siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: periodeId }
+    });
+    const payload = {
+        siakMahasiswaId: mahasiswaId, siakPeriodeAkademikId: periodeId,
+        semester: krsMhs.semester, ips, ipk,
+        sksDiambil: totalSksSemester, sksLulus: sksLulusSemester
+    };
+    if (existing) await existing.update(payload);
+    else await HasilStudi.create(payload);
+};
+
+// ====================================================================
 // FINALISASI NILAI KELAS (Permanent Lock setelah masa sanggah habis)
 // Koordinator MK mengeksekusi ini setelah masa sanggah berakhir.
 // Status berubah dari 'Dikunci' → 'Lulus' / 'Tidak Lulus' (permanen)
@@ -849,9 +936,18 @@ export const kunciNilaiSatuMahasiswa = async (rincianKrsId, action = 'kunci') =>
 const GRADE_LULUS = ['A', 'AB', 'B', 'BC', 'C', 'CD'];
 
 export const finalisasiNilaiKelas = async (kelasId) => {
+    const kelas = await KelasKuliah.findByPk(kelasId, { attributes: ['id', 'siakMataKuliahId'] });
+    if (!kelas) throw new Error('Kelas tidak ditemukan');
+
+    // Leaf-level CPMK/Sub-CPMK + target -- sumber sama persis dengan laporan
+    // monitoring (getLaporanCpmkPerMahasiswa), supaya "harus mengulang CPMK mana"
+    // di sini konsisten dengan yang ditampilkan di laporan.
+    const { columns: cpmkList } = await getCpmkColumnsForMataKuliah(kelas.siakMataKuliahId);
+
     const rincianList = await RincianKrsMahasiswa.findAll({
         where: { siak_kelas_kuliah_id: kelasId },
-        attributes: ['id', 'status', 'huruf_mutu', 'hurufMutu']
+        attributes: ['id', 'status', 'huruf_mutu', 'hurufMutu'],
+        include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
     });
 
     if (rincianList.length === 0) throw new Error('Tidak ada mahasiswa di kelas ini');
@@ -863,15 +959,45 @@ export const finalisasiNilaiKelas = async (kelasId) => {
 
     const yangBisaFinal = rincianList.filter(r => !STATUS_FINAL.includes(r.status));
 
+    const mahasiswaIds = [...new Set(yangBisaFinal.map(r => r.krsMahasiswa?.siakMahasiswaId).filter(Boolean))];
+    const semuaNilaiCpmk = await NilaiCpmkMahasiswa.findAll({
+        where: { siakKelasKuliahId: kelasId, siakMahasiswaId: mahasiswaIds },
+        include: [{ model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['kode'] }]
+    });
+
     let jumlahLulus = 0;
     let jumlahTidakLulus = 0;
+    const daftarPerluMengulangCpmk = [];
 
     for (const r of yangBisaFinal) {
         const grade = r.hurufMutu || r.huruf_mutu;
-        const isLulus = GRADE_LULUS.includes(grade);
+        const mahasiswaId = r.krsMahasiswa?.siakMahasiswaId;
+
+        // Cek tiap CPMK/Sub-CPMK terhadap target -- kalau ada yang di bawah target,
+        // mahasiswa WAJIB mengulang CPMK itu walau nilai akhir MK-nya sendiri sudah
+        // di atas passing grade (termasuk nilai akhir dari CBT/Jalur D, yang TIDAK
+        // disentuh sama sekali di sini -- huruf_mutu/nilai_akhir tetap murni dari
+        // sumbernya masing-masing, cuma status kelulusan MK yang dipengaruhi).
+        const nilaiMhs = semuaNilaiCpmk.filter(n => String(n.siakMahasiswaId) === String(mahasiswaId));
+        const cpmkGagal = [];
+        cpmkList.forEach(cpmk => {
+            const match = nilaiMhs.find(n =>
+                String(n.siakCapaianMataKuliahId) === String(cpmk.id) ||
+                String(n.capaianMataKuliah?.kode || '').toUpperCase() === String(cpmk.kode).toUpperCase()
+            );
+            if (match && parseFloat(match.nilai) < cpmk.target) {
+                cpmkGagal.push({ kode: cpmk.kode, nilai: parseFloat(match.nilai), target: cpmk.target });
+            }
+        });
+
+        const isLulus = GRADE_LULUS.includes(grade) && cpmkGagal.length === 0;
         await r.update({ status: isLulus ? 'Lulus' : 'Tidak Lulus' });
         if (isLulus) jumlahLulus++;
         else jumlahTidakLulus++;
+
+        if (cpmkGagal.length > 0) {
+            daftarPerluMengulangCpmk.push({ rincianKrsId: r.id, mahasiswaId, cpmkGagal });
+        }
     }
 
     return {
@@ -879,7 +1005,9 @@ export const finalisasiNilaiKelas = async (kelasId) => {
         jumlahLulus,
         jumlahTidakLulus,
         jumlahSudahFinalSebelumnya: rincianList.length - yangBisaFinal.length,
+        daftarPerluMengulangCpmk,
         pesan: `Finalisasi selesai. ${jumlahLulus} lulus, ${jumlahTidakLulus} tidak lulus.`
+            + (daftarPerluMengulangCpmk.length > 0 ? ` ${daftarPerluMengulangCpmk.length} mahasiswa punya CPMK di bawah target, wajib mengulang.` : '')
     };
 };
 const getMetadataKelas = async (kelasId) => {
@@ -970,6 +1098,21 @@ export const inputNilaiPerCpmk = async (krsId, nilaiCpmkList) => {
     });
     if (!rincian) throw Object.assign(new Error('Data rincian KRS tidak ditemukan'), { statusCode: 404 });
     if (STATUS_FINAL.includes(rincian.status)) throw Object.assign(new Error('Nilai sudah difinalisasi, tidak dapat diubah'), { statusCode: 403 });
+
+    // GUARD Jalur D: kalau mata kuliah ini sudah punya data breakdown dari CBT (sumber='CBT'),
+    // TOLAK input manual per CPMK -- supaya tidak diam-diam menimpa nilai_akhir & NilaiCpmkMahasiswa
+    // yang sudah dihitung/disinkron dari CBT (lihat guard yang sama di hitungNilaiAkhir).
+    const jalurDCbt = await sequelize.query(
+        `SELECT 1 FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+         WHERE siak_rincian_krs_mahasiswa_id = :krsId AND sumber = 'CBT' AND deleted_at IS NULL LIMIT 1`,
+        { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (jalurDCbt.length > 0) {
+        throw Object.assign(
+            new Error('Nilai mata kuliah ini dikelola dari sistem CBT eksternal (Jalur D), tidak dapat diinput manual per CPMK'),
+            { statusCode: 403 }
+        );
+    }
 
     const kelasId = rincian.siakKelasKuliahId;
     const mahasiswaId = rincian.krsMahasiswa?.siakMahasiswaId;

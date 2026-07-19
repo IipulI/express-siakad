@@ -3320,9 +3320,13 @@ export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
 
         // ── HEADER ROW (2 baris tinggi) ──
         const hy = doc.y;
-        const hh = 28;
-        const halfHy = hy + 14;
         const hasSubCpmk = !!data.hasSubCpmk;
+        // Kolom Sub-CPMK bisa banyak & jadi sempit (mis. 1 MK dgn 9 Sub-CPMK) --
+        // kode kolom kayak "Sub-CPMK0331" gampang kepotong/ke-clip di kolom sempit.
+        // Tinggi baris header dibikin adaptif (lebih tinggi kalau kolomnya sempit)
+        // sebagai jaring pengaman kalau teksnya masih perlu wrap 2 baris.
+        const hh = cpmkW < 35 ? 34 : 28;
+        const halfHy = hy + (cpmkW < 35 ? 16 : 14);
 
         doc.save().rect(boxX, hy, boxW, hh).fill('#0c4781').restore();
         doc.save().lineWidth(0.5).strokeColor('#aaaaaa')
@@ -3369,10 +3373,16 @@ export const exportPdfLaporanCpmkPerMahasiswa = async (req, res, next) => {
             doc.text('Nilai CPMK', cpmkStartX, hy + 4, { width: cpmkArea, align: 'center' });
         }
 
-        // Baris bawah: kode kolom (Sub-CPMK jika ada, atau CPMK)
-        doc.fontSize(7);
+        // Baris bawah: kode kolom (Sub-CPMK jika ada, atau CPMK) -- prefix
+        // "Sub-CPMK"/"Sub CPMK" dipangkas (kode CPMK induknya sudah kelihatan di
+        // baris atas, jadi gak perlu diulang), dan font mengecil otomatis kalau
+        // kolomnya sempit -- dua-duanya supaya teks gak kepotong/ke-clip.
+        const fontKode = cpmkW < 25 ? 5.5 : (cpmkW < 35 ? 6 : 7);
+        doc.fontSize(fontKode);
         data.daftarCpmk.forEach((c, i) => {
-            doc.text(c.kode, cpmkStartX + (i * cpmkW), halfHy + 4, { width: cpmkW, align: 'center' });
+            const kodeAsli = String(c.kode || '');
+            const kodeRingkas = hasSubCpmk ? (kodeAsli.replace(/^sub[\s-]*cpmk/i, '').trim() || kodeAsli) : kodeAsli;
+            doc.text(kodeRingkas, cpmkStartX + (i * cpmkW), halfHy + (cpmkW < 35 ? 5 : 4), { width: cpmkW, align: 'center' });
         });
 
         let rowY = hy + hh;

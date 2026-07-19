@@ -1,6 +1,6 @@
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
-import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen } from './penilaian.service.js';
+import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap } from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
@@ -44,9 +44,28 @@ const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 //    dialokasikan ke CPMK/Sub-CPMK tsb (kalau 1 unit = 1 CPMK, bobotPoin = skorMaksimal).
 //
 // TIDAK ADA nilaiAkhir di sini -- itu urusan simpanNilaiAkhirDariCbt terpisah.
+// Kata kunci komponen non-soal (Kehadiran/Partisipasi/dst) -- CBT tidak punya data
+// ini sama sekali (arahan Pak Fitrah: presensi diinput manual langsung di NL-SIAK),
+// jadi breakdown soal TIDAK BOLEH masuk ke komponen jenis ini. metodeEvaluasi &
+// jenisEvaluasi itu teks bebas (tidak ada enum baku -- dibuktikan data produksi
+// pakai 'KEHADIRAN' & 'PARTISIPASI' utk hal yang sama), jadi deteksinya best-effort
+// kata kunci case-insensitive, bukan exact-match.
+const KATA_KUNCI_KOMPONEN_NON_SOAL = ['kehadiran', 'partisipasi', 'presensi', 'keaktifan', 'absen'];
+const isKomponenNonSoal = (rencanaEvaluasi) => {
+    const teks = `${rencanaEvaluasi.metodeEvaluasi || ''} ${rencanaEvaluasi.jenisEvaluasi || ''}`.toLowerCase();
+    return KATA_KUNCI_KOMPONEN_NON_SOAL.some(kw => teks.includes(kw));
+};
+
 export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasiswa) => {
     const rencanaEvaluasi = await RencanaEvaluasi.findByPk(rencanaEvaluasiId);
     if (!rencanaEvaluasi) throw new CustomError.NotFoundError("Komponen evaluasi tidak ditemukan");
+    if (isKomponenNonSoal(rencanaEvaluasi)) {
+        throw new CustomError.BadRequestError(
+            `Komponen "${rencanaEvaluasi.metodeEvaluasi} (${rencanaEvaluasi.jenisEvaluasi})" terdeteksi sebagai komponen non-soal `
+            + `(Kehadiran/Partisipasi/dst) -- CBT tidak punya data ini, tidak boleh dikirim breakdown soal ke sini. `
+            + `Input manual langsung di NL-SIAK, bukan lewat /cbt/komponen/:id/nilai.`
+        );
+    }
 
     const hasil = [];
     for (const item of daftarMahasiswa) {
@@ -67,6 +86,19 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
         // 1. Reduksi breakdown (per unit/soal, ephemeral) jadi agregat per cpmkId
         //    UNTUK KOMPONEN INI SAJA -- rumus identik hitungDanOverrideNilaiCpmkBottomUp
         //    di soal.service.js (Jalur C), cuma sumbernya array dari request, bukan query DB.
+        // Skor diperoleh tidak boleh melebihi skor maksimal unit itu sendiri -- data
+        // seperti ini hampir pasti salah kirim dari CBT (skor kebalik/typo), dan kalau
+        // dibiarkan bisa bikin Nilai CPMK di atas 100.
+        (breakdown || []).forEach((unit, idx) => {
+            const skor = parseFloat(unit.skorDiperoleh || 0);
+            const maksUnit = parseFloat(unit.skorMaksimal || 0);
+            if (skor > maksUnit + 0.01) {
+                throw new CustomError.BadRequestError(
+                    `Breakdown (krsId ${krsId}) unit ke-${idx + 1}: skorDiperoleh (${skor}) tidak boleh melebihi skorMaksimal (${maksUnit})`
+                );
+            }
+        });
+
         const agregatKomponenIni = {}; // { cpmkId: { skorTerbobot, totalBobot } }
         (breakdown || []).forEach(unit => {
             const skor = parseFloat(unit.skorDiperoleh || 0);
@@ -80,6 +112,29 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
                 agregatKomponenIni[p.cpmkId].totalBobot += bobotPoin;
             });
         });
+
+        // 1.5. Kalau breakdown dikirim tapi SEMUA unit ke-skip (bobotPoin <= 0, skorMaksimal <= 0,
+        //      atau cpmkId kosong), agregatKomponenIni bakal kosong -- ini hampir pasti data yang
+        //      belum bener dari CBT (mis. bobotPoin lupa diisi/ke-default 0), jadi TOLAK daripada
+        //      diam-diam nyimpen kosong.
+        if ((breakdown || []).length > 0 && Object.keys(agregatKomponenIni).length === 0) {
+            throw new CustomError.BadRequestError(
+                `Breakdown (krsId ${krsId}) dikirim tapi tidak ada satupun unit yang valid -- cek bobotPoin (harus > 0), skorMaksimal (harus > 0), dan cpmkId tiap unit`
+            );
+        }
+
+        // 1.6. Total bobot poin (lintas semua CPMK) dari breakdown mahasiswa ini TIDAK BOLEH
+        //      melebihi bobot evaluasi komponen ini (%) -- aturan yang sama dengan Jalur C
+        //      (lihat validasiTotalBobotPoinKomponen di soal.service.js), supaya bobot poin
+        //      yang dikirim CBT tetap konsisten dengan rancangan RPS, bukan angka sembarangan.
+        const totalBobotPoinKiriman = Object.values(agregatKomponenIni)
+            .reduce((sum, agg) => sum + agg.totalBobot, 0);
+        const bobotEvaluasi = parseFloat(rencanaEvaluasi.bobot || 0);
+        if (totalBobotPoinKiriman > bobotEvaluasi + 0.01) {
+            throw new CustomError.BadRequestError(
+                `Total bobot poin breakdown (krsId ${krsId}) adalah ${totalBobotPoinKiriman}, tidak boleh melebihi bobot evaluasi komponen ini (${bobotEvaluasi})`
+            );
+        }
 
         // 2. Wipe & replace hasil agregat komponen ini -- resend dari CBT (mis. dosen
         //    minta koreksi ulang) otomatis MENGGANTIKAN data lama, bukan menumpuk.
@@ -143,6 +198,51 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
             { nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu },
             { where: { id: krsId } }
         );
+
+        // Auto-kunci per-kelas -- pola identik Jalur A (hitungNilaiAkhir) &
+        // Jalur B (inputNilaiPerCpmk): begitu SEMUA mahasiswa di kelas ini sudah
+        // punya nilai_akhir (dari CBT), seluruh kelas otomatis dikunci bareng,
+        // supaya nilai kebuka di KHS/Transkrip (hasil-studi.service.js &
+        // transkrip.service.js sama-sama syarat status IN Dikunci/Lulus/Tidak
+        // Lulus). Sebelumnya jalur ini TIDAK PERNAH auto-kunci sama sekali --
+        // nilai bisa masuk penuh tapi mahasiswa gak pernah lihat di KHS sampai
+        // ada yang kunci manual.
+        const kelasId = rincian.siakKelasKuliahId;
+        if (kelasId) {
+            const [cekRows] = await sequelize.query(
+                `SELECT COUNT(*) AS total,
+                        SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
+                 FROM siak_rincian_krs_mahasiswa
+                 WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
+                { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+            );
+            if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+                await sequelize.query(
+                    `UPDATE siak_rincian_krs_mahasiswa
+                     SET status = 'Dikunci', updated_at = NOW()
+                     WHERE siak_kelas_kuliah_id = :kelasId
+                       AND (status IS NULL OR status NOT IN ('Dikunci', 'Lulus', 'Tidak Lulus'))
+                       AND deleted_at IS NULL`,
+                    { replacements: { kelasId } }
+                );
+
+                // Kelas ini baru saja lengkap & terkunci -- utk TIAP mahasiswanya, cek
+                // apa SEMUA kelas lain dia di periode yang sama JUGA sudah selesai; kalau
+                // iya, hitung & simpan HasilStudi (IPS/IPK) periode itu (lihat komentar
+                // lengkap di definisi updateHasilStudiJikaPeriodeLengkap).
+                const pesertaKelas = await sequelize.query(
+                    `SELECT km.siak_mahasiswa_id AS "mahasiswaId", kk.siak_periode_akademik_id AS "periodeId"
+                     FROM siak_rincian_krs_mahasiswa rkm
+                     JOIN siak_krs_mahasiswa km ON rkm.siak_krs_mahasiswa_id = km.id
+                     JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+                     WHERE rkm.siak_kelas_kuliah_id = :kelasId AND rkm.deleted_at IS NULL`,
+                    { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+                );
+                for (const p of pesertaKelas) {
+                    await updateHasilStudiJikaPeriodeLengkap(p.mahasiswaId, p.periodeId);
+                }
+            }
+        }
 
         hasil.push({ krsId, nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu });
     }
