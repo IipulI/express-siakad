@@ -7,8 +7,16 @@ export const findAll = async (req, res) => {
     const size = req.query.size ? parseInt(req.query.size) : null;
     const responseBuilder = new ResponseBuilder(res);
 
+    const filter = {
+        tahunKurikulumId: req.query.tahunKurikulumId,
+        programStudiId: req.query.programStudiId,
+        search: req.query.search,
+        order: req.query.order,
+        nip: req.query.nip,
+    }
+
     try {
-        const data = await MataKuliahService.findAll(page, size, req.query.search, undefined, req.query.tahunKurikulumId, req.query.programStudiId);
+        const data = await MataKuliahService.findAll(page, size, filter);
 
         let payload;
         if (data.isPaginated === true) {

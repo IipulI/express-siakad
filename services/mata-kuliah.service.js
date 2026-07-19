@@ -8,6 +8,10 @@ import { NotFoundError } from "../utils/custom-error.js";
 const {
     sequelize,
     ProgramStudi,
+    KelasKuliah,
+    JadwalKuliah,
+    Dosen,
+    PeriodeAkademik,
     MataKuliah,
     TahunKurikulum,
 } = models;
@@ -148,8 +152,44 @@ export const getDetailMataKuliahObe = async (id) => {
 // =========================================================
 // 3. FIND ALL (Bawaan)
 // =========================================================
-export const findAll = async (page, size, search, order, tahunKurikulumId, siakProgramStudiId) => {
+export const findAll = async (page, size, filter) => {
     const isPaginated = page !== null && size !== null;
+    let dosenInclude = {}
+
+    if (filter.nip || filter.nidn || filter.nuptk) {
+        const orConditions = [];
+        if (filter.nip) orConditions.push({ nip: filter.nip });
+        if (filter.nidn) orConditions.push({ nidn: filter.nidn });
+        if (filter.nuptk) orConditions.push({ nuptk: filter.nuptk });
+
+        const dosen = await Dosen.findOne({
+            where: {
+                [Op.or]: orConditions
+            }
+        });
+
+        const activePeriod = await PeriodeAkademik.findOne({
+            attributes: ['id'],
+            where: {
+                status: 'Aktif'
+            }
+        })
+
+        console.log(activePeriod)
+
+        dosenInclude = {
+            attributes: ['id', 'siakMataKuliahId'],
+            model: KelasKuliah,
+            as: 'kelasKuliah',
+            where: { siakPeriodeAkademikId: activePeriod.id },
+            include: {
+                attributes: ['id', 'siakKelasKuliahId', 'siakDosenId'],
+                model: JadwalKuliah,
+                as: 'jadwalKuliah',
+                where: { siakDosenId: dosen.id },
+            }
+        }
+    }
 
     const queryBuilder = {
         attributes: {
@@ -171,14 +211,18 @@ export const findAll = async (page, size, search, order, tahunKurikulumId, siakP
         order: [['id', 'DESC']],
     }
 
-    if (search) {
+    if (Object.keys(dosenInclude).length > 0) {
+        queryBuilder.include.push(dosenInclude);
+    }
+
+    if (filter.search) {
         queryBuilder.where[Op.or] = [
-            { nama: { [Op.iLike]: `%${search}%` } },
-            { kode: { [Op.iLike]: `%${search}%` } }
+            { nama: { [Op.iLike]: `%${filter.search}%` } },
+            { kode: { [Op.iLike]: `%${filter.search}%` } }
         ];
     }
-    if (tahunKurikulumId) queryBuilder.where.siakTahunKurikulumId = tahunKurikulumId;
-    if (siakProgramStudiId) queryBuilder.where.siakProgramStudiId = siakProgramStudiId;
+    if (filter.tahunKurikulumId) queryBuilder.where.siakTahunKurikulumId = filter.tahunKurikulumId;
+    if (filter.siakProgramStudiId) queryBuilder.where.siakProgramStudiId = filter.siakProgramStudiId;
 
     if (isPaginated) {
         const { limit, offset } = getPagination(page, size);
