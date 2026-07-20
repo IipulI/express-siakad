@@ -706,6 +706,32 @@ export const getPesertaKelasList = async (kelasId) => {
                 .localeCompare(b.krsMahasiswa?.mahasiswa?.npm || '')
         );
 
+        // 5b. Nilai per komponen versi JALUR D -- NilaiEvaluasiMahasiswa (dipakai
+        // di atas) cuma keisi dari input manual (Jalur A/Kehadiran), breakdown CBT
+        // TIDAK PERNAH nulis ke situ (nyimpennya di ledger siak_nilai_subcpmk_evaluasi_mahasiswa,
+        // per Sub-CPMK, bukan per komponen). Supaya UTS/UAS/Tugas dari Jalur D juga
+        // kelihatan di layar ini (bukan cuma null), hitung representasi "nilai
+        // komponen" dari ledger: Σ skorTerbobot ÷ Σ totalBobot × 100 -- rumus sama
+        // persis dengan yang dipakai buat Nilai Sub-CPMK, cuma diagregasi per
+        // komponen (rencanaEvaluasiId) bukan per Sub-CPMK.
+        const krsIdList = pesertaUnik.map(item => item.id);
+        const jalurDPerKomponen = {}; // { krsId: { rencanaEvaluasiId: nilai } }
+        if (krsIdList.length > 0) {
+            const ledgerAgg = await sequelize.query(`
+                SELECT siak_rincian_krs_mahasiswa_id AS "krsId", siak_rencana_evaluasi_id AS "rencanaEvaluasiId",
+                       SUM(skor_terbobot) AS "totalW", SUM(total_bobot) AS "totalT"
+                FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+                WHERE siak_rincian_krs_mahasiswa_id IN (:krsIdList) AND deleted_at IS NULL
+                GROUP BY siak_rincian_krs_mahasiswa_id, siak_rencana_evaluasi_id
+            `, { replacements: { krsIdList }, type: sequelize.QueryTypes.SELECT });
+            ledgerAgg.forEach(row => {
+                const t = parseFloat(row.totalT || 0);
+                if (t <= 0) return;
+                if (!jalurDPerKomponen[row.krsId]) jalurDPerKomponen[row.krsId] = {};
+                jalurDPerKomponen[row.krsId][row.rencanaEvaluasiId] = Math.round((parseFloat(row.totalW || 0) / t) * 10000) / 100;
+            });
+        }
+
         // 6. Build tabel
         let no = 1;
         const tabel = pesertaUnik.map(item => {
@@ -727,10 +753,13 @@ export const getPesertaKelasList = async (kelasId) => {
                 }
             });
 
-            // Komponen belum diinput -> null (tampil kosong)
+            // Komponen belum diinput lewat Jalur A/manual -> coba isi dari ledger
+            // Jalur D dulu (kalau ada), baru null kalau dua-duanya kosong.
+            const ledgerMhsIni = jalurDPerKomponen[item.id] || {};
             komposisiList.forEach(k => {
                 const label = (k.metodeEvaluasi || '-').toUpperCase();
-                if (!(label in nilaiPerKomponen)) nilaiPerKomponen[label] = null;
+                if (label in nilaiPerKomponen) return;
+                nilaiPerKomponen[label] = (k.id in ledgerMhsIni) ? ledgerMhsIni[k.id] : null;
             });
 
             nilaiAkhirHitung = Math.round(nilaiAkhirHitung * 100) / 100;
