@@ -3,29 +3,26 @@ import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
 
-export const getTranskrip = async (req, res) => {
-  const responseBuilder = new ResponseBuilder(res);
+export const getTranskrip = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res);
 
-  const user = req.user;
+    const user = req.user;
 
-  const mahasiswa = user.mahasiswa;
+    const mahasiswa = user.mahasiswa;
 
-  console.log(user);
+    console.log(user);
 
-  try {
-    const mahasiswaId = mahasiswa.id;
+    try {
+        const mahasiswaId = mahasiswa.id;
 
-    const transkrip = await transkripService.getTranskrip(mahasiswaId);
+        const transkrip = await transkripService.getTranskrip(mahasiswaId);
 
-    responseBuilder
-      .code(200)
-      .message("Berhasil mengambil data")
-      .json(transkrip);
-  } catch (error) {
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message("Gagal mengambil data")
-      .json(error.message);
-  }
+        responseBuilder
+            .code(200)
+            .message("Berhasil mengambil data")
+            .json(transkrip);
+    } catch (error) {
+        console.error(error);
+        next(error);
+    }
 };
