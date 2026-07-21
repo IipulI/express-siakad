@@ -30,3 +30,21 @@ export const getAllAssignedMahasiswa = async (req, res, next) => {
         next(error)
     }
 }
+
+export const getKrsMahasiswa = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+
+    const krsId = req.params.krsId
+
+    try {
+        const data = await pembimbingAkademikService.getKrsMahasiswaDetail(krsId)
+
+        responseBuilder
+            .status('success')
+            .code(200)
+            .message("Berhasil menggambil data")
+            .json(data)
+    } catch (error) {
+        next(error)
+    }
+}

@@ -5,12 +5,18 @@ import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 
 const {
     Dosen,
+    HasilStudi,
+    JadwalKuliah,
+    KelasKuliah,
     KrsMahasiswa,
     Mahasiswa,
+    MataKuliah,
     PembimbingAkademik,
     PeriodeAkademik,
-    HasilStudi,
     StatusMahasiswa,
+    RincianKrsMahasiswa,
+    TahunKurikulum,
+    Ruangan,
     sequelize
 } = db
 
@@ -164,6 +170,77 @@ export const getAllMahasiswaFiltered = async (filters, userDosen, page, size) =>
 
     return finalData;
 };
+
+export const getKrsMahasiswaDetail = async (krsId) => {
+    const krsMahasiswa = await KrsMahasiswa.findByPk(krs, {
+        attributes: ['id']
+    })
+    if (!krsMahasiswa) {
+        throw new NotFoundError("KRS Mahasiswa tidak dapat ditemukan")
+    }
+
+    const krsData = await KrsMahasiswa.findOne({
+        where: {
+            id: krsMahasiswa.id
+        },
+        attributes: ['id', 'siakMahasiswaId', 'siakPeriodeAkademikId', 'status'],
+        include: [
+            {
+                // This becomes the "child" list
+                model: RincianKrsMahasiswa,
+                as: 'rincianKrsMahasiswa',
+                attributes: ['id', 'hurufMutu', 'nilaiAkhir'],
+                include: [{
+                    model: KelasKuliah,
+                    as: 'kelasKuliah',
+                    attributes: [
+                        'id', 'siakMataKuliahId', 'nama', 'kapasitas', 'sistemKuliah', 'jumlahPeminat'
+                    ],
+                    include: [
+                        {
+                            model: MataKuliah,
+                            as: 'mataKuliah',
+                            attributes: [
+                                'id', 'siakTahunKurikulumId', 'nama', 'kode', 'semester', 'nilaiMin', 'totalSks',
+                            ],
+                            include: [
+                                { attributes: ['id', 'tahun'], model: TahunKurikulum, as: 'tahunKurikulum' },
+                                { attributes: ['id', 'nama', 'kode'], model: MataKuliah, as: 'prasyarat1' },
+                                { attributes: ['id', 'nama', 'kode'], model: MataKuliah, as: 'prasyarat2' },
+                                { attributes: ['id', 'nama', 'kode'], model: MataKuliah, as: 'prasyarat3' },
+                            ]
+                        },
+                        {
+                            model: JadwalKuliah,
+                            as: 'jadwalKuliah',
+                            attributes: ['id', 'hari', 'jamMulai', 'jamSelesai'],
+                            include: [
+                                { attributes: ["id", "nama", "nidn"], model: Dosen, as: 'dosen' },
+                                { attributes: ['id', 'nama'], model: Ruangan, as: 'ruangan' }
+                            ]
+                        }
+                    ]
+                }]
+            }
+        ]
+    });
+
+    if (!krsData) return null;
+
+    const krsJson = krsData.toJSON();
+
+    krsJson.rincianKrsMahasiswa = krsJson.rincianKrsMahasiswa.map(rincian => {
+        const item = rincian.kelasKuliah;
+
+        return {
+            ...item,
+            previousGrade: rincian.hurufMutu,
+            rincianId: rincian.id
+        };
+    });
+
+    return krsJson;
+}
 
 export const assignDosen = async (dosenId, mahasiswaIds, periodeAkademikId) => {
     try {
