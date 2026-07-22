@@ -2,7 +2,7 @@ import { Router } from "express";
 import pembimbingAkademikRouter from './pembimbing-akademik.router.js'
 // import jadwalAkademikRouter from "../mahasiswa/jadwal-akademik.router.js";
 import jadwalAkademikRouter from "./jadwal-akademik.routes.js";
-import kelasKuliahRouter from "../akademik/kelas-kuliah.router.js";
+import kelasKuliahRouter from "./kelas-kuliah.routes.js";
 
 const router = Router();
 

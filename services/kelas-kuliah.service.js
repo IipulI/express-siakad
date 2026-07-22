@@ -81,13 +81,7 @@ export const findAll = async (page, size, filter) => {
                 model: KrsMahasiswa,
                 as: 'krsMahasiswa',
                 required: false,
-                include: {
-                    attributes: ['id', 'npm'],
-                    model: Mahasiswa,
-                    as: 'mahasiswa',
-                    required: true,
-                    where: { npm: filter.npm },
-                }
+                where: { siakMahasiswaId: mahasiswa.id }
             }
         }
     }
@@ -99,6 +93,23 @@ export const findAll = async (page, size, filter) => {
                 ...(Object.keys(dosenNipNidnWhere).length > 0 ? [dosenNipNidnWhere] : [])
             ]
         }
+
+        const jadwalRows = await JadwalKuliah.findAll({
+            attributes: ['siakKelasKuliahId'],
+            where: { deletedAt: null },
+            include: {
+                model: Dosen,
+                as: 'dosen',
+                attributes: [],
+                required: true,
+                where: dosenWhere
+            },
+            raw: true
+        })
+
+        const kelasIds = [...new Set(jadwalRows.map(r => r.siakKelasKuliahId))]
+
+        kelasKuliahWhere.id = { [Op.in]: kelasIds }
     }
 
     let kelasKuliahQueryBuilder = {
@@ -109,24 +120,27 @@ export const findAll = async (page, size, filter) => {
         where: kelasKuliahWhere,
         include: [
             {
-                attributes: [
-                    'id', 'nama', 'kode', 'totalSks'
-                ],
+                attributes: [ 'id', 'nama', 'kode', 'totalSks'],
                 where: mataKuliahWhere,
                 required: Object.keys(mataKuliahWhere).length > 0,
                 model: MataKuliah,
                 as: 'mataKuliah',
-                include: {
-                    attributes: [
-                        'id', 'nama'
-                    ],
-                    model: ProgramStudi,
-                    as: 'programStudi',
-                    include: {
-                        model: Jenjang,
-                        as: 'jenjang'
+                include: [
+                    {
+                        attributes: ['id', 'nama'],
+                        model: ProgramStudi,
+                        as: 'programStudi',
+                        include: {
+                            model: Jenjang,
+                            as: 'jenjang'
+                        }
+                    },
+                    {
+                        attributes: ['id', 'tahun'],
+                        model: TahunKurikulum,
+                        as: 'tahunKurikulum',
                     }
-                }
+                ]
             },
             {
                 where: activePeriodWhere,

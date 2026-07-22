@@ -5,6 +5,8 @@ import { acceptKrsMahasiswa, rejectKrsMahasiswa } from '../../controllers/akadem
 const router = new Router();
 
 router.get('/all', dosenPembimbingAkademikController.getAllAssignedMahasiswa)
+router.get('/detail-krs/:id/', dosenPembimbingAkademikController.getKrsMahasiswa)
+
 router.post('/setuju', acceptKrsMahasiswa);
 router.post('/tolak', rejectKrsMahasiswa);
 

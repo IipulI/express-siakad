@@ -4,12 +4,29 @@ import { getPagingData } from "../../utils/pagination.js";
 import { detailClass } from "../../services/kelas-kuliah.service.js";
 
 export const getKelasKuliah = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
     const page = req.query.page ? parseInt(req.query.page) : null;
     const size = req.query.size ? parseInt(req.query.size) : null;
-    const responseBuilder = new ResponseBuilder(res)
+    const siakPeriodeAkademikId = req.query.siakPeriodeAkademikId ? req.query.siakPeriodeAkademikId : '';
+    const siakProgramStudiId = req.query.siakProgramStudiId ? req.query.siakProgramStudiId : '';
+    const sistemKuliah = req.query.sistemKuliah ? req.query.sistemKuliah : '';
+    const siakTahunKurikulumId = req.query.siakTahunKurikulumId ? req.query.siakTahunKurikulumId : '';
+
+    const user = req.user
+    const siakDosenId = user.dosen.id
+
+    const filter = {
+        siakDosenId,
+        siakPeriodeAkademikId,
+        siakProgramStudiId,
+        sistemKuliah,
+        siakTahunKurikulumId,
+    }
+
+    if (siakPeriodeAkademikId === '') { filter.isActive = 'true' }
 
     try {
-        const data = await kelasKuliahService.findAll(page, size)
+        const data = await kelasKuliahService.findAll(page, size, filter)
 
         let payload
         if (data.isPaginated) {
@@ -46,3 +63,38 @@ export const getDetailKelasKuliah = async (req, res, next) => {
      }
 }
 
+export const getPesertaKelasKuliah = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+    const id= req.params.id
+
+    try {
+        const data = await kelasKuliahService.classParticipant(id)
+
+        responseBuilder
+            .status('success')
+            .code(200)
+            .message("Berhasil mengambil data")
+            .json(data)
+    } catch (error) {
+        console.error(error)
+        next(error)
+    }
+}
+
+export const getGradingKelasKuliah = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+    const id = req.params.id
+
+    try {
+        const data = null
+
+        responseBuilder
+            .status('success')
+            .code(200)
+            .message("Berhasil mengambil data")
+            .json(data)
+    } catch (error) {
+        console.error(error)
+        next(error)
+    }
+}
