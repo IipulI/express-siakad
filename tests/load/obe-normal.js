@@ -4,14 +4,14 @@ import encoding from 'k6/encoding';
 import { check, sleep, group } from 'k6';
 
 // =====================================================================
-// KONFIGURASI BEBAN EKSTREM (200 VU — GET HEAVY)
+// KONFIGURASI BEBAN NORMAL (20 VU — Simulasi Harian)
 // =====================================================================
 export const options = {
-    // Skenario Beban Ekstrem: Mensimulasikan lonjakan hingga 200 pengguna (Virtual Users)
+    // Skenario Beban Normal: Mensimulasikan 20 pengguna mengakses sistem secara bersamaan
     stages: [
-        { duration: '30s', target: 100 }, // Naik ke 100 user dalam 30 detik
-        { duration: '1m', target: 200 },  // Lonjakan ekstrem ke 200 user
-        { duration: '30s', target: 0 },   // Turun kembali ke 0 user
+        { duration: '10s', target: 20 }, // Naik ke 20 user dalam 10 detik
+        { duration: '55s', target: 20 }, // Tahan 20 user selama 55 detik
+        { duration: '10s', target: 0 },  // Turun kembali ke 0 user
     ],
     thresholds: {
         http_req_duration: ['p(95)<2000'],
