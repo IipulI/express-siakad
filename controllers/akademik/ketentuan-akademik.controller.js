@@ -22,12 +22,12 @@ export const upsertSkalaNilai = async (req, res) => {
         // req.body berisi: id (jika update), programStudiId, tahunKurikulumId, hurufMutu, angkaMutu, dll
         const payload = {
             id: req.body.id,
-            siak_program_studi_id: req.body.programStudiId,
-            siak_tahun_kurikulum_id: req.body.tahunKurikulumId,
-            huruf_mutu: req.body.hurufMutu,
-            angka_mutu: req.body.angkaMutu,
-            nilai_min: req.body.nilaiMin,
-            nilai_max: req.body.nilaiMax
+            siakProgramStudiId: req.body.programStudiId,
+            siakTahunKurikulumId: req.body.tahunKurikulumId,
+            hurufMutu: req.body.hurufMutu,
+            angkaMutu: req.body.angkaMutu,
+            nilaiMin: req.body.nilaiMin,
+            nilaiMax: req.body.nilaiMax
         };
         await KetentuanService.saveSkalaNilai(payload);
         return responseBuilder.code(200).message("Data Skala Nilai berhasil disimpan").json();
@@ -65,10 +65,10 @@ export const upsertBatasSks = async (req, res) => {
     try {
         const payload = {
             id: req.body.id,
-            siak_jenjang_id: req.body.jenjangId,
-            ips_min: req.body.ipsMin,
-            ips_max: req.body.ipsMax,
-            batas_sks: req.body.batasSks
+            siakJenjangId: req.body.jenjangId,
+            ipsMin: req.body.ipsMin,
+            ipsMax: req.body.ipsMax,
+            batasSks: req.body.batasSks
         };
         await KetentuanService.saveBatasSks(payload);
         return responseBuilder.code(200).message("Data Batas SKS berhasil disimpan").json();

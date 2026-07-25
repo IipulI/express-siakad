@@ -462,6 +462,7 @@ export const deleteMataKuliah = async (id) => {
     }
 
     await cekDataMataKuliah.destroy()
+    return true
 }
 
 // Private function

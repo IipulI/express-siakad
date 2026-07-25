@@ -29,6 +29,7 @@ export const validateStoreProfilLulusan = [
     body('siakObeId').isUUID().withMessage('ID OBE tidak valid'),
     body('kode').notEmpty().withMessage('Kode PL wajib diisi'),
     body('profil').notEmpty().withMessage('Profil Lulusan wajib diisi'),
+    body('profesi').notEmpty().withMessage('Profesi wajib diisi'),
     body('deskripsi').notEmpty().withMessage('Deskripsi (IND) wajib diisi'),
     validate
 ];

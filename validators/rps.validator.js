@@ -59,7 +59,11 @@ export const validateSaveDetailRps = [
     body('siakPeriodeAkademikId').isUUID().withMessage('ID Periode Akademik wajib diisi'),
     body('tanggalPenyusunan').isDate().withMessage('Format tanggal tidak valid (YYYY-MM-DD)'),
     body('deskripsiMataKuliah').notEmpty().withMessage('Deskripsi Mata Kuliah wajib diisi'),
-    validate 
+    body('tujuanMataKuliah').notEmpty().withMessage('Tujuan Mata Kuliah wajib diisi'),
+    body('materiPembelajaran').notEmpty().withMessage('Materi Pembelajaran wajib diisi'),
+    body('pustakaUtama').notEmpty().withMessage('Pustaka Utama wajib diisi'),
+    body('pustakaPendukung').notEmpty().withMessage('Pustaka Pendukung wajib diisi'),
+    validate
 ];
 
 // Validator untuk GET Rencana Pembelajaran
@@ -99,6 +103,15 @@ export const validateSaveSesi = [
     body('bobotPenilaian').isFloat({ min: 0, max: 100 }).withMessage('Bobot Penilaian harus 0-100'),
     body('cpmkIds').isArray({ min: 1 }).withMessage('Minimal pilih 1 CPMK/Sub-CPMK dari tabel mapping'),
     body('cpmkIds.*').isUUID().withMessage('ID CPMK tidak valid'),
+    validate
+];
+export const validateUpdateSesi = [
+    param('id').isUUID().withMessage('ID Sesi tidak valid'),
+    body('siakPeriodeAkademikId').isUUID().withMessage('Periode Akademik wajib dipilih'),
+    body('sesi').isInt({ min: 1, max: 16 }).withMessage('Sesi harus angka 1-16'),
+    body('jenisPertemuan').notEmpty().withMessage('Jenis pertemuan wajib dipilih'),
+    body('materiPembelajaran').notEmpty().withMessage('Materi Perkuliahan (IND) wajib diisi'),
+    body('bobotPenilaian').isFloat({ min: 0, max: 100 }).withMessage('Bobot Penilaian harus 0-100'),
     validate
 ];
 export const validateCpmk = [

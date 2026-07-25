@@ -214,7 +214,7 @@ export const createMataKuliahObe = async (req, res, next) => {
 export const updateMataKuliahObe = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const data = await MataKuliahService.updateMataKuliahObe(id, req.body);
+        const data = await MataKuliahService.updateMataKuliah(id, req.body);
 
         return new ResponseBuilder(res)
             .code(200)
