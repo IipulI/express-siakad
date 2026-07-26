@@ -2,6 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import models from '../../models/index.js';
+import { addUserToBlacklist, removeUserFromBlacklist } from '../../utils/tokenBlacklist.js';
 
 const { Mahasiswa } = models;
 const router = express.Router();
@@ -103,11 +104,15 @@ router.get('/callback', async (req, res) => {
 
         console.log('[SSO] siakadUserId:', siakadUserId, '| role:', siakadRole);
 
+        const eportalUserId = eportalUser.sso_id || eportalUser.id;
+        removeUserFromBlacklist(eportalUserId);
+
         const siakadToken = jwt.sign(
             {
                 id: siakadUserId,
                 username: eportalUser.npm || eportalUser.nidn || eportalUser.email,
                 roles: [siakadRole],
+                eportal_user_id: eportalUserId,
             },
             process.env.THIRD_PARTY_JWT_SECRET,
             { expiresIn: '8h' }
@@ -139,6 +144,24 @@ router.get('/callback', async (req, res) => {
             debug: error.response?.data?.message || error.message,
         });
     }
+});
+
+router.post('/logout', async (req, res) => {
+    console.log('[SSO Logout] SIAKAD hit, body:', req.body);
+
+    const { user_id, secret } = req.body;
+    const validSecret = process.env.EXTERNAL_SYNC_API_KEY || 'secret_sso_uika';
+
+    if (secret !== validSecret) {
+        return res.status(401).json({ status: 401, message: 'Invalid secret.' });
+    }
+
+    if (!user_id) {
+        return res.status(400).json({ status: 400, message: 'user_id wajib diisi.' });
+    }
+
+    addUserToBlacklist(user_id);
+    return res.json({ status: 200, message: `User ${user_id} berhasil di-logout dari SIAKAD.` });
 });
 
 export default router;
