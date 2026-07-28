@@ -1208,13 +1208,25 @@ export const pratinjauSalinRencanaEvaluasi = async (mkId, periodeAsalId) => {
 // yang sudah ada dari komponennya (skor tidak hilang, tapi jadi tidak
 // terhubung ke komponen apa pun: tidak tampil di tabel nilai dosen, dan
 // tidak ikut terhitung kalau hitungNilaiAkhir dijalankan ulang).
+//
+// PENTING: NilaiEvaluasiMahasiswa cuma diisi komponen MANUAL (mis. Kehadiran).
+// Breakdown dari Jalur D (CBT) untuk UTS/UAS/Tugas tidak pernah menulis ke
+// tabel itu -- nyimpennya di NilaiSubcpmkEvaluasiMahasiswa. Kalau cuma cek
+// NilaiEvaluasiMahasiswa, komponen yang sudah ada nilai CBT-nya dianggap
+// "belum ada nilai" dan boleh dihapus/direset, padahal breakdown-nya nyata.
 const cekAdaNilaiTerinput = async (rencanaEvaluasiIds, trx) => {
     if (rencanaEvaluasiIds.length === 0) return false;
-    const jumlah = await models.NilaiEvaluasiMahasiswa.count({
-        where: { siakRencanaEvaluasiId: rencanaEvaluasiIds },
-        transaction: trx
-    });
-    return jumlah > 0;
+    const [jumlahManual, jumlahCbt] = await Promise.all([
+        models.NilaiEvaluasiMahasiswa.count({
+            where: { siakRencanaEvaluasiId: rencanaEvaluasiIds },
+            transaction: trx
+        }),
+        models.NilaiSubcpmkEvaluasiMahasiswa.count({
+            where: { siakRencanaEvaluasiId: rencanaEvaluasiIds },
+            transaction: trx
+        })
+    ]);
+    return (jumlahManual + jumlahCbt) > 0;
 };
 
 export const salinRencanaEvaluasi = async (mkId, periodeAsalId, periodeTujuanId) => {
