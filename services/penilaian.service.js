@@ -471,52 +471,40 @@ const gabungKontribusiManualKeJalurD = async (krsId) => {
 // 4. GENERATOR RAPOR OBE MAHASISWA
 export const getRaporOBEMahasiswa = async (rincianKrsId) => {
     try {
-        const listNilai = await models.NilaiEvaluasiMahasiswa.findAll({
-            where: { siakRincianKrsMahasiswaId: rincianKrsId },
+        // PENTING: rapor HARUS dibaca dari NilaiCpmkMahasiswa (hasil rollup
+        // hitungDanOverrideNilaiCpmkDariKomponen, yang sudah menggabungkan
+        // seluruh sumber CBT + MANUAL). Jangan baca dari NilaiEvaluasiMahasiswa
+        // -- tabel itu cuma diisi komponen manual (mis. Kehadiran), breakdown
+        // CBT (UTS/UAS/Tugas) tidak pernah menulis ke sana sehingga
+        // kontribusinya hilang total dari rapor.
+        const rincian = await RincianKrsMahasiswa.findByPk(rincianKrsId, {
+            include: [{ model: KrsMahasiswa, as: 'krsMahasiswa' }]
+        });
+        if (!rincian || !rincian.krsMahasiswa) return [];
+
+        const daftarNilaiCpmk = await NilaiCpmkMahasiswa.findAll({
+            where: {
+                siakKelasKuliahId: rincian.siakKelasKuliahId,
+                siakMahasiswaId: rincian.krsMahasiswa.siakMahasiswaId
+            },
             include: [{
-                model: models.RencanaEvaluasi,
-                as: 'rencanaEvaluasi',
-                include: [{
-                    model: models.CapaianMataKuliah,
-                    as: 'cpmkList',
-                    attributes: ['id', 'kode', 'deskripsi'],
-                    through: { attributes: ['bobotCpmk'] }
-                }]
+                model: CapaianMataKuliah,
+                as: 'capaianMataKuliah',
+                attributes: ['kode', 'deskripsi', 'target']
             }]
         });
 
-        let raporCPMK = {};
-
-        listNilai.forEach(nilai => {
-            if (!nilai.rencanaEvaluasi?.cpmkList) return;
-            const skorAsli = parseFloat(nilai.skor);
-
-            nilai.rencanaEvaluasi.cpmkList.forEach(cpmk => {
-                const kodeCpmk = cpmk.kode || cpmk.id;
-                if (!kodeCpmk) return;
-
-                const bobotCpmk = parseFloat(cpmk.PemetaanEvaluasiCpmk?.bobotCpmk || 0);
-
-                if (!raporCPMK[kodeCpmk]) {
-                    raporCPMK[kodeCpmk] = {
-                        kode: kodeCpmk,
-                        deskripsi: cpmk.deskripsi || '-',
-                        totalSkorTerbobot: 0,
-                        totalBobot: 0
-                    };
-                }
-                raporCPMK[kodeCpmk].totalSkorTerbobot += skorAsli * bobotCpmk;
-                raporCPMK[kodeCpmk].totalBobot += bobotCpmk;
-            });
+        return daftarNilaiCpmk.map(n => {
+            const target = n.capaianMataKuliah?.target != null ? parseFloat(n.capaianMataKuliah.target) : null;
+            const nilaiCapaian = parseFloat(n.nilai);
+            return {
+                kodeCpmk: n.capaianMataKuliah?.kode || n.siakCapaianMataKuliahId,
+                deskripsi: n.capaianMataKuliah?.deskripsi || '-',
+                nilaiCapaian,
+                target,
+                statusKetercapaian: target != null ? (nilaiCapaian >= target ? 'Memenuhi' : 'Belum Memenuhi') : null
+            };
         });
-
-        return Object.values(raporCPMK).map(item => ({
-            kodeCpmk: item.kode,
-            deskripsi: item.deskripsi,
-            nilaiCapaian: item.totalBobot > 0
-                ? parseFloat((item.totalSkorTerbobot / item.totalBobot).toFixed(2))
-                : 0
-        }));
 
     } catch (error) {
         throw new Error("Gagal menggenerate rapor OBE: " + error.message);
