@@ -4,15 +4,46 @@ import encoding from 'k6/encoding';
 import { check, sleep, group } from 'k6';
 
 // =====================================================================
-// KONFIGURASI BEBAN EKSTREM (200 VU — GET HEAVY)
+// KONFIGURASI BEBAN EKSTREM (2500 VU — BREAKPOINT / CAPACITY TEST)
 // =====================================================================
+// Beda dengan "beban normal" (obe-normal.js, niruin trafik harian yang
+// realistis), skenario ini SENGAJA gak dirancang buat merepresentasikan
+// jumlah user asli. Definisi stress testing sendiri (lihat Bab 2.12) itu
+// mendorong sistem MELEBIHI kapasitas yang diharapkan, khusus buat
+// nemuin titik jebol (breaking point) dan lihat gimana sistem gagal --
+// apakah gagal dengan baik (graceful degradation, error rate naik
+// terkendali) atau langsung crash/tidak responsif. Makanya angkanya
+// jauh lebih besar dari estimasi user riil (bandingkan dengan estimasi
+// realistis di obe-cbt-sync-stress.js yang ~100 VU).
+//
+// ⚠️ JANGAN dijalankan ke produksi tanpa koordinasi ⚠️
+// 2500 VU concurrent request ke server produksi (api-siak.uika-bogor.ac.id)
+// BERISIKO bikin server keteteran/gak responsif buat mahasiswa & staf yang
+// LAGI PAKAI sistem beneran saat itu juga -- ini beda dari risiko skrip
+// CBT (yang soal data), di sini risikonya ke KETERSEDIAAN layanan.
+// Jalankan di jam yang gak ada aktivitas akademik (malam/dini hari,
+// idealnya sepengetahuan admin server), atau kalau ada, arahkan BASE_URL
+// ke instance staging/lokal yang sanggup dites habis-habisan tanpa
+// mengganggu pengguna asli.
+// Mode "tangga": -e TARGET_VU=300 buat lari beban rata di angka itu selama
+// TARGET_DURATION (default 30s) -- dipakai nyari titik jebol presisi lewat
+// beberapa run terpisah, sama seperti obe-cbt-sync-stress.js.
+const TARGET_VU = __ENV.TARGET_VU ? Number(__ENV.TARGET_VU) : null;
+const TARGET_DURATION = __ENV.TARGET_DURATION || '30s';
+
 export const options = {
-    // Skenario Beban Ekstrem: Mensimulasikan lonjakan hingga 200 pengguna (Virtual Users)
-    stages: [
-        { duration: '30s', target: 100 }, // Naik ke 100 user dalam 30 detik
-        { duration: '1m', target: 200 },  // Lonjakan ekstrem ke 200 user
-        { duration: '30s', target: 0 },   // Turun kembali ke 0 user
-    ],
+    ...(TARGET_VU
+        ? { vus: TARGET_VU, duration: TARGET_DURATION }
+        : {
+            // Skenario Beban Ekstrem: dorong bertahap sampai 2500 VU buat cari breakpoint
+            stages: [
+                { duration: '30s', target: 500 },  // Naik cepat ke 500 user
+                { duration: '1m', target: 1500 },  // Terus naik ke 1500 user
+                { duration: '1m', target: 2500 },  // Lonjakan ekstrem ke 2500 user (di atas 2000)
+                { duration: '30s', target: 2500 }, // Tahan di puncak buat lihat perilaku sistem
+                { duration: '30s', target: 0 },    // Turun kembali ke 0 user
+            ],
+        }),
     thresholds: {
         http_req_duration: ['p(95)<2000'],
         http_req_failed: ['rate<0.05'],

@@ -4,14 +4,31 @@ import encoding from 'k6/encoding';
 import { check, sleep, group } from 'k6';
 
 // =====================================================================
-// KONFIGURASI BEBAN NORMAL (20 VU — Simulasi Harian)
+// KONFIGURASI BEBAN NORMAL (200 VU — Simulasi Harian, trafik staf, margin konservatif)
 // =====================================================================
+// Skenario ini mensimulasikan Kaprodi/Koordinator MK/Dosen Pengampu (staf)
+// yang mengakses data OBE bersamaan pada jam kerja biasa -- BUKAN periode
+// puncak/deadline (itu dicakup di skenario ekstrem/breakpoint, lihat
+// obe-get-stress.js & obe-cbt-sync-stress.js).
+//
+// Modul OBE dirancang generik untuk seluruh program studi di NL-SIAK
+// (siak_obe punya siak_program_studi_id sendiri per prodi); Teknik
+// Informatika baru pilot project implementasi & pengujian saat ini, bukan
+// batas cakupan sistem. Estimasi beban dihitung dari total dosen aktif
+// se-universitas (294 orang, dicek langsung dari database), bukan cuma
+// dosen TI. Perhitungan konkurensi ketat (5-15% aktif bersamaan) memberi
+// 15-44 orang -- tapi 200 VU sengaja dipilih jauh di atas itu sebagai
+// MARGIN KONSERVATIF, bukan estimasi ketat: mewakili skenario "hampir
+// seluruh dosen aktif kampus mengakses bersamaan" (200 dari 294, ~68%),
+// jadi bukti sistem tetap lancar bahkan pada kondisi jauh lebih berat
+// dari kondisi harian sebenarnya, sebelum masuk ke skenario ekstrem
+// (breakpoint testing) yang levelnya lebih tinggi lagi.
 export const options = {
-    // Skenario Beban Normal: Mensimulasikan 20 pengguna mengakses sistem secara bersamaan
+    // Skenario Beban Normal: Mensimulasikan 200 pengguna mengakses sistem secara bersamaan
     stages: [
-        { duration: '10s', target: 20 }, // Naik ke 20 user dalam 10 detik
-        { duration: '55s', target: 20 }, // Tahan 20 user selama 55 detik
-        { duration: '10s', target: 0 },  // Turun kembali ke 0 user
+        { duration: '20s', target: 200 },  // Naik ke 200 user dalam 20 detik
+        { duration: '90s', target: 200 },  // Tahan 200 user selama 90 detik
+        { duration: '20s', target: 0 },    // Turun kembali ke 0 user
     ],
     thresholds: {
         http_req_duration: ['p(95)<2000'],
