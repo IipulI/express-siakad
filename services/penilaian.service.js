@@ -84,9 +84,20 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
 
 // 3. KALKULATOR HASIL AKHIR OBE (VERSI DINAMIS SKALA NILAI)
 export const hitungNilaiAkhir = async (krsId) => {
-    // GUARD Jalur D: nilai_akhir/huruf_mutu MK di-skip HANYA kalau CBT betulan
-    // sudah kirim data (sumber='CBT' di siak_nilai_subcpmk_evaluasi_mahasiswa) --
-    // itu murni otoritas CBT (simpanNilaiAkhirDariCbt), JANGAN dihitung ulang.
+    // GUARD Jalur D: begitu CBT betulan sudah kirim data (sumber='CBT' di
+    // siak_nilai_subcpmk_evaluasi_mahasiswa), rumus Jalur A di bawah (baca
+    // NilaiEvaluasiMahasiswa x bobot) DILEWATI SEPENUHNYA -- diganti
+    // gabungKontribusiManualKeJalurD, yang menuju refreshNilaiAkhirJalurD.
+    //
+    // Revisi 2026-08-10 (dipastikan langsung ke tim CBT): CBT TIDAK PERNAH
+    // mengirim /cbt/nilai-akhir, cuma kirim skor mentah per soal. Jadi
+    // nilai_akhir/huruf_mutu MK sekarang DIHITUNG ULANG di sini dari ledger
+    // (gabungan breakdown CBT tiap komponen x bobot resmi RencanaEvaluasi),
+    // BUKAN lagi dibiarkan kosong menunggu titipan CBT yang tidak akan pernah
+    // datang. Sebelum revisi ini, baris di bawah cuma MEMBACA nilai_akhir yang
+    // sudah ada -- karena CBT memang tidak pernah menulisnya, nilai_akhir akan
+    // tetap kosong selamanya kalau tidak diubah.
+    //
     // CPMK-nya sendiri SELALU digabung lewat "ledger" yang sama (lihat
     // tulisManualRowsKeLedger di bawah + hitungDanOverrideNilaiCpmkDariKomponen),
     // baik ada data CBT atau tidak -- supaya urutan Kehadiran/komponen manual vs
@@ -433,9 +444,141 @@ const tulisManualRowsKeLedger = async (krsId, listNilai, trx) => {
     }
 };
 
+// Revisi 2026-08-10 (hasil ketemu langsung sama tim CBT): CBT dipastikan TIDAK
+// PERNAH mengirim /cbt/nilai-akhir sama sekali -- CBT cuma kirim skor mentah
+// (breakdown per soal). Sebelumnya fungsi ini cuma BACA nilai_akhir yang sudah
+// ada (murni titipan CBT), yang berarti nilai_akhir MK bakal kosong SELAMANYA
+// begitu ada data CBT. Sekarang nilai_akhir dihitung SENDIRI dari ledger
+// (gabungan breakdown CBT tiap komponen + kontribusi manual seperti Kehadiran,
+// dikalikan bobot resmi RencanaEvaluasi masing-masing) -- rumus identik dengan
+// hitungReferensiNilaiAkhirDariLedger di cbt.service.js, cuma di sini dipakai
+// buat MENULIS nilai_akhir, bukan sekadar dibandingkan.
+const hitungNilaiAkhirDariLedgerJalurD = async (krsId, kelasId) => {
+    const kelas = await sequelize.query(
+        `SELECT siak_mata_kuliah_id AS "mataKuliahId", siak_periode_akademik_id AS "periodeId"
+         FROM siak_kelas_kuliah WHERE id = :kelasId LIMIT 1`,
+        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (kelas.length === 0) return null;
+    const { mataKuliahId, periodeId } = kelas[0];
+
+    const komponenList = await sequelize.query(
+        `SELECT id, bobot FROM siak_rencana_evaluasi
+         WHERE siak_mata_kuliah_id = :mataKuliahId AND siak_periode_akademik_id = :periodeId
+           AND deleted_at IS NULL`,
+        { replacements: { mataKuliahId, periodeId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (komponenList.length === 0) return null;
+
+    const ledgerAgg = await sequelize.query(
+        `SELECT siak_rencana_evaluasi_id AS "rencanaEvaluasiId",
+                SUM(skor_terbobot) AS "totalW", SUM(total_bobot) AS "totalB"
+         FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+         WHERE siak_rincian_krs_mahasiswa_id = :krsId AND deleted_at IS NULL
+         GROUP BY siak_rencana_evaluasi_id`,
+        { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
+    );
+    const ledgerMap = {};
+    ledgerAgg.forEach(row => { ledgerMap[row.rencanaEvaluasiId] = row; });
+
+    let totalTerhitung = 0;
+    let totalBobotDipakai = 0;
+    komponenList.forEach(k => {
+        const row = ledgerMap[k.id];
+        const bobotK = parseFloat(k.bobot || 0);
+        if (!row || parseFloat(row.totalB || 0) <= 0) return;
+        const persenKomponen = (parseFloat(row.totalW) / parseFloat(row.totalB)) * 100;
+        totalTerhitung += persenKomponen * (bobotK / 100);
+        totalBobotDipakai += bobotK;
+    });
+
+    // Belum ada komponen manapun yang punya data -- jangan tulis 0 seolah itu
+    // nilai final (bisa salah kepicu auto-kunci kelas padahal belum ada apa-apa).
+    if (totalBobotDipakai === 0) return null;
+    return Math.round(totalTerhitung * 100) / 100;
+};
+
+// Dipakai bersama oleh gabungKontribusiManualKeJalurD (lewat input manual, mis.
+// Kehadiran) DAN simpanNilaiKomponenDariCbt di cbt.service.js (lewat breakdown
+// CBT langsung) -- supaya nilai akhir tetap kehitung otomatis walau mata kuliah
+// yang bersangkutan TIDAK PUNYA komponen manual sama sekali (100% dari CBT),
+// yang kalau cuma dipicu dari jalur manual gak akan pernah kesentuh sama sekali.
+export const refreshNilaiAkhirJalurD = async (krsId, kelasId) => {
+    if (!kelasId) return null;
+
+    const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId);
+    if (!rincianKrs || ['Lulus', 'Tidak Lulus'].includes(rincianKrs.status)) return null;
+
+    const nilaiAkhirBaru = await hitungNilaiAkhirDariLedgerJalurD(krsId, kelasId);
+    if (nilaiAkhirBaru === null) return null;
+
+    // Skala dinamis per prodi+kurikulum kalau ada, fallback DEFAULT_SKALA kalau
+    // belum dikonfigurasi -- pola sama dengan resolveHurufMutu di cbt.service.js.
+    const traceSkala = await sequelize.query(
+        `SELECT mk.siak_program_studi_id AS "prodiId", mk.siak_tahun_kurikulum_id AS "kurikulumId"
+         FROM siak_rincian_krs_mahasiswa rkm
+         LEFT JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+         LEFT JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
+         WHERE rkm.id = :krsId LIMIT 1`,
+        { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
+    );
+    let skalaAktif = DEFAULT_SKALA;
+    if (traceSkala?.[0]?.prodiId && traceSkala?.[0]?.kurikulumId) {
+        const skalaRows = await sequelize.query(
+            `SELECT huruf_mutu AS "hurufMutu", angka_mutu AS "angkaMutu", nilai_min AS "nilaiMin"
+             FROM siak_skala_penilaian
+             WHERE siak_program_studi_id = :prodiId AND siak_tahun_kurikulum_id = :kurikulumId
+               AND deleted_at IS NULL
+             ORDER BY nilai_min DESC`,
+            { replacements: { prodiId: traceSkala[0].prodiId, kurikulumId: traceSkala[0].kurikulumId }, type: sequelize.QueryTypes.SELECT }
+        );
+        if (skalaRows.length > 0) skalaAktif = skalaRows;
+    }
+    const grade = getGrade(nilaiAkhirBaru, skalaAktif);
+    const hurufMutu = grade.hurufMutu;
+    const angkaMutu = grade.angkaMutu;
+
+    await RincianKrsMahasiswa.update(
+        { nilaiAkhir: nilaiAkhirBaru, hurufMutu, angkaMutu },
+        { where: { id: krsId } }
+    );
+
+    // Auto-kunci per-kelas -- pola identik simpanNilaiAkhirDariCbt (cbt.service.js):
+    // begitu SEMUA mahasiswa di kelas ini sudah punya nilai_akhir, kelas otomatis
+    // dikunci, supaya nilai kebuka di KHS/Transkrip.
+    const [cekRows] = await sequelize.query(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
+         FROM siak_rincian_krs_mahasiswa
+         WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
+        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+        await sequelize.query(
+            `UPDATE siak_rincian_krs_mahasiswa
+             SET status = 'Dikunci', updated_at = NOW()
+             WHERE siak_kelas_kuliah_id = :kelasId
+               AND (status IS NULL OR status NOT IN ('Dikunci', 'Lulus', 'Tidak Lulus'))
+               AND deleted_at IS NULL`,
+            { replacements: { kelasId } }
+        );
+        const pesertaKelas = await sequelize.query(
+            `SELECT km.siak_mahasiswa_id AS "mahasiswaId", kk.siak_periode_akademik_id AS "periodeId"
+             FROM siak_rincian_krs_mahasiswa rkm
+             JOIN siak_krs_mahasiswa km ON rkm.siak_krs_mahasiswa_id = km.id
+             JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+             WHERE rkm.siak_kelas_kuliah_id = :kelasId AND rkm.deleted_at IS NULL`,
+            { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+        );
+        for (const p of pesertaKelas) {
+            await updateHasilStudiJikaPeriodeLengkap(p.mahasiswaId, p.periodeId);
+        }
+    }
+
+    return { krsId, nilaiAkhir: nilaiAkhirBaru, hurufMutu, angkaMutu };
+};
+
 // Dipanggil oleh hitungNilaiAkhir kalau krsId sudah punya data CBT (sumber='CBT').
-// nilai_akhir/huruf_mutu MK TIDAK disentuh sama sekali (tetap murni dari CBT) --
-// cuma tulis kontribusi manual ke ledger lalu rollup ulang gabung dgn CBT.
 const gabungKontribusiManualKeJalurD = async (krsId) => {
     const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId, {
         include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa' }]
@@ -459,12 +602,15 @@ const gabungKontribusiManualKeJalurD = async (krsId) => {
     // Rollup ulang CPMK dari SEMUA sumber (CBT + MANUAL) utk krsId ini.
     await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
 
-    const existing = await models.RincianKrsMahasiswa.findByPk(krsId);
+    // Hitung ulang & tulis nilai akhir MK dari ledger gabungan (lihat komentar revisi di atas).
+    const hasilRefresh = await refreshNilaiAkhirJalurD(krsId, kelasId);
+
+    const existing = hasilRefresh ? null : await models.RincianKrsMahasiswa.findByPk(krsId);
     return {
         krsId,
-        totalSkor: existing ? parseFloat(existing.nilaiAkhir || 0) : 0,
-        hurufMutu: existing?.hurufMutu ?? null,
-        angkaMutu: existing ? parseFloat(existing.angkaMutu || 0) : 0
+        totalSkor: hasilRefresh ? hasilRefresh.nilaiAkhir : parseFloat(existing?.nilaiAkhir || 0),
+        hurufMutu: hasilRefresh ? hasilRefresh.hurufMutu : (existing?.hurufMutu ?? null),
+        angkaMutu: hasilRefresh ? hasilRefresh.angkaMutu : parseFloat(existing?.angkaMutu || 0)
     };
 };
 
