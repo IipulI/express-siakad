@@ -888,12 +888,24 @@ export const getPesertaKelasList = async (kelasId) => {
             });
 
             // Komponen belum diinput lewat Jalur A/manual -> coba isi dari ledger
-            // Jalur D dulu (kalau ada), baru null kalau dua-duanya kosong.
+            // Jalur D dulu (kalau ada), baru null kalau dua-duanya kosong. Ikut
+            // ditambahkan ke nilaiAkhirHitung/adaNilai juga -- kalau tidak, mahasiswa
+            // yang nilai_akhir di DB-nya belum ke-refresh (breakdown lama, belum ada
+            // write baru yang men-trigger refreshNilaiAkhirJalurD) akan tetap tampil
+            // Nilai Akhir 0 walau nilai per komponennya sendiri sudah lengkap.
             const ledgerMhsIni = jalurDPerKomponen[item.id] || {};
             komposisiList.forEach(k => {
                 const label = (k.metodeEvaluasi || '-').toUpperCase();
                 if (label in nilaiPerKomponen) return;
-                nilaiPerKomponen[label] = (k.id in ledgerMhsIni) ? ledgerMhsIni[k.id] : null;
+                if (k.id in ledgerMhsIni) {
+                    const skorLedger = ledgerMhsIni[k.id];
+                    const persentase = parseFloat(k.bobot || 0);
+                    nilaiPerKomponen[label] = skorLedger;
+                    nilaiAkhirHitung += skorLedger * (persentase / 100);
+                    adaNilai = true;
+                } else {
+                    nilaiPerKomponen[label] = null;
+                }
             });
 
             nilaiAkhirHitung = Math.round(nilaiAkhirHitung * 100) / 100;
