@@ -1326,7 +1326,7 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
             `, { replacements: { mataKuliahId }, type: sequelize.QueryTypes.SELECT });
 
             if (cekJalurCatauD.length > 0) {
-                // Jalur C atau D aktif untuk MK ini — baca nilai CPMK yang sudah akurat
+                // Jalur C atau D aktif untuk MK ini, baca nilai CPMK yang sudah akurat
                 const queryScoresJalurC = `
                     SELECT
                         m.id AS mahasiswa_id,
