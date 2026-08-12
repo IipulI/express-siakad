@@ -1147,15 +1147,15 @@ export const getManajemenCplByObeId = async (obeId) => {
         include: [
             { model: ProgramStudi, as: 'programStudi', attributes: ['kode', 'nama', 'siakJenjangId'],
               include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }] },
-            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
-          
-            { 
-                model: CapaianPembelajaranLulusan, as: 'capaianPembelajaranLulusan', 
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['id', 'tahun'] },
+
+            {
+                model: CapaianPembelajaranLulusan, as: 'capaianPembelajaranLulusan',
                 attributes: ['id', 'kode', 'deskripsi', 'deskripsiEn', 'targetCpl', 'kategori'],
                 include: [
-                    { 
-                        model: models.IndikatorKinerja, 
-                        as: 'indikatorKinerja', 
+                    {
+                        model: models.IndikatorKinerja,
+                        as: 'indikatorKinerja',
                         attributes: ['id', 'kode', 'deskripsi','deskripsiEn']
                     }
                 ]
@@ -1170,7 +1170,10 @@ export const getManajemenCplByObeId = async (obeId) => {
         header: {
             kodeProdi: data.programStudi?.kode,
             programStudi: `${data.programStudi?.jenjang?.jenjang || 'S1'} - ${data.programStudi?.nama}`,
-            tahunKurikulum: data.tahunKurikulum?.tahun
+            tahunKurikulum: data.tahunKurikulum?.tahun,
+            // Ditambahin buat kebutuhan FE (modal "Tambah CPL Umum" perlu UUID-nya,
+            // bukan cuma label tahun, buat manggil GET /cpl-umum/:tahunKurikulumId)
+            tahunKurikulumId: data.tahunKurikulum?.id
         },
         dataCpl: (data.capaianPembelajaranLulusan || []).map(cpl => ({
             id: cpl.id,
