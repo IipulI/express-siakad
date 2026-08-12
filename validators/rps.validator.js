@@ -59,10 +59,26 @@ export const validateSaveDetailRps = [
     body('siakPeriodeAkademikId').isUUID().withMessage('ID Periode Akademik wajib diisi'),
     body('tanggalPenyusunan').isDate().withMessage('Format tanggal tidak valid (YYYY-MM-DD)'),
     body('deskripsiMataKuliah').notEmpty().withMessage('Deskripsi Mata Kuliah wajib diisi'),
+    body('deskripsiMataKuliahEng').optional().isString().withMessage('Deskripsi Mata Kuliah (Eng) harus berupa teks'),
     body('tujuanMataKuliah').notEmpty().withMessage('Tujuan Mata Kuliah wajib diisi'),
     body('materiPembelajaran').notEmpty().withMessage('Materi Pembelajaran wajib diisi'),
     body('pustakaUtama').notEmpty().withMessage('Pustaka Utama wajib diisi'),
     body('pustakaPendukung').notEmpty().withMessage('Pustaka Pendukung wajib diisi'),
+    body('mediaPerangkatLunak').optional().isString().withMessage('Media Perangkat Lunak harus berupa teks'),
+    body('mediaPerangkatKeras').optional().isString().withMessage('Media Perangkat Keras harus berupa teks'),
+    validate
+];
+
+// --- Salin Detail RPS antar periode ---
+export const validateGetPratinjauSalinDetailRps = [
+    param('mataKuliahId').isUUID().withMessage('ID Mata Kuliah tidak valid'),
+    query('periodeAsalId').isUUID().withMessage('ID Periode asal wajib dipilih'),
+    validate
+];
+export const validateSalinDetailRps = [
+    param('mataKuliahId').isUUID().withMessage('ID Mata Kuliah tidak valid'),
+    body('periodeAsalId').isUUID().withMessage('ID Periode asal wajib dipilih'),
+    body('periodeTujuanId').isUUID().withMessage('ID Periode tujuan wajib dipilih'),
     validate
 ];
 
