@@ -1618,7 +1618,7 @@ export const getDataDaftarNilai = async (kelasId) => {
         getPesertaKelasList(kelasId),
     ]);
 
-    const { tabel } = pesertaData;
+    const { headerKolom, tabel } = pesertaData;
     const dosenList = (metadata.jadwalKuliah || []).map((dk) => dk.dosen).filter(Boolean);
 
     return {
@@ -1642,11 +1642,13 @@ export const getDataDaftarNilai = async (kelasId) => {
             semester: metadata.periodeAkademik?.semester || null,
         },
         dosen: dosenList,
+        komponenEvaluasi: headerKolom,
         mahasiswa: tabel.map((row) => ({
             no: row.no,
             rincianKrsId: row.rincianKrsId,
             nim: row.nim,
             nama: row.nama,
+            nilaiPerKomponen: row.nilaiPerKomponen,
             nilaiAkhir: row.nilaiAkhir,
             nilaiAngka: row.angkaMutu,
             nilaiHuruf: row.grade,
