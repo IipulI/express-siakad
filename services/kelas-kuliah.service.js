@@ -44,9 +44,9 @@ export const findAll = async (page, size, filter) => {
     if (filter.siakProgramStudiId !== undefined && filter.siakProgramStudiId !== '') {
         kelasKuliahWhere.siakProgramStudiId = filter.siakProgramStudiId
     }
-    // if (filter.siakSistemKuliahId !== undefined) {
-    //     kelasKuliahWhere.siakSistemKuliahId = filter.siakSistemKuliahId
-    // }
+    if (filter.sistemKuliah !== undefined && filter.sistemKuliah !== '') {
+        kelasKuliahWhere.sistemKuliah = filter.sistemKuliah
+    }
     if (filter.siakTahunKurikulumId !== undefined && filter.siakTahunKurikulumId !== '') {
         mataKuliahWhere.siakTahunKurikulumId = filter.siakTahunKurikulumId
     }
