@@ -1,7 +1,7 @@
 import models from "../models/index.js";
 import * as CustomError from "../utils/custom-error.js";
 
-const { MataKuliah, CapaianMataKuliah, CapaianPembelajaranLulusan, ProgramStudi, TahunKurikulum, Jenjang, PemetaanCplCpmk, Obe, sequelize } = models;
+const { MataKuliah, CapaianMataKuliah, CapaianPembelajaranLulusan, ProgramStudi, TahunKurikulum, Jenjang, PemetaanCplCpmk, PemetaanEvaluasiCpmk, PemetaanSoalCpmk, NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, Obe, sequelize } = models;
 
 // =========================================================
 // GET: Ambil Data untuk Render UI Pemetaan CPMK
@@ -440,6 +440,31 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
         if (removedIds.length > 0) {
             await PemetaanCplCpmk.destroy({
                 where: { siakCapaianMataKuliahId: removedIds },
+                force: true,
+                transaction: t
+            });
+            // Bersihkan juga pemetaan bobot di Rencana Evaluasi & Soal yang nunjuk ke
+            // CPMK/Sub-CPMK yang barusan dihapus -- kalau tidak, baris ini jadi yatim
+            // (siak_cpmk_id nunjuk ke row yang sudah deleted_at terisi), bikin rollup
+            // nilai ke CPMK induk (hitungDanOverrideNilaiCpmkDariKomponen, paranoid
+            // query) diam-diam gagal dan monitoring CPL/CPMK jadi kosong.
+            await PemetaanEvaluasiCpmk.destroy({
+                where: { siakCpmkId: removedIds },
+                force: true,
+                transaction: t
+            });
+            await PemetaanSoalCpmk.destroy({
+                where: { siakCpmkId: removedIds },
+                force: true,
+                transaction: t
+            });
+            await NilaiCpmkMahasiswa.destroy({
+                where: { siakCapaianMataKuliahId: removedIds },
+                force: true,
+                transaction: t
+            });
+            await NilaiSubcpmkEvaluasiMahasiswa.destroy({
+                where: { siakCpmkId: removedIds },
                 force: true,
                 transaction: t
             });
