@@ -410,6 +410,23 @@ const tulisManualRowsKeLedger = async (krsId, listNilai, trx) => {
         .filter(Boolean);
     if (rencanaEvaluasiIds.length === 0) return;
 
+    // Kalau komponen yang sama SEBELUMNYA pernah ketulis dari CBT (mis. dosen
+    // sempat coba Jalur D/simulasi CBT dulu, baru pindah ke Jalur A manual),
+    // baris CBT lama utk rencana_evaluasi_id yang SEKARANG diisi manual harus
+    // ikut dibersihkan -- manual jadi sumber kebenaran final utk komponen itu,
+    // BUKAN digabung/dijumlah sama sisa CBT lama (hitungDanOverrideNilaiCpmk-
+    // DariKomponen menjumlah semua baris tanpa peduli sumber). Baris CBT utk
+    // rencana_evaluasi_id LAIN (komponen lain) tetap dibiarkan, supaya gabungan
+    // lintas-komponen CBT+manual yang memang diinginkan tetap jalan.
+    await NilaiSubcpmkEvaluasiMahasiswa.destroy({
+        where: {
+            siakRincianKrsMahasiswaId: krsId,
+            sumber: 'CBT',
+            siakRencanaEvaluasiId: rencanaEvaluasiIds
+        },
+        force: true, transaction: trx
+    });
+
     const pemetaanRows = await sequelize.query(
         `SELECT pec.siak_rencana_evaluasi_id AS rencana_evaluasi_id,
                 pec.siak_cpmk_id AS cpmk_id, pec.bobot_cpmk AS bobot_cpmk
