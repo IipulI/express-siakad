@@ -832,8 +832,8 @@ export const getListManajemenCapaian = async (filters) => {
                                     ON cpl.siak_obe_id = obe.id AND cpl.deleted_at IS NULL
         LEFT JOIN siak_pemetaan_pl_cpl ppc
                                     ON ppc.siak_profil_lulusan_id = pl.id AND ppc.deleted_at IS NULL
-        LEFT JOIN siak_pemetaan_cpl_cpmk pcc
-                                    ON pcc.siak_capaian_pembelajaran_lulusan_id = cpl.id AND pcc.deleted_at IS NULL
+        LEFT JOIN siak_pemetaan_cpl_mata_kuliah pcm
+                                    ON pcm.siak_capaian_pembelajaran_lulusan_id = cpl.id AND pcm.deleted_at IS NULL
         WHERE ps.deleted_at IS NULL AND tk.deleted_at IS NULL
         ${whereClause}
     `;
@@ -862,7 +862,7 @@ export const getListManajemenCapaian = async (filters) => {
                 COUNT(DISTINCT pl.id)  AS total_pl,
                 COUNT(DISTINCT cpl.id) AS total_cpl,
                 COUNT(DISTINCT ppc.siak_profil_lulusan_id)                    AS pl_terpetakan,
-                COUNT(DISTINCT pcc.siak_capaian_pembelajaran_lulusan_id)      AS cpl_terpetakan
+                COUNT(DISTINCT pcm.siak_capaian_pembelajaran_lulusan_id)      AS cpl_terpetakan
             ${baseQuery}
             GROUP BY ps.id, ps.kode, ps.nama, tk.id, tk.tahun, j.jenjang, d.nama, obe.id
             ORDER BY (obe.id IS NOT NULL) DESC, tk.tahun DESC, ps.nama ASC
