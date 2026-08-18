@@ -146,12 +146,14 @@ export const destroy = async (req, res) => {
 export const getDaftarMataKuliahObe = async (req, res, next) => {
     try {
         // 1. Ambil parameter dari query string
-        const { page, size, search, searchBy, prodiId, tahunKurikulumId } = req.query;
+        // (FE ada yang ngirim "limit", ada yang "size" -- terima dua-duanya)
+        const { page, size, limit, search, searchBy, prodiId, tahunKurikulumId } = req.query;
+        const finalSize = size || limit;
 
         // 2. Panggil Service
         const result = await MataKuliahService.getListMataKuliahObe(
             page,
-            size,
+            finalSize,
             search,
             prodiId,
             tahunKurikulumId,
@@ -160,7 +162,7 @@ export const getDaftarMataKuliahObe = async (req, res, next) => {
 
         // 3. Bungkus data mentah dengan utilitas pagination milik Abang
         // result berisi { count, rows }
-        const payload = getPagingData(result, page, size);
+        const payload = getPagingData(result, page, finalSize);
 
         // 4. Kirim response sukses menggunakan ResponseBuilder
         return new ResponseBuilder(res)
@@ -168,7 +170,7 @@ export const getDaftarMataKuliahObe = async (req, res, next) => {
             .message("Berhasil mengambil daftar mata kuliah OBE")
             .json({
                 ...payload,
-                isPaginated: page !== null && size !== null // Tambahan flag seperti di JSON Abang
+                isPaginated: page !== null && finalSize !== null // Tambahan flag seperti di JSON Abang
             });
 
     } catch (error) {
