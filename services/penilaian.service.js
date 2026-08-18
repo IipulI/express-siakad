@@ -42,8 +42,12 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
         err.statusCode = 404;
         throw err;
     }
-    if (rincian.status === 'Lulus' || rincian.status === 'Tidak Lulus') {
-        const err = new Error('Nilai sudah difinalisasi dan bersifat permanen, tidak dapat diubah');
+    // BUG FIX 2026-08-19: sebelumnya cuma cek 'Lulus'/'Tidak Lulus' -- status
+    // 'Dikunci' (dikunci dosen/koordinator MK, atau auto-kunci begitu semua
+    // mahasiswa di kelas sudah punya nilai_akhir) LOLOS begitu saja, jadi
+    // fitur "kunci nilai" gak beneran nge-block input manual (Jalur A).
+    if (['Lulus', 'Tidak Lulus', 'Dikunci'].includes(rincian.status)) {
+        const err = new Error('Nilai sudah dikunci/difinalisasi, tidak dapat diubah. Buka kunci dulu lewat menu Kunci Nilai Kelas kalau memang perlu direvisi.');
         err.statusCode = 403;
         throw err;
     }
@@ -525,6 +529,33 @@ export const refreshNilaiAkhirJalurD = async (krsId, kelasId) => {
 
     const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId);
     if (!rincianKrs || ['Lulus', 'Tidak Lulus'].includes(rincianKrs.status)) return null;
+
+    // BUG FIX 2026-08-19: sebelumnya fungsi ini langsung baca ledger tanpa
+    // nge-sync komponen manual (mis. Partisipasi/Kehadiran) dulu -- beda dari
+    // gabungKontribusiManualKeJalurD yang emang nge-sync sebelum hitung. Kalau
+    // dosen input Partisipasi lewat Jalur A (inputNilaiMahasiswa) SETELAH atau
+    // TERPISAH dari breakdown CBT, kontribusi Partisipasi-nya kepencet karena
+    // baris MANUAL di ledger belum ke-refresh -- nilai akhir jadi cuma dihitung
+    // dari komponen CBT doang. Sinkronkan dulu di sini juga.
+    const listNilaiManual = await NilaiEvaluasiMahasiswa.findAll({
+        where: { siakRincianKrsMahasiswaId: krsId }
+    });
+    if (listNilaiManual.length > 0) {
+        await sequelize.transaction(async (trx) => {
+            await tulisManualRowsKeLedger(krsId, listNilaiManual, trx);
+        });
+
+        // Rollup CPMK ulang juga -- Sub-CPMK yang CUMA dipetakan ke komponen manual
+        // (mis. tidak ikut UTS/Tugas/Proyek sama sekali) baru kebaca sekarang,
+        // bukan pas rollup sebelumnya (dipanggil sebelum baris MANUAL ini ke-sync).
+        const krsUntukMahasiswaId = await models.RincianKrsMahasiswa.findByPk(krsId, {
+            include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
+        });
+        const mahasiswaId = krsUntukMahasiswaId?.krsMahasiswa?.siakMahasiswaId;
+        if (mahasiswaId) {
+            await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
+        }
+    }
 
     const nilaiAkhirBaru = await hitungNilaiAkhirDariLedgerJalurD(krsId, kelasId);
     if (nilaiAkhirBaru === null) return null;
@@ -1289,7 +1320,11 @@ export const inputNilaiPerCpmk = async (krsId, nilaiCpmkList) => {
         include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
     });
     if (!rincian) throw Object.assign(new Error('Data rincian KRS tidak ditemukan'), { statusCode: 404 });
-    if (STATUS_FINAL.includes(rincian.status)) throw Object.assign(new Error('Nilai sudah difinalisasi, tidak dapat diubah'), { statusCode: 403 });
+    // BUG FIX 2026-08-19: STATUS_FINAL cuma 'Lulus'/'Tidak Lulus' (sengaja, dipakai
+    // juga oleh kunciNilaiKelas buat cek "buka kunci" -- 'Dikunci' harus TETAP bisa
+    // dibuka dari situ). Tapi buat nge-block INPUT nilai baru, 'Dikunci' juga wajib
+    // ditolak, makanya dicek terpisah di sini, bukan reuse STATUS_FINAL apa adanya.
+    if ([...STATUS_FINAL, 'Dikunci'].includes(rincian.status)) throw Object.assign(new Error('Nilai sudah dikunci/difinalisasi, tidak dapat diubah'), { statusCode: 403 });
 
     // GUARD Jalur D: kalau mata kuliah ini sudah punya data breakdown dari CBT (sumber='CBT'),
     // TOLAK input manual per CPMK -- supaya tidak diam-diam menimpa nilai_akhir & NilaiCpmkMahasiswa

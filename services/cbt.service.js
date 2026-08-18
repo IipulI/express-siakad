@@ -7,7 +7,12 @@ const {
     NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, PemetaanEvaluasiCpmk
 } = models;
 
-const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
+// BUG FIX 2026-08-19: nama variabel ini sejak awal bilang "final ATAU kunci",
+// tapi isinya cuma 2 status final -- 'Dikunci' gak pernah ada di sini. Akibatnya
+// kelas yang udah dikunci (semua mahasiswa punya nilai_akhir, auto-kunci di
+// refreshNilaiAkhirJalurD) masih bisa nerima breakdown CBT baru tanpa ditolak,
+// padahal maksudnya "dikunci" itu ya gak boleh diubah lagi. Ditambahin di sini.
+const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus', 'Dikunci'];
 
 // ============================================================================
 // JALUR D — Integrasi CBT (soal & koreksi/cek-benar-salah dilakukan di CBT,
