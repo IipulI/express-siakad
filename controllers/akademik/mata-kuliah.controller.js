@@ -146,7 +146,7 @@ export const destroy = async (req, res) => {
 export const getDaftarMataKuliahObe = async (req, res, next) => {
     try {
         // 1. Ambil parameter dari query string
-        const { page, size, search, prodiId, tahunKurikulumId } = req.query;
+        const { page, size, search, searchBy, prodiId, tahunKurikulumId } = req.query;
 
         // 2. Panggil Service
         const result = await MataKuliahService.getListMataKuliahObe(
@@ -154,7 +154,8 @@ export const getDaftarMataKuliahObe = async (req, res, next) => {
             size,
             search,
             prodiId,
-            tahunKurikulumId
+            tahunKurikulumId,
+            searchBy
         );
 
         // 3. Bungkus data mentah dengan utilitas pagination milik Abang
