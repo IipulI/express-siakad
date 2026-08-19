@@ -7,6 +7,13 @@ const {
     Dosen
 } = db
 
+// FIX 2026-08-19: sebelumnya dipakai di findOneById tapi gak pernah
+// didefinisikan (ReferenceError), bikin endpoint detail dosen selalu crash.
+const ADMIN_LIST_ATTRIBUTES = [
+    'id', 'nama', 'nidn', 'nip', 'gelarDepan', 'gelarBelakang',
+    'jenisKelamin', 'emailPegawai', 'jabatanFungsional', 'statusAktif'
+];
+
 export const findOneById = async (id) => {
     const dosen = await Dosen.findOne({
         where: { id, isDosen: true },
