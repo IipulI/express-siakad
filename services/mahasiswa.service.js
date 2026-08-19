@@ -17,6 +17,7 @@ const {
     ProgramStudi,
     RincianKrsMahasiswa,
     Ruangan,
+    StatusMahasiswa,
     User,
 } = models;
 
@@ -70,11 +71,11 @@ export const findAll = async (filter, page, size) => {
         // hasMany association drops the per-parent WHERE/LIMIT scoping.
         const mahasiswaQueryBuilder = {
             attributes: [
-                'id', 'nama', 'npm', 'periodeMasuk'
+                'id', 'nama', 'npm', 'periodeMasuk', 'semester',
             ],
             where: mahasiswaWhere,
             order: [
-                ["id", "DESC"]
+                ["npm", "desc"]
             ],
             include: [
                 {
@@ -106,6 +107,11 @@ export const findAll = async (filter, page, size) => {
                             }
                         }
                     }
+                },
+                {
+                    attributes: ['id', 'nama'],
+                    model: StatusMahasiswa,
+                    as: 'statusMahasiswa',
                 }
             ],
         }
@@ -153,6 +159,13 @@ export const findAll = async (filter, page, size) => {
             latestByMahasiswa = Object.fromEntries(
                 latestHasilStudi.map(hs => [hs.siakMahasiswaId, hs])
             );
+
+            // const totalSksDiambil = await sequelize.query(`
+            //     SELECT Distinct on (siak_mahasiswa_id)
+            //         sum(sks_lulus) as totalSksLulus
+            //     FROM siak_hasil_studi
+            //     WHERE siak_mahasiswa_id IN (:mahasiswaIds)
+            // `)
         }
 
         const formattedRows = rows.map(mahasiswa => {

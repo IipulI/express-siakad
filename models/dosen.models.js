@@ -34,6 +34,11 @@ export default (sequelize) => {
                 foreignKey: 'kaprodi_id', // Harus sama dengan yang di atas
                 as: 'kepalaProdi'
             });
+
+            this.hasMany(models.Pengumuman, {
+                foreignKey: 'siak_pegawai_id',
+                as: 'pengumuman'
+            });
         }
     }
     Dosen.init({
@@ -41,6 +46,23 @@ export default (sequelize) => {
             type: DataTypes.UUID,
             primaryKey: true,
             defaultValue: uuid7,
+        },
+        siakUserId: {
+            field: 'siak_user_id',
+            type: DataTypes.UUID,
+            allowNull: false,
+        },
+        isDosen: {
+            field: 'is_dosen',
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
+        isPegawai: {
+            field: 'is_pegawai',
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
         },
         nama: {
             type: DataTypes.STRING(75),
@@ -108,7 +130,7 @@ export default (sequelize) => {
         paranoid: true,
 
         modelName: "Dosen",
-        tableName: "siak_dosen",
+        tableName: "siak_pegawai",
     });
     return Dosen;
 };

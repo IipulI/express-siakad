@@ -3,7 +3,7 @@ import akademikRoutes from './akademik/index.js';
 import mahasiswaRoutes from './mahasiswa/index.js';
 import dosenRoutes from './dosen/index.js';
 import orangTuaRoutes from './orang-tua/index.js';
-import { verifySsoToken } from "../middleware/auth.middleware.js";
+import { checkBlacklist, verifySsoToken } from "../middleware/auth.middleware.js";
 import * as programStudiController from "../controllers/akademik/program-studi.controller.js"
 import { attachUser } from "../middleware/attachUser.middleware.js";
 import ssoRoutes from '../routes/sso/sso.js';
@@ -24,9 +24,9 @@ router.get('/program-studi', programStudiController.findAll)
 
 router.use('/public', publicRouter)
 
-router.use('/akademik', verifySsoToken, attachUser, akademikRoutes);
-router.use('/mahasiswa', verifySsoToken, attachUser, mahasiswaRoutes)
-router.use('/dosen', verifySsoToken, attachUser, dosenRoutes)
+router.use('/akademik', verifySsoToken, checkBlacklist, attachUser, akademikRoutes);
+router.use('/mahasiswa', verifySsoToken, checkBlacklist, attachUser, mahasiswaRoutes)
+router.use('/dosen', verifySsoToken, checkBlacklist, attachUser, dosenRoutes)
 router.use('/orang-tua', orangTuaRoutes)
 
 export default router;

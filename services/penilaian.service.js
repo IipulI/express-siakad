@@ -42,8 +42,12 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
         err.statusCode = 404;
         throw err;
     }
-    if (rincian.status === 'Lulus' || rincian.status === 'Tidak Lulus') {
-        const err = new Error('Nilai sudah difinalisasi dan bersifat permanen, tidak dapat diubah');
+    // BUG FIX 2026-08-19: sebelumnya cuma cek 'Lulus'/'Tidak Lulus' -- status
+    // 'Dikunci' (dikunci dosen/koordinator MK, atau auto-kunci begitu semua
+    // mahasiswa di kelas sudah punya nilai_akhir) LOLOS begitu saja, jadi
+    // fitur "kunci nilai" gak beneran nge-block input manual (Jalur A).
+    if (['Lulus', 'Tidak Lulus', 'Dikunci'].includes(rincian.status)) {
+        const err = new Error('Nilai sudah dikunci/difinalisasi, tidak dapat diubah. Buka kunci dulu lewat menu Kunci Nilai Kelas kalau memang perlu direvisi.');
         err.statusCode = 403;
         throw err;
     }
@@ -84,9 +88,20 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
 
 // 3. KALKULATOR HASIL AKHIR OBE (VERSI DINAMIS SKALA NILAI)
 export const hitungNilaiAkhir = async (krsId) => {
-    // GUARD Jalur D: nilai_akhir/huruf_mutu MK di-skip HANYA kalau CBT betulan
-    // sudah kirim data (sumber='CBT' di siak_nilai_subcpmk_evaluasi_mahasiswa) --
-    // itu murni otoritas CBT (simpanNilaiAkhirDariCbt), JANGAN dihitung ulang.
+    // GUARD Jalur D: begitu CBT betulan sudah kirim data (sumber='CBT' di
+    // siak_nilai_subcpmk_evaluasi_mahasiswa), rumus Jalur A di bawah (baca
+    // NilaiEvaluasiMahasiswa x bobot) DILEWATI SEPENUHNYA -- diganti
+    // gabungKontribusiManualKeJalurD, yang menuju refreshNilaiAkhirJalurD.
+    //
+    // Revisi 2026-08-10 (dipastikan langsung ke tim CBT): CBT TIDAK PERNAH
+    // mengirim /cbt/nilai-akhir, cuma kirim skor mentah per soal. Jadi
+    // nilai_akhir/huruf_mutu MK sekarang DIHITUNG ULANG di sini dari ledger
+    // (gabungan breakdown CBT tiap komponen x bobot resmi RencanaEvaluasi),
+    // BUKAN lagi dibiarkan kosong menunggu titipan CBT yang tidak akan pernah
+    // datang. Sebelum revisi ini, baris di bawah cuma MEMBACA nilai_akhir yang
+    // sudah ada -- karena CBT memang tidak pernah menulisnya, nilai_akhir akan
+    // tetap kosong selamanya kalau tidak diubah.
+    //
     // CPMK-nya sendiri SELALU digabung lewat "ledger" yang sama (lihat
     // tulisManualRowsKeLedger di bawah + hitungDanOverrideNilaiCpmkDariKomponen),
     // baik ada data CBT atau tidak -- supaya urutan Kehadiran/komponen manual vs
@@ -399,6 +414,23 @@ const tulisManualRowsKeLedger = async (krsId, listNilai, trx) => {
         .filter(Boolean);
     if (rencanaEvaluasiIds.length === 0) return;
 
+    // Kalau komponen yang sama SEBELUMNYA pernah ketulis dari CBT (mis. dosen
+    // sempat coba Jalur D/simulasi CBT dulu, baru pindah ke Jalur A manual),
+    // baris CBT lama utk rencana_evaluasi_id yang SEKARANG diisi manual harus
+    // ikut dibersihkan -- manual jadi sumber kebenaran final utk komponen itu,
+    // BUKAN digabung/dijumlah sama sisa CBT lama (hitungDanOverrideNilaiCpmk-
+    // DariKomponen menjumlah semua baris tanpa peduli sumber). Baris CBT utk
+    // rencana_evaluasi_id LAIN (komponen lain) tetap dibiarkan, supaya gabungan
+    // lintas-komponen CBT+manual yang memang diinginkan tetap jalan.
+    await NilaiSubcpmkEvaluasiMahasiswa.destroy({
+        where: {
+            siakRincianKrsMahasiswaId: krsId,
+            sumber: 'CBT',
+            siakRencanaEvaluasiId: rencanaEvaluasiIds
+        },
+        force: true, transaction: trx
+    });
+
     const pemetaanRows = await sequelize.query(
         `SELECT pec.siak_rencana_evaluasi_id AS rencana_evaluasi_id,
                 pec.siak_cpmk_id AS cpmk_id, pec.bobot_cpmk AS bobot_cpmk
@@ -433,9 +465,168 @@ const tulisManualRowsKeLedger = async (krsId, listNilai, trx) => {
     }
 };
 
+// Revisi 2026-08-10 (hasil ketemu langsung sama tim CBT): CBT dipastikan TIDAK
+// PERNAH mengirim /cbt/nilai-akhir sama sekali -- CBT cuma kirim skor mentah
+// (breakdown per soal). Sebelumnya fungsi ini cuma BACA nilai_akhir yang sudah
+// ada (murni titipan CBT), yang berarti nilai_akhir MK bakal kosong SELAMANYA
+// begitu ada data CBT. Sekarang nilai_akhir dihitung SENDIRI dari ledger
+// (gabungan breakdown CBT tiap komponen + kontribusi manual seperti Kehadiran,
+// dikalikan bobot resmi RencanaEvaluasi masing-masing) -- rumus identik dengan
+// hitungReferensiNilaiAkhirDariLedger di cbt.service.js, cuma di sini dipakai
+// buat MENULIS nilai_akhir, bukan sekadar dibandingkan.
+const hitungNilaiAkhirDariLedgerJalurD = async (krsId, kelasId) => {
+    const kelas = await sequelize.query(
+        `SELECT siak_mata_kuliah_id AS "mataKuliahId", siak_periode_akademik_id AS "periodeId"
+         FROM siak_kelas_kuliah WHERE id = :kelasId LIMIT 1`,
+        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (kelas.length === 0) return null;
+    const { mataKuliahId, periodeId } = kelas[0];
+
+    const komponenList = await sequelize.query(
+        `SELECT id, bobot FROM siak_rencana_evaluasi
+         WHERE siak_mata_kuliah_id = :mataKuliahId AND siak_periode_akademik_id = :periodeId
+           AND deleted_at IS NULL`,
+        { replacements: { mataKuliahId, periodeId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (komponenList.length === 0) return null;
+
+    const ledgerAgg = await sequelize.query(
+        `SELECT siak_rencana_evaluasi_id AS "rencanaEvaluasiId",
+                SUM(skor_terbobot) AS "totalW", SUM(total_bobot) AS "totalB"
+         FROM siak_nilai_subcpmk_evaluasi_mahasiswa
+         WHERE siak_rincian_krs_mahasiswa_id = :krsId AND deleted_at IS NULL
+         GROUP BY siak_rencana_evaluasi_id`,
+        { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
+    );
+    const ledgerMap = {};
+    ledgerAgg.forEach(row => { ledgerMap[row.rencanaEvaluasiId] = row; });
+
+    let totalTerhitung = 0;
+    let totalBobotDipakai = 0;
+    komponenList.forEach(k => {
+        const row = ledgerMap[k.id];
+        const bobotK = parseFloat(k.bobot || 0);
+        if (!row || parseFloat(row.totalB || 0) <= 0) return;
+        const persenKomponen = (parseFloat(row.totalW) / parseFloat(row.totalB)) * 100;
+        totalTerhitung += persenKomponen * (bobotK / 100);
+        totalBobotDipakai += bobotK;
+    });
+
+    // Belum ada komponen manapun yang punya data -- jangan tulis 0 seolah itu
+    // nilai final (bisa salah kepicu auto-kunci kelas padahal belum ada apa-apa).
+    if (totalBobotDipakai === 0) return null;
+    return Math.round(totalTerhitung * 100) / 100;
+};
+
+// Dipakai bersama oleh gabungKontribusiManualKeJalurD (lewat input manual, mis.
+// Kehadiran) DAN simpanNilaiKomponenDariCbt di cbt.service.js (lewat breakdown
+// CBT langsung) -- supaya nilai akhir tetap kehitung otomatis walau mata kuliah
+// yang bersangkutan TIDAK PUNYA komponen manual sama sekali (100% dari CBT),
+// yang kalau cuma dipicu dari jalur manual gak akan pernah kesentuh sama sekali.
+export const refreshNilaiAkhirJalurD = async (krsId, kelasId) => {
+    if (!kelasId) return null;
+
+    const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId);
+    if (!rincianKrs || ['Lulus', 'Tidak Lulus'].includes(rincianKrs.status)) return null;
+
+    // BUG FIX 2026-08-19: sebelumnya fungsi ini langsung baca ledger tanpa
+    // nge-sync komponen manual (mis. Partisipasi/Kehadiran) dulu -- beda dari
+    // gabungKontribusiManualKeJalurD yang emang nge-sync sebelum hitung. Kalau
+    // dosen input Partisipasi lewat Jalur A (inputNilaiMahasiswa) SETELAH atau
+    // TERPISAH dari breakdown CBT, kontribusi Partisipasi-nya kepencet karena
+    // baris MANUAL di ledger belum ke-refresh -- nilai akhir jadi cuma dihitung
+    // dari komponen CBT doang. Sinkronkan dulu di sini juga.
+    const listNilaiManual = await NilaiEvaluasiMahasiswa.findAll({
+        where: { siakRincianKrsMahasiswaId: krsId }
+    });
+    if (listNilaiManual.length > 0) {
+        await sequelize.transaction(async (trx) => {
+            await tulisManualRowsKeLedger(krsId, listNilaiManual, trx);
+        });
+
+        // Rollup CPMK ulang juga -- Sub-CPMK yang CUMA dipetakan ke komponen manual
+        // (mis. tidak ikut UTS/Tugas/Proyek sama sekali) baru kebaca sekarang,
+        // bukan pas rollup sebelumnya (dipanggil sebelum baris MANUAL ini ke-sync).
+        const krsUntukMahasiswaId = await models.RincianKrsMahasiswa.findByPk(krsId, {
+            include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
+        });
+        const mahasiswaId = krsUntukMahasiswaId?.krsMahasiswa?.siakMahasiswaId;
+        if (mahasiswaId) {
+            await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
+        }
+    }
+
+    const nilaiAkhirBaru = await hitungNilaiAkhirDariLedgerJalurD(krsId, kelasId);
+    if (nilaiAkhirBaru === null) return null;
+
+    // Skala dinamis per prodi+kurikulum kalau ada, fallback DEFAULT_SKALA kalau
+    // belum dikonfigurasi -- pola sama dengan resolveHurufMutu di cbt.service.js.
+    const traceSkala = await sequelize.query(
+        `SELECT mk.siak_program_studi_id AS "prodiId", mk.siak_tahun_kurikulum_id AS "kurikulumId"
+         FROM siak_rincian_krs_mahasiswa rkm
+         LEFT JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+         LEFT JOIN siak_mata_kuliah mk ON kk.siak_mata_kuliah_id = mk.id
+         WHERE rkm.id = :krsId LIMIT 1`,
+        { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
+    );
+    let skalaAktif = DEFAULT_SKALA;
+    if (traceSkala?.[0]?.prodiId && traceSkala?.[0]?.kurikulumId) {
+        const skalaRows = await sequelize.query(
+            `SELECT huruf_mutu AS "hurufMutu", angka_mutu AS "angkaMutu", nilai_min AS "nilaiMin"
+             FROM siak_skala_penilaian
+             WHERE siak_program_studi_id = :prodiId AND siak_tahun_kurikulum_id = :kurikulumId
+               AND deleted_at IS NULL
+             ORDER BY nilai_min DESC`,
+            { replacements: { prodiId: traceSkala[0].prodiId, kurikulumId: traceSkala[0].kurikulumId }, type: sequelize.QueryTypes.SELECT }
+        );
+        if (skalaRows.length > 0) skalaAktif = skalaRows;
+    }
+    const grade = getGrade(nilaiAkhirBaru, skalaAktif);
+    const hurufMutu = grade.hurufMutu;
+    const angkaMutu = grade.angkaMutu;
+
+    await RincianKrsMahasiswa.update(
+        { nilaiAkhir: nilaiAkhirBaru, hurufMutu, angkaMutu },
+        { where: { id: krsId } }
+    );
+
+    // Auto-kunci per-kelas -- pola identik simpanNilaiAkhirDariCbt (cbt.service.js):
+    // begitu SEMUA mahasiswa di kelas ini sudah punya nilai_akhir, kelas otomatis
+    // dikunci, supaya nilai kebuka di KHS/Transkrip.
+    const [cekRows] = await sequelize.query(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
+         FROM siak_rincian_krs_mahasiswa
+         WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
+        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+    );
+    if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+        await sequelize.query(
+            `UPDATE siak_rincian_krs_mahasiswa
+             SET status = 'Dikunci', updated_at = NOW()
+             WHERE siak_kelas_kuliah_id = :kelasId
+               AND (status IS NULL OR status NOT IN ('Dikunci', 'Lulus', 'Tidak Lulus'))
+               AND deleted_at IS NULL`,
+            { replacements: { kelasId } }
+        );
+        const pesertaKelas = await sequelize.query(
+            `SELECT km.siak_mahasiswa_id AS "mahasiswaId", kk.siak_periode_akademik_id AS "periodeId"
+             FROM siak_rincian_krs_mahasiswa rkm
+             JOIN siak_krs_mahasiswa km ON rkm.siak_krs_mahasiswa_id = km.id
+             JOIN siak_kelas_kuliah kk ON rkm.siak_kelas_kuliah_id = kk.id
+             WHERE rkm.siak_kelas_kuliah_id = :kelasId AND rkm.deleted_at IS NULL`,
+            { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
+        );
+        for (const p of pesertaKelas) {
+            await updateHasilStudiJikaPeriodeLengkap(p.mahasiswaId, p.periodeId);
+        }
+    }
+
+    return { krsId, nilaiAkhir: nilaiAkhirBaru, hurufMutu, angkaMutu };
+};
+
 // Dipanggil oleh hitungNilaiAkhir kalau krsId sudah punya data CBT (sumber='CBT').
-// nilai_akhir/huruf_mutu MK TIDAK disentuh sama sekali (tetap murni dari CBT) --
-// cuma tulis kontribusi manual ke ledger lalu rollup ulang gabung dgn CBT.
 const gabungKontribusiManualKeJalurD = async (krsId) => {
     const rincianKrs = await models.RincianKrsMahasiswa.findByPk(krsId, {
         include: [{ model: models.KrsMahasiswa, as: 'krsMahasiswa' }]
@@ -459,64 +650,55 @@ const gabungKontribusiManualKeJalurD = async (krsId) => {
     // Rollup ulang CPMK dari SEMUA sumber (CBT + MANUAL) utk krsId ini.
     await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
 
-    const existing = await models.RincianKrsMahasiswa.findByPk(krsId);
+    // Hitung ulang & tulis nilai akhir MK dari ledger gabungan (lihat komentar revisi di atas).
+    const hasilRefresh = await refreshNilaiAkhirJalurD(krsId, kelasId);
+
+    const existing = hasilRefresh ? null : await models.RincianKrsMahasiswa.findByPk(krsId);
     return {
         krsId,
-        totalSkor: existing ? parseFloat(existing.nilaiAkhir || 0) : 0,
-        hurufMutu: existing?.hurufMutu ?? null,
-        angkaMutu: existing ? parseFloat(existing.angkaMutu || 0) : 0
+        totalSkor: hasilRefresh ? hasilRefresh.nilaiAkhir : parseFloat(existing?.nilaiAkhir || 0),
+        hurufMutu: hasilRefresh ? hasilRefresh.hurufMutu : (existing?.hurufMutu ?? null),
+        angkaMutu: hasilRefresh ? hasilRefresh.angkaMutu : parseFloat(existing?.angkaMutu || 0)
     };
 };
 
 // 4. GENERATOR RAPOR OBE MAHASISWA
 export const getRaporOBEMahasiswa = async (rincianKrsId) => {
     try {
-        const listNilai = await models.NilaiEvaluasiMahasiswa.findAll({
-            where: { siakRincianKrsMahasiswaId: rincianKrsId },
+        // PENTING: rapor HARUS dibaca dari NilaiCpmkMahasiswa (hasil rollup
+        // hitungDanOverrideNilaiCpmkDariKomponen, yang sudah menggabungkan
+        // seluruh sumber CBT + MANUAL). Jangan baca dari NilaiEvaluasiMahasiswa
+        // -- tabel itu cuma diisi komponen manual (mis. Kehadiran), breakdown
+        // CBT (UTS/UAS/Tugas) tidak pernah menulis ke sana sehingga
+        // kontribusinya hilang total dari rapor.
+        const rincian = await RincianKrsMahasiswa.findByPk(rincianKrsId, {
+            include: [{ model: KrsMahasiswa, as: 'krsMahasiswa' }]
+        });
+        if (!rincian || !rincian.krsMahasiswa) return [];
+
+        const daftarNilaiCpmk = await NilaiCpmkMahasiswa.findAll({
+            where: {
+                siakKelasKuliahId: rincian.siakKelasKuliahId,
+                siakMahasiswaId: rincian.krsMahasiswa.siakMahasiswaId
+            },
             include: [{
-                model: models.RencanaEvaluasi,
-                as: 'rencanaEvaluasi',
-                include: [{
-                    model: models.CapaianMataKuliah,
-                    as: 'cpmkList',
-                    attributes: ['id', 'kode', 'deskripsi'],
-                    through: { attributes: ['bobotCpmk'] }
-                }]
+                model: CapaianMataKuliah,
+                as: 'capaianMataKuliah',
+                attributes: ['kode', 'deskripsi', 'target']
             }]
         });
 
-        let raporCPMK = {};
-
-        listNilai.forEach(nilai => {
-            if (!nilai.rencanaEvaluasi?.cpmkList) return;
-            const skorAsli = parseFloat(nilai.skor);
-
-            nilai.rencanaEvaluasi.cpmkList.forEach(cpmk => {
-                const kodeCpmk = cpmk.kode || cpmk.id;
-                if (!kodeCpmk) return;
-
-                const bobotCpmk = parseFloat(cpmk.PemetaanEvaluasiCpmk?.bobotCpmk || 0);
-
-                if (!raporCPMK[kodeCpmk]) {
-                    raporCPMK[kodeCpmk] = {
-                        kode: kodeCpmk,
-                        deskripsi: cpmk.deskripsi || '-',
-                        totalSkorTerbobot: 0,
-                        totalBobot: 0
-                    };
-                }
-                raporCPMK[kodeCpmk].totalSkorTerbobot += skorAsli * bobotCpmk;
-                raporCPMK[kodeCpmk].totalBobot += bobotCpmk;
-            });
+        return daftarNilaiCpmk.map(n => {
+            const target = n.capaianMataKuliah?.target != null ? parseFloat(n.capaianMataKuliah.target) : null;
+            const nilaiCapaian = parseFloat(n.nilai);
+            return {
+                kodeCpmk: n.capaianMataKuliah?.kode || n.siakCapaianMataKuliahId,
+                deskripsi: n.capaianMataKuliah?.deskripsi || '-',
+                nilaiCapaian,
+                target,
+                statusKetercapaian: target != null ? (nilaiCapaian >= target ? 'Memenuhi' : 'Belum Memenuhi') : null
+            };
         });
-
-        return Object.values(raporCPMK).map(item => ({
-            kodeCpmk: item.kode,
-            deskripsi: item.deskripsi,
-            nilaiCapaian: item.totalBobot > 0
-                ? parseFloat((item.totalSkorTerbobot / item.totalBobot).toFixed(2))
-                : 0
-        }));
 
     } catch (error) {
         throw new Error("Gagal menggenerate rapor OBE: " + error.message);
@@ -754,12 +936,24 @@ export const getPesertaKelasList = async (kelasId) => {
             });
 
             // Komponen belum diinput lewat Jalur A/manual -> coba isi dari ledger
-            // Jalur D dulu (kalau ada), baru null kalau dua-duanya kosong.
+            // Jalur D dulu (kalau ada), baru null kalau dua-duanya kosong. Ikut
+            // ditambahkan ke nilaiAkhirHitung/adaNilai juga -- kalau tidak, mahasiswa
+            // yang nilai_akhir di DB-nya belum ke-refresh (breakdown lama, belum ada
+            // write baru yang men-trigger refreshNilaiAkhirJalurD) akan tetap tampil
+            // Nilai Akhir 0 walau nilai per komponennya sendiri sudah lengkap.
             const ledgerMhsIni = jalurDPerKomponen[item.id] || {};
             komposisiList.forEach(k => {
                 const label = (k.metodeEvaluasi || '-').toUpperCase();
                 if (label in nilaiPerKomponen) return;
-                nilaiPerKomponen[label] = (k.id in ledgerMhsIni) ? ledgerMhsIni[k.id] : null;
+                if (k.id in ledgerMhsIni) {
+                    const skorLedger = ledgerMhsIni[k.id];
+                    const persentase = parseFloat(k.bobot || 0);
+                    nilaiPerKomponen[label] = skorLedger;
+                    nilaiAkhirHitung += skorLedger * (persentase / 100);
+                    adaNilai = true;
+                } else {
+                    nilaiPerKomponen[label] = null;
+                }
             });
 
             nilaiAkhirHitung = Math.round(nilaiAkhirHitung * 100) / 100;
@@ -1126,7 +1320,11 @@ export const inputNilaiPerCpmk = async (krsId, nilaiCpmkList) => {
         include: [{ model: KrsMahasiswa, as: 'krsMahasiswa', attributes: ['siakMahasiswaId'] }]
     });
     if (!rincian) throw Object.assign(new Error('Data rincian KRS tidak ditemukan'), { statusCode: 404 });
-    if (STATUS_FINAL.includes(rincian.status)) throw Object.assign(new Error('Nilai sudah difinalisasi, tidak dapat diubah'), { statusCode: 403 });
+    // BUG FIX 2026-08-19: STATUS_FINAL cuma 'Lulus'/'Tidak Lulus' (sengaja, dipakai
+    // juga oleh kunciNilaiKelas buat cek "buka kunci" -- 'Dikunci' harus TETAP bisa
+    // dibuka dari situ). Tapi buat nge-block INPUT nilai baru, 'Dikunci' juga wajib
+    // ditolak, makanya dicek terpisah di sini, bukan reuse STATUS_FINAL apa adanya.
+    if ([...STATUS_FINAL, 'Dikunci'].includes(rincian.status)) throw Object.assign(new Error('Nilai sudah dikunci/difinalisasi, tidak dapat diubah'), { statusCode: 403 });
 
     // GUARD Jalur D: kalau mata kuliah ini sudah punya data breakdown dari CBT (sumber='CBT'),
     // TOLAK input manual per CPMK -- supaya tidak diam-diam menimpa nilai_akhir & NilaiCpmkMahasiswa
@@ -1472,7 +1670,7 @@ export const getDataDaftarNilai = async (kelasId) => {
         getPesertaKelasList(kelasId),
     ]);
 
-    const { tabel } = pesertaData;
+    const { headerKolom, tabel } = pesertaData;
     const dosenList = (metadata.jadwalKuliah || []).map((dk) => dk.dosen).filter(Boolean);
 
     return {
@@ -1496,11 +1694,13 @@ export const getDataDaftarNilai = async (kelasId) => {
             semester: metadata.periodeAkademik?.semester || null,
         },
         dosen: dosenList,
+        komponenEvaluasi: headerKolom,
         mahasiswa: tabel.map((row) => ({
             no: row.no,
             rincianKrsId: row.rincianKrsId,
             nim: row.nim,
             nama: row.nama,
+            nilaiPerKomponen: row.nilaiPerKomponen,
             nilaiAkhir: row.nilaiAkhir,
             nilaiAngka: row.angkaMutu,
             nilaiHuruf: row.grade,

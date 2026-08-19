@@ -44,7 +44,7 @@ export default (sequelize) => {
             siakProgramStudiId: {
                 type: DataTypes.UUID,
                 field: 'siak_program_studi_id',
-                allowNull: true // legacy -- fitur aktif sekarang pakai siakJenjangId
+                allowNull: true
             },
             siakJenjangId: {
                 type: DataTypes.UUID,
@@ -76,7 +76,6 @@ export default (sequelize) => {
                 field: 'nilai_max',
                 allowNull: false
             },
-            // Kolom baru dari hasil migration tadi
             keterangan: {
                 type: DataTypes.STRING,
                 allowNull: true
@@ -88,10 +87,10 @@ export default (sequelize) => {
                 defaultValue: false
             },
             siakPeriodeAkademikId: {
-    type: DataTypes.UUID,
-    field: 'siak_periode_akademik_id', // 👈 Jembatan ke database
-    allowNull: true
-}
+                type: DataTypes.UUID,
+                field: 'siak_periode_akademik_id',
+                allowNull: true
+            }
         },
         {
             sequelize,

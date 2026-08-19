@@ -650,7 +650,10 @@ export const exportPdfCapaianKelas = async (req, res, next) => {
         doc.text('NIM', boxX + colNo, headerY, { width: colNim, align: 'center', lineBreak: false });
         doc.text('Nama', boxX + colNo + colNim, headerY, { width: colNama, align: 'center', lineBreak: false });
         data.cpmkInfo.forEach((c, i) => {
-            doc.text(c.kode, cpmkX + i * cpmkW, headerY, { width: cpmkW, align: 'center', lineBreak: false });
+            // Kolom sempit (bisa 9+ Sub-CPMK sejajar) -- cukup nomornya, label CPMK
+            // induk penuh udah ada di baris grup header di atasnya.
+            const labelKolom = c.kode.replace(/^Sub-CPMK|^CPMK/, '');
+            doc.text(labelKolom, cpmkX + i * cpmkW, headerY, { width: cpmkW, align: 'center', lineBreak: false });
         });
         doc.text('Status Capaian', statusX, headerY, { width: colStatus, align: 'center', lineBreak: false });
         doc.restore();

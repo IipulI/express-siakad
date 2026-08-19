@@ -110,9 +110,6 @@ router.get('/:obeId/mata-kuliah/:mataKuliahId/matriks-pemetaan', ObeController.g
 router.get('/mata-kuliah/:id/pemetaan-cpl', MataKuliahController.getCplMapping);
 
 
-// Endpoint detail mata kuliah biasa
-router.get('/mata-kuliah/:id', MataKuliahController.findOne);
-
 // Endpoint untuk merender halaman Ceklis CPL (Yang tadi dibuat)
 router.get('/mata-kuliah/:id/pemetaan-cpl', MataKuliahController.getCplMapping);
 

@@ -5,7 +5,10 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
   class Pengumuman extends Model {
     static associate(models) {
-      //   this.belongsTo(models.Pegawai);
+      this.belongsTo(models.Dosen, {
+        foreignKey: "siak_pegawai_id",
+        as: "pegawai",
+      });
     }
   }
 

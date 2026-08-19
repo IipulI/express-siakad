@@ -4,7 +4,7 @@ import { Op } from "sequelize";
 import { NotFoundError } from "../utils/custom-error.js";
 
 const {
-    Pegawai,
+    Dosen,
     Pengumuman
 } = models;
 
@@ -65,7 +65,7 @@ export const findOneById = async (id) => {
 }
 
 export const createPengumuman = async (data, file, userId) => {
-    const pegawai = await Pegawai.findOne({
+    const pegawai = await Dosen.findOne({
         where: {
             siakUserId: userId
         }
