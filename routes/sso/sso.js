@@ -2,12 +2,13 @@ import express from 'express';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import models from '../../models/index.js';
+import { UnprocessableEntityError } from "../../utils/custom-error.js";
 
 const { Mahasiswa } = models;
 const router = express.Router();
 const EPORTAL_API = process.env.EPORTAL_API_URL || 'https://eportal.uika-bogor.ac.id';
 
-router.get('/callback', async (req, res) => {
+router.get('/callback', async (req, res, next) => {
     const { token, role_id, appModule_id, unit_id } = req.query;
 
     if (!token || !role_id || !appModule_id) {
@@ -48,12 +49,16 @@ router.get('/callback', async (req, res) => {
         let siakadUserId = null;
         let siakadRole = 'MAHASISWA';
 
+        let accountInfo = {}
         if (roleUpper === 'MAHASISWA' && isValid(eportalUser.npm)) {
             const mahasiswa = await Mahasiswa.findOne({
                 where: { npm: eportalUser.npm },
-                attributes: ['nama', 'npm', 'siakUserId'],
+                attributes: ['id', 'nama', 'npm', 'semester', 'siakUserId'],
             });
             if (mahasiswa) {
+                accountInfo.nama = mahasiswa.nama
+                accountInfo.npm = mahasiswa.npm
+                accountInfo.semester = mahasiswa.semester
                 nama = mahasiswa.nama;
                 siakadUserId = mahasiswa.siakUserId;
                 siakadRole = 'MAHASISWA';
@@ -65,8 +70,8 @@ router.get('/callback', async (req, res) => {
             const nidnWithoutZero = nidn.replace(/^0+/, '');
 
             const dosenResult = await models.sequelize.query(
-                `SELECT id, siak_user_id, nama FROM siak_dosen 
-                 WHERE nidn IN (:nidn, :nidnWithZero, :nidnWithoutZero) 
+                `SELECT id, siak_user_id, nama FROM siak_pegawai
+                 WHERE nidn IN (:nidn, :nidnWithZero, :nidnWithoutZero)
                  AND deleted_at IS NULL LIMIT 1`,
                 {
                     replacements: { nidn, nidnWithZero, nidnWithoutZero },
@@ -75,6 +80,9 @@ router.get('/callback', async (req, res) => {
             );
 
             if (dosenResult.length > 0) {
+                accountInfo.nama = dosenResult.nama
+                accountInfo.code = dosenResult.nip
+
                 nama = dosenResult[0].nama;
                 siakadUserId = dosenResult[0].siak_user_id;
                 siakadRole = 'DOSEN';
@@ -95,10 +103,15 @@ router.get('/callback', async (req, res) => {
             );
 
             if (pegawaiResult.length > 0) {
+                accountInfo.nama = dosenResult.nama
+                accountInfo.code = dosenResult.nip
+
                 nama = pegawaiResult[0].nama;
                 siakadUserId = pegawaiResult[0].siak_user_id;
                 siakadRole = 'AKADEMIK_UNIV';
             }
+        } else {
+            throw new UnprocessableEntityError("User tidak dapat ditemukan")
         }
 
         console.log('[SSO] siakadUserId:', siakadUserId, '| role:', siakadRole);
@@ -128,6 +141,7 @@ router.get('/callback', async (req, res) => {
                     nama: nama,
                     code: eportalUser.npm || eportalUser.nidn || eportalUser.email,
                 },
+                permissions: parsedRes.access.role_permissions
             },
         });
 
