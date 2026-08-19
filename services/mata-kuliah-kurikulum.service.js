@@ -137,7 +137,6 @@ export const getRekapDistribusiSks = async (filters) => {
             resultData.push({
                 tahunKurikulumId: kurikulum.id,
                 tahun: kurikulum.tahun,
-                prodiId: prodi.id,
                 kodeProdi: prodi.kode,
                 programStudi: `${namaJenjang} - ${prodi.nama}`,
                 sksWajib: sksWajib,

@@ -1,18 +1,13 @@
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
-import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap, refreshNilaiAkhirJalurD } from './penilaian.service.js';
+import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap } from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
-    NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, PemetaanEvaluasiCpmk
+    NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa
 } = models;
 
-// BUG FIX 2026-08-19: nama variabel ini sejak awal bilang "final ATAU kunci",
-// tapi isinya cuma 2 status final -- 'Dikunci' gak pernah ada di sini. Akibatnya
-// kelas yang udah dikunci (semua mahasiswa punya nilai_akhir, auto-kunci di
-// refreshNilaiAkhirJalurD) masih bisa nerima breakdown CBT baru tanpa ditolak,
-// padahal maksudnya "dikunci" itu ya gak boleh diubah lagi. Ditambahin di sini.
-const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus', 'Dikunci'];
+const STATUS_FINAL_ATAU_KUNCI = ['Lulus', 'Tidak Lulus'];
 
 // ============================================================================
 // JALUR D — Integrasi CBT (soal & koreksi/cek-benar-salah dilakukan di CBT,
@@ -61,40 +56,6 @@ const isKomponenNonSoal = (rencanaEvaluasi) => {
     return KATA_KUNCI_KOMPONEN_NON_SOAL.some(kw => teks.includes(kw));
 };
 
-// Revisi 2026-08-10: peringatan (bukan blokir) kalau distribusi bobotPoin yang
-// dikirim CBT per CPMK menyimpang jauh dari proporsi resmi di PemetaanEvaluasiCpmk
-// (rencana evaluasi). Sebelumnya sistem cuma cek TOTAL bobotPoin <= bobot komponen
-// (poin 1.6 di bawah), tidak pernah cek pembagian ANTAR CPMK-nya -- jadi dosen di
-// CBT bisa bikin soal dengan bobot yang gak sesuai RPS tanpa ketahuan sama sekali.
-// Toleransi: selisih absolut > 3 poin ATAU > 30% dari bobot resmi CPMK itu (mana
-// yang lebih besar) -- floor 3 poin supaya CPMK dengan porsi kecil (mis. 2 poin)
-// tidak gampang ke-flag cuma karena pembulatan wajar.
-const TOLERANSI_SELISIH_BOBOT_CPMK = 3;
-const TOLERANSI_RELATIF_BOBOT_CPMK = 0.3;
-
-const cekPeringatanDistribusiBobotCpmk = (agregatKomponenIni, bobotCpmkResmiMap) => {
-    const peringatanList = [];
-    // CPMK yang resmi ada porsinya di RPS tapi actual-nya beda jauh (termasuk
-    // kalau actual-nya 0, artinya CBT sama sekali gak kirim ke CPMK itu).
-    Object.entries(bobotCpmkResmiMap).forEach(([cpmkId, bobotResmi]) => {
-        const actual = agregatKomponenIni[cpmkId]?.totalBobot || 0;
-        const selisih = Math.abs(actual - bobotResmi);
-        const toleransi = Math.max(TOLERANSI_SELISIH_BOBOT_CPMK, bobotResmi * TOLERANSI_RELATIF_BOBOT_CPMK);
-        if (selisih > toleransi) {
-            peringatanList.push(`CPMK ${cpmkId}: bobot poin dikirim ${actual}, rencana evaluasi resmi ${bobotResmi} (selisih ${selisih.toFixed(2)})`);
-        }
-    });
-    // CPMK yang dikirim CBT tapi TIDAK ADA di rencana evaluasi resmi sama sekali
-    // (kemungkinan cpmkId salah, atau CPMK itu memang belum dipetakan di RPS).
-    Object.keys(agregatKomponenIni).forEach(cpmkId => {
-        if (!(cpmkId in bobotCpmkResmiMap)) {
-            peringatanList.push(`CPMK ${cpmkId}: dikirim ${agregatKomponenIni[cpmkId].totalBobot} poin, tapi tidak ada di rencana evaluasi resmi komponen ini`);
-        }
-    });
-    if (peringatanList.length === 0) return null;
-    return `Distribusi bobot poin per CPMK berbeda dari rencana evaluasi resmi: ${peringatanList.join('; ')}. Nilai tetap tersimpan, ini cuma informasi.`;
-};
-
 export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasiswa) => {
     const rencanaEvaluasi = await RencanaEvaluasi.findByPk(rencanaEvaluasiId);
     if (!rencanaEvaluasi) throw new CustomError.NotFoundError("Komponen evaluasi tidak ditemukan");
@@ -105,16 +66,6 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
             + `Input manual langsung di NL-SIAK, bukan lewat /cbt/komponen/:id/nilai.`
         );
     }
-
-    // Diambil sekali di luar loop -- sama buat semua mahasiswa di request ini,
-    // karena rencanaEvaluasiId-nya sama.
-    const pemetaanResmi = await PemetaanEvaluasiCpmk.findAll({
-        where: { siakRencanaEvaluasiId: rencanaEvaluasiId }
-    });
-    const bobotCpmkResmiMap = {}; // { cpmkId: bobotCpmk }
-    pemetaanResmi.forEach(row => {
-        bobotCpmkResmiMap[row.siakCpmkId] = parseFloat(row.bobotCpmk || 0);
-    });
 
     const hasil = [];
     for (const item of daftarMahasiswa) {
@@ -206,23 +157,11 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
 
         // 3. Gabungkan agregat LINTAS SEMUA KOMPONEN (UTS+UAS+Tugas, dst), rollup ke
         //    CPMK induk, lalu override NilaiCpmkMahasiswa -- sama pola dengan Jalur C.
+        //    TIDAK ADA panggilan ke inputNilaiMahasiswa/hitungNilaiAkhir di sini --
+        //    nilai akhir MK sepenuhnya urusan simpanNilaiAkhirDariCbt.
         const nilaiCpmkAkurat = await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
 
-        // 4. Revisi 2026-08-10 (CBT dipastikan TIDAK PERNAH kirim /cbt/nilai-akhir,
-        //    cuma kirim skor mentah per soal) -- hitung ulang & tulis nilai akhir MK
-        //    dari ledger di sini juga, JANGAN cuma nunggu komponen manual (mis.
-        //    Kehadiran) dikirim, supaya mata kuliah yang 100% komponennya dari CBT
-        //    (tanpa Kehadiran/komponen manual sama sekali) tetap kehitung nilai
-        //    akhirnya. Lihat refreshNilaiAkhirJalurD di penilaian.service.js.
-        await refreshNilaiAkhirJalurD(krsId, kelasId);
-
-        // 5. Peringatan (bukan blokir) kalau distribusi bobotPoin per CPMK menyimpang
-        //    dari rencana evaluasi resmi -- lihat cekPeringatanDistribusiBobotCpmk di atas.
-        const peringatanBobot = Object.keys(bobotCpmkResmiMap).length > 0
-            ? cekPeringatanDistribusiBobotCpmk(agregatKomponenIni, bobotCpmkResmiMap)
-            : null;
-
-        hasil.push({ krsId, nilaiCpmk: nilaiCpmkAkurat, peringatanBobot });
+        hasil.push({ krsId, nilaiCpmk: nilaiCpmkAkurat });
     }
 
     return hasil;
@@ -230,20 +169,9 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
 
 // ============================================================================
 // SINKRON nilai akhir MK dari CBT -- LANGSUNG tulis ke RincianKrsMahasiswa,
-// TIDAK dihitung ulang dari komponen sama sekali (beda dari refreshNilaiAkhirJalurD
-// di penilaian.service.js, yang MENGHITUNG dari ledger).
-//
-// Revisi 2026-08-10: dipastikan langsung ke tim CBT bahwa endpoint ini TIDAK
-// PERNAH dipakai -- CBT cuma kirim skor mentah per soal lewat
-// simpanNilaiKomponenDariCbt, yang sekarang SUDAH menghitung & menulis
-// nilai_akhir sendiri lewat refreshNilaiAkhirJalurD (lihat poin 4 di fungsi
-// itu). Fungsi simpanNilaiAkhirDariCbt ini dibiarkan tetap ada (endpoint POST
-// /cbt/nilai-akhir tidak dihapus) sebagai jalur cadangan kalau suatu saat CBT
-// (atau konsumen lain) memang mau kirim nilaiAkhir final secara eksplisit --
-// tapi kalau itu terjadi BERSAMAAN dengan breakdown yang terus di-resend,
-// nilai_akhir manapun yang paling terakhir ditulis yang menang (tidak ada
-// penguncian antara dua jalur ini). Selama CBT konsisten cuma kirim skor
-// mentah seperti sekarang, ini bukan masalah nyata.
+// TIDAK dihitung ulang dari komponen sama sekali. Ini terpisah total dari
+// simpanNilaiKomponenDariCbt supaya tidak ada resiko 1 fungsi menimpa hasil
+// fungsi lain.
 //
 // CBT cuma kirim `nilaiAkhir` (angka 0-100) -- huruf mutu & angka mutu
 // (A/AB/B/dst) TIDAK perlu dikirim CBT, itu diturunkan otomatis dari tabel
@@ -252,69 +180,6 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
 // dengan hitungNilaiAkhir (Jalur A) di penilaian.service.js, cuma sumber
 // nilaiAkhir-nya dari CBT, bukan dihitung dari Σ komponen×bobot.
 // ============================================================================
-// Selisih toleransi (poin, skala 0-100) sebelum nilaiAkhir kiriman CBT dianggap
-// mencurigakan dibanding hasil hitung ulang dari ledger internal (lihat
-// hitungReferensiNilaiAkhirDariLedger). Nilai kecil (rounding antar sistem)
-// selalu wajar -- ini cuma jaring pengaman buat kasus SELISIH BESAR, dua
-// skenario nyata yang memicunya: (1) salah satu komponen sudah dikoreksi CBT
-// tapi nilaiAkhir lupa dikirim ulang (jadi basi), atau (2) nilaiAkhir yang
-// dikirim itu murni skor internal CBT sendiri (mis. rata-rata polos per soal)
-// yang tidak memperhitungkan bobotPoin per CPMK/Sub-CPMK atau Kehadiran sama
-// sekali. TIDAK memblokir penyimpanan -- desain awal (arahan Pak Fitrah)
-// sengaja mempercayai CBT sepenuhnya supaya tidak ada 1 fungsi yang menimpa
-// hasil fungsi lain; ini cuma menambahkan flag informatif di response.
-const TOLERANSI_SELISIH_NILAI_AKHIR = 3;
-
-const hitungReferensiNilaiAkhirDariLedger = async (krsId, kelasId) => {
-    const kelas = await sequelize.query(
-        `SELECT siak_mata_kuliah_id AS "mataKuliahId", siak_periode_akademik_id AS "periodeId"
-         FROM siak_kelas_kuliah WHERE id = :kelasId LIMIT 1`,
-        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
-    );
-    if (kelas.length === 0) return null;
-    const { mataKuliahId, periodeId } = kelas[0];
-
-    const komponenList = await sequelize.query(
-        `SELECT id, bobot FROM siak_rencana_evaluasi
-         WHERE siak_mata_kuliah_id = :mataKuliahId AND siak_periode_akademik_id = :periodeId
-           AND deleted_at IS NULL`,
-        { replacements: { mataKuliahId, periodeId }, type: sequelize.QueryTypes.SELECT }
-    );
-    if (komponenList.length === 0) return null;
-
-    const ledgerAgg = await sequelize.query(
-        `SELECT siak_rencana_evaluasi_id AS "rencanaEvaluasiId",
-                SUM(skor_terbobot) AS "totalW", SUM(total_bobot) AS "totalB"
-         FROM siak_nilai_subcpmk_evaluasi_mahasiswa
-         WHERE siak_rincian_krs_mahasiswa_id = :krsId AND deleted_at IS NULL
-         GROUP BY siak_rencana_evaluasi_id`,
-        { replacements: { krsId }, type: sequelize.QueryTypes.SELECT }
-    );
-    const ledgerMap = {};
-    ledgerAgg.forEach(row => { ledgerMap[row.rencanaEvaluasiId] = row; });
-
-    let totalTerhitung = 0;
-    let totalBobotDipakai = 0;
-    let adaKomponenBelumLengkap = false;
-    komponenList.forEach(k => {
-        const row = ledgerMap[k.id];
-        const bobotK = parseFloat(k.bobot || 0);
-        if (!row || parseFloat(row.totalB || 0) <= 0) {
-            adaKomponenBelumLengkap = true;
-            return;
-        }
-        const persenKomponen = (parseFloat(row.totalW) / parseFloat(row.totalB)) * 100;
-        totalTerhitung += persenKomponen * (bobotK / 100);
-        totalBobotDipakai += bobotK;
-    });
-
-    if (totalBobotDipakai === 0) return null;
-    return {
-        nilaiReferensi: Math.round(totalTerhitung * 100) / 100,
-        lengkap: !adaKomponenBelumLengkap
-    };
-};
-
 export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
     const hasil = [];
     for (const item of daftarMahasiswa) {
@@ -333,24 +198,6 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
             { nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu },
             { where: { id: krsId } }
         );
-
-        // Bandingkan (bukan blokir) ke hasil hitung ulang dari ledger internal --
-        // lihat komentar TOLERANSI_SELISIH_NILAI_AKHIR di atas.
-        let peringatan = null;
-        try {
-            const referensi = await hitungReferensiNilaiAkhirDariLedger(krsId, rincian.siakKelasKuliahId);
-            if (referensi) {
-                const selisih = Math.round((nilaiAkhirNum - referensi.nilaiReferensi) * 100) / 100;
-                if (Math.abs(selisih) > TOLERANSI_SELISIH_NILAI_AKHIR) {
-                    peringatan = `Nilai akhir yang dikirim (${nilaiAkhirNum}) berbeda ${Math.abs(selisih)} poin dari hasil hitung ulang ledger internal `
-                        + `(${referensi.nilaiReferensi}${referensi.lengkap ? '' : ', TAPI ada komponen yang belum ada datanya sama sekali di ledger'}). `
-                        + `Kemungkinan penyebab: komponen sudah dikoreksi tapi nilai akhir belum dikirim ulang, atau nilai akhir ini murni skor internal CBT `
-                        + `(mis. rata-rata polos per soal) yang belum memperhitungkan bobotPoin per CPMK/Kehadiran. Nilai tetap tersimpan, ini cuma informasi.`;
-                }
-            }
-        } catch (e) {
-            // Jangan sampai kegagalan hitung referensi menggagalkan penyimpanan nilai akhir yang sebenarnya valid.
-        }
 
         // Auto-kunci per-kelas -- pola identik Jalur A (hitungNilaiAkhir) &
         // Jalur B (inputNilaiPerCpmk): begitu SEMUA mahasiswa di kelas ini sudah
@@ -397,7 +244,7 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
             }
         }
 
-        hasil.push({ krsId, nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu, peringatan });
+        hasil.push({ krsId, nilaiAkhir: nilaiAkhirNum, hurufMutu, angkaMutu });
     }
     return hasil;
 };
@@ -527,26 +374,6 @@ export const resetNilaiKomponenCbt = async (krsId, rencanaEvaluasiId) => {
     });
 
     const nilaiCpmk = await hitungDanOverrideNilaiCpmkDariKomponen(krsId, kelasId, mahasiswaId);
-
-    // Reset komponen ngubah ledger juga -- nilai_akhir yang udah kehitung sebelumnya
-    // (dari refreshNilaiAkhirJalurD) jadi basi kalau gak ikut dihitung ulang di sini.
-    const hasilRefresh = await refreshNilaiAkhirJalurD(krsId, kelasId);
-
-    // Fix 2026-08-10: kalau refresh balik null KARENA ledger-nya kosong total
-    // (bukan cuma "belum lengkap"), berarti komponen yang direset ini SATU-SATUNYA
-    // data yang pernah ada -- nilai_akhir lama harus ikut dikosongkan, jangan
-    // dibiarkan tertinggal basi.
-    if (!hasilRefresh) {
-        const sisaLedger = await NilaiSubcpmkEvaluasiMahasiswa.count({
-            where: { siakRincianKrsMahasiswaId: krsId }
-        });
-        if (sisaLedger === 0) {
-            await RincianKrsMahasiswa.update(
-                { nilaiAkhir: null, hurufMutu: null, angkaMutu: null },
-                { where: { id: krsId } }
-            );
-        }
-    }
 
     return { krsId, nilaiCpmk, pesan: `Komponen ini berhasil direset utk mahasiswa ${krsId}` };
 };

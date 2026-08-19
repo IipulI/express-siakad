@@ -18,13 +18,13 @@
 // export default router;
 import express from 'express';
 import * as EkivalensiController from '../../controllers/akademik/ekivalensi-mata-kuliah.controller.js';
-import { validateGetEkivalensi, validateGetDropdownMkLama, validateBulkSaveEkivalensi } from '../../validators/ekivalensi.validator.js';
+import { validateGetEkivalensi, validateBulkSaveEkivalensi } from '../../validators/ekivalensi.validator.js';
 import { validateIdParam } from '../../validators/mata-kuliah-kurikulum.validator.js';
 
 const router = express.Router();
 
 router.get('/', validateGetEkivalensi, EkivalensiController.fetchListEkivalensi);
-router.get('/dropdown-lama', validateGetDropdownMkLama, EkivalensiController.fetchDropdownMkLama);
+router.get('/dropdown-lama', EkivalensiController.fetchDropdownMkLama); // Validator optional tergantung kebutuhan
 router.post('/bulk', validateBulkSaveEkivalensi, EkivalensiController.saveBulkEkivalensi);
 router.delete('/:mkBaruId', EkivalensiController.deleteEkivalensiByMk);
 

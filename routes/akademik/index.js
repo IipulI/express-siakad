@@ -132,7 +132,6 @@ router.use("/ekivalensi-mata-kuliah", EkivalensiMataKuliah)
 router.use("/soal", SoalRouter) // Jalur C: penilaian per soal/unit
 router.use("/cbt", CbtRouter) // Jalur D: integrasi CBT (soal & koreksi di CBT, NL-SIAK terima hasil agregat)
 router.use("/monitoring", MonitoringRouter)
-router.use("/krs-mahasiswa", KrsRouter)
 
 router.use('/koordinator-mk', koordinatorMkRouter);
 router.use('/dosen', dosenPengampuRouter);

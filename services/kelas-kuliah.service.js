@@ -44,9 +44,9 @@ export const findAll = async (page, size, filter) => {
     if (filter.siakProgramStudiId !== undefined && filter.siakProgramStudiId !== '') {
         kelasKuliahWhere.siakProgramStudiId = filter.siakProgramStudiId
     }
-    if (filter.sistemKuliah !== undefined && filter.sistemKuliah !== '') {
-        kelasKuliahWhere.sistemKuliah = filter.sistemKuliah
-    }
+    // if (filter.siakSistemKuliahId !== undefined) {
+    //     kelasKuliahWhere.siakSistemKuliahId = filter.siakSistemKuliahId
+    // }
     if (filter.siakTahunKurikulumId !== undefined && filter.siakTahunKurikulumId !== '') {
         mataKuliahWhere.siakTahunKurikulumId = filter.siakTahunKurikulumId
     }
@@ -184,7 +184,7 @@ export const findAll = async (page, size, filter) => {
 
         return {
             count,
-            rows: await withStatusPenilaian(rows),
+            rows,
             isPaginated: true
         }
     } else{
@@ -192,51 +192,11 @@ export const findAll = async (page, size, filter) => {
 
         return {
             count: data.length,
-            rows: await withStatusPenilaian(data),
+            rows: data,
             isPaginated: false
         }
     }
 }
-
-// ─────────────────────────────────────────────
-// STATUS PENILAIAN per kelas (kolom "Status Penilaian" di list Kelas Kuliah)
-// -- dihitung dari status RincianKrsMahasiswa: "Sudah Dikunci" kalau SEMUA
-// peserta terkunci/final, "Sebagian Dikunci" kalau campur, "Belum Dikunci"
-// kalau belum ada satupun, "Belum Ada Peserta" kalau kelasnya kosong.
-// ─────────────────────────────────────────────
-const STATUS_TERKUNCI = ['Dikunci', 'Lulus', 'Tidak Lulus'];
-
-const withStatusPenilaian = async (rows) => {
-    const plain = rows.map(r => r.toJSON());
-    const kelasIds = plain.map(r => r.id);
-    if (kelasIds.length === 0) return plain;
-
-    const agregat = await sequelize.query(`
-        SELECT
-            siak_kelas_kuliah_id AS "kelasId",
-            COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE status IN (:statusTerkunci)) AS terkunci
-        FROM siak_rincian_krs_mahasiswa
-        WHERE siak_kelas_kuliah_id IN (:kelasIds) AND deleted_at IS NULL
-        GROUP BY siak_kelas_kuliah_id
-    `, {
-        replacements: { kelasIds, statusTerkunci: STATUS_TERKUNCI },
-        type: sequelize.QueryTypes.SELECT
-    });
-
-    const statusMap = {};
-    agregat.forEach(row => {
-        const total = parseInt(row.total, 10);
-        const terkunci = parseInt(row.terkunci, 10);
-        statusMap[row.kelasId] =
-            total === 0 ? 'Belum Ada Peserta' :
-            terkunci === 0 ? 'Belum Dikunci' :
-            terkunci === total ? 'Sudah Dikunci' :
-            'Sebagian Dikunci';
-    });
-
-    return plain.map(r => ({ ...r, statusPenilaian: statusMap[r.id] || 'Belum Ada Peserta' }));
-};
 
 export const createClass = async (payload) => {
     try {

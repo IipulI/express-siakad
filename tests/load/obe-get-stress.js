@@ -1,49 +1,16 @@
 import http from 'k6/http';
-import crypto from 'k6/crypto';
-import encoding from 'k6/encoding';
 import { check, sleep, group } from 'k6';
 
 // =====================================================================
-// KONFIGURASI BEBAN EKSTREM (2500 VU — BREAKPOINT / CAPACITY TEST)
+// KONFIGURASI BEBAN (GET HEAVY)
 // =====================================================================
-// Beda dengan "beban normal" (obe-normal.js, niruin trafik harian yang
-// realistis), skenario ini SENGAJA gak dirancang buat merepresentasikan
-// jumlah user asli. Definisi stress testing sendiri (lihat Bab 2.12) itu
-// mendorong sistem MELEBIHI kapasitas yang diharapkan, khusus buat
-// nemuin titik jebol (breaking point) dan lihat gimana sistem gagal --
-// apakah gagal dengan baik (graceful degradation, error rate naik
-// terkendali) atau langsung crash/tidak responsif. Makanya angkanya
-// jauh lebih besar dari estimasi user riil (bandingkan dengan estimasi
-// realistis di obe-cbt-sync-stress.js yang ~100 VU).
-//
-// ⚠️ JANGAN dijalankan ke produksi tanpa koordinasi ⚠️
-// 2500 VU concurrent request ke server produksi (api-siak.uika-bogor.ac.id)
-// BERISIKO bikin server keteteran/gak responsif buat mahasiswa & staf yang
-// LAGI PAKAI sistem beneran saat itu juga -- ini beda dari risiko skrip
-// CBT (yang soal data), di sini risikonya ke KETERSEDIAAN layanan.
-// Jalankan di jam yang gak ada aktivitas akademik (malam/dini hari,
-// idealnya sepengetahuan admin server), atau kalau ada, arahkan BASE_URL
-// ke instance staging/lokal yang sanggup dites habis-habisan tanpa
-// mengganggu pengguna asli.
-// Mode "tangga": -e TARGET_VU=300 buat lari beban rata di angka itu selama
-// TARGET_DURATION (default 30s) -- dipakai nyari titik jebol presisi lewat
-// beberapa run terpisah, sama seperti obe-cbt-sync-stress.js.
-const TARGET_VU = __ENV.TARGET_VU ? Number(__ENV.TARGET_VU) : null;
-const TARGET_DURATION = __ENV.TARGET_DURATION || '30s';
-
 export const options = {
-    ...(TARGET_VU
-        ? { vus: TARGET_VU, duration: TARGET_DURATION }
-        : {
-            // Skenario Beban Ekstrem: dorong bertahap sampai 2500 VU buat cari breakpoint
-            stages: [
-                { duration: '30s', target: 500 },  // Naik cepat ke 500 user
-                { duration: '1m', target: 1500 },  // Terus naik ke 1500 user
-                { duration: '1m', target: 2500 },  // Lonjakan ekstrem ke 2500 user (di atas 2000)
-                { duration: '30s', target: 2500 }, // Tahan di puncak buat lihat perilaku sistem
-                { duration: '30s', target: 0 },    // Turun kembali ke 0 user
-            ],
-        }),
+    // Skenario Beban Ekstrem: Mensimulasikan lonjakan hingga 200 pengguna (Virtual Users)
+    stages: [
+        { duration: '30s', target: 100 }, // Naik ke 100 user dalam 30 detik
+        { duration: '1m', target: 200 },  // Lonjakan ekstrem ke 200 user
+        { duration: '30s', target: 0 },   // Turun kembali ke 0 user
+    ],
     thresholds: {
         http_req_duration: ['p(95)<2000'],
         http_req_failed: ['rate<0.05'],
@@ -53,71 +20,37 @@ export const options = {
 const BASE_URL = 'https://api-siak.uika-bogor.ac.id';
 
 const DUMMY_IDS = {
-    id_obe: "019e7e03-a16c-707f-89b1-e62050644836",        // OBE TI Kurikulum 2025
-    id_mk: "019e7f79-3ab9-778c-9c55-0dec062cb6eb",         // TIF117 - Rangkaian Digital
-    id_prodi: "0197ea6f-2c4f-7afb-a06e-2f13f589c195",      // Teknik Informatika
+    id_obe: "019e7e03-a16c-707f-89b1-e62050644836",         // OBE TI Kurikulum 2025
+    id_mk: "019e7f79-3ab9-778c-9c55-0dec062cb6eb",          // TIF117 - Rangkaian Digital
+    id_prodi: "0197ea6f-2c4f-7afb-a06e-2f13f589c195",       // Teknik Informatika
     tahun_kurikulum: "019e7dfc-b5a8-757f-a9be-954d00fb6912", // Kurikulum 2025
-    periodeId: "0197fce6-e176-7c62-b315-00b0c4b4ed8b",     // 2025 Genap
-    id_jenjang: "0197e936-e8cd-7212-9086-4f2e0cb6a9bc",    // D4
-    id_rencana_evaluasi: "019e8138-186d-703c-ad7f-3d31e210f248", // TIF117 - UTS
+    periodeId: "0197fce6-e176-7c62-b315-00b0c4b4ed8b",      // 2025 Genap
+    id_jenjang: "0197e936-e8cd-7212-9086-4f2e0cb6a9bc",     // D4
 };
 
-// =====================================================================
-// AUTENTIKASI — semua endpoint /api/akademik/* mewajibkan Bearer token
-// (middleware verifySsoToken). Token di-generate SENDIRI di sini (bukan
-// login user asli) supaya skrip tidak perlu menyimpan username/password
-// nyata. JWT_SECRET & USER_ID WAJIB dikirim lewat -e saat run, JANGAN
-// di-hardcode di file ini (file ini di-commit ke git, secret tidak boleh
-// ikut ter-commit). Lihat PANDUAN-STRESS-TESTING-K6.md bagian 3-4.
-// =====================================================================
-const JWT_SECRET = __ENV.JWT_SECRET;
-const USER_ID = __ENV.USER_ID || '0197eeb1-836d-7d8d-933d-4e8c9f4e7733';
-
-if (!JWT_SECRET) {
-    throw new Error('JWT_SECRET wajib diisi, contoh: k6 run -e JWT_SECRET=xxx tests/load/obe-normal.js (lihat PANDUAN-STRESS-TESTING-K6.md)');
-}
-
-function base64url(input) {
-    return encoding.b64encode(input, 'rawurl');
-}
-
-function signJwt(payload) {
-    const headerEncoded = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-    const payloadEncoded = base64url(JSON.stringify(payload));
-    const data = `${headerEncoded}.${payloadEncoded}`;
-    const signature = crypto.hmac('sha256', JWT_SECRET, data, 'base64rawurl');
-    return `${data}.${signature}`;
-}
-
-const now = Math.floor(Date.now() / 1000);
-const AUTH_TOKEN = signJwt({ id: USER_ID, iat: now, exp: now + 7200 });
-
 export default function () {
-    const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AUTH_TOKEN}` };
+    const headers = { 'Content-Type': 'application/json' };
 
-    // Jalur endpoint pada grup ini disamakan dengan yang benar-benar dipakai
-    // di index.html (public/tes-response-untuk-be/index.html), supaya stress
-    // test menguji rute yang sama persis dengan yang dipegang saat demo.
     group('1. GET Mata Kuliah & Pemetaan', () => {
-        check(http.get(`${BASE_URL}/api/akademik/koordinator-mk/mata-kuliah/${DUMMY_IDS.id_mk}/pemetaan-cpl`, { headers }), { 'GET Pemetaan CPL': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/obe/mata-kuliah/${DUMMY_IDS.id_mk}/pemetaan-cpl`, { headers }), { 'GET Pemetaan CPL': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/obe/mata-kuliah/${DUMMY_IDS.id_mk}/pemetaan-cpmk`, { headers }), { 'GET Pemetaan CPMK': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah?size=10`, { headers }), { 'GET MK Hal 1': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah?page=3&size=10`, { headers }), { 'GET MK Pagination': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/obe/mata-kuliah`, { headers }), { 'GET MK Hal 1': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/obe/mata-kuliah?page=3&size=10`, { headers }), { 'GET MK Pagination': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/obe/mata-kuliah/${DUMMY_IDS.id_mk}`, { headers }), { 'GET MK Detail': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah?page=1&size=10&programStudiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}&search=Data`, { headers }), { 'GET MK Filter': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/mata-kuliah?search=pemrograman`, { headers }), { 'GET MK Search': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/obe/mata-kuliah?page=1&limit=10&prodiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}&jenis=Kuliah&search=Data`, { headers }), { 'GET MK Filter': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/obe/mata-kuliah?search=pemrograman`, { headers }), { 'GET MK Search': (r) => r.status === 200 });
         sleep(0.5);
     });
 
     group('2. GET RPS & Rencana Evaluasi', () => {
         check(http.get(`${BASE_URL}/api/akademik/rps/mata-kuliah/${DUMMY_IDS.id_mk}/detail?periodeId=${DUMMY_IDS.periodeId}`, { headers }), { 'GET Detail RPS': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/koordinator-mk/mata-kuliah/${DUMMY_IDS.id_mk}/rencana-pembelajaran?periodeId=${DUMMY_IDS.periodeId}`, { headers }), { 'GET Rencana Pb': (r) => r.status === 200 });
-        check(http.get(`${BASE_URL}/api/akademik/koordinator-mk/mata-kuliah/${DUMMY_IDS.id_mk}/rencana-evaluasi?periodeId=${DUMMY_IDS.periodeId}`, { headers }), { 'GET Rencana Evaluasi': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/rps/mata-kuliah/${DUMMY_IDS.id_mk}/rencana-pembelajaran?periodeId=${DUMMY_IDS.periodeId}`, { headers }), { 'GET Rencana Pb': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/rps/mata-kuliah/${DUMMY_IDS.id_mk}/rencana-evaluasi`, { headers }), { 'GET Rencana Evaluasi': (r) => r.status === 200 });
         sleep(0.5);
     });
 
     group('3. GET Skala Nilai, Predikat & Template Evaluasi', () => {
-        check(http.get(`${BASE_URL}/api/akademik/skala-nilai/?tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}&jenjangId=${DUMMY_IDS.id_jenjang}`, { headers }), { 'GET Skala Nilai': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/skala-nilai/?programStudiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}`, { headers }), { 'GET Skala Nilai': (r) => r.status === 200 });
 
         check(http.get(`${BASE_URL}/api/akademik/predikat-kelulusan?prodiId=${DUMMY_IDS.id_prodi}&tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}`, { headers }), { 'GET Predikat Kelulusan': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/predikat-kelulusan?tahunKurikulumId=${DUMMY_IDS.tahun_kurikulum}&prodiId=${DUMMY_IDS.id_prodi}`, { headers }), { 'GET Predikat Kelulusan Filter': (r) => r.status === 200 });
@@ -138,20 +71,11 @@ export default function () {
         sleep(0.5);
     });
 
-    // Sebelumnya ada 2 URL export Excel yang TIDAK TERDAFTAR di rute manapun
-    // (manajemen-pl & manajemen-cpl) -- diganti dengan rute yang benar-benar
-    // ada (matriks-pl-cpl Excel + pemetaan-cpl-mk PDF, keduanya terverifikasi
-    // di routes/akademik/obe.router.js).
     group('5. GET Export Laporan', () => {
+        check(http.get(`${BASE_URL}/api/akademik/obe/export/excel/manajemen-pl/${DUMMY_IDS.id_obe}`, { headers }), { 'GET Export Excel PL': (r) => r.status === 200 });
+        check(http.get(`${BASE_URL}/api/akademik/obe/export/excel/manajemen-cpl/${DUMMY_IDS.id_obe}`, { headers }), { 'GET Export Excel CPL': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/obe/export/excel/matriks-pl-cpl/${DUMMY_IDS.id_obe}`, { headers }), { 'GET Export Excel Matriks PL-CPL': (r) => r.status === 200 });
         check(http.get(`${BASE_URL}/api/akademik/obe/export/pdf/pemetaan-cpl-mk/${DUMMY_IDS.id_obe}`, { headers }), { 'GET Export PDF Matriks CPL-MK': (r) => r.status === 200 });
-        sleep(0.5);
-    });
-
-    // Grup baru: representasi Jalur D (integrasi CBT) pada stress test --
-    // sebelumnya tidak ada satu pun endpoint CBT yang diuji di sini.
-    group('6. GET Breakdown Nilai dari CBT (Jalur D)', () => {
-        check(http.get(`${BASE_URL}/api/akademik/cbt/komponen/${DUMMY_IDS.id_rencana_evaluasi}/nilai`, { headers }), { 'GET Breakdown Nilai CBT': (r) => r.status === 200 });
         sleep(1);
     });
 }

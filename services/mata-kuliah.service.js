@@ -19,7 +19,7 @@ const {
 // =========================================================
 // 1. GET LIST MATA KULIAH OBE (Dipanggil oleh Controller OBE)
 // =========================================================
-export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKurikulumId, searchBy) => {
+export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKurikulumId) => {
     // 👇 1. PASTIKAN SEMUA MODEL DI-DESTRUCTURE DULU DI SINI
     const {
         MataKuliah,
@@ -38,16 +38,10 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
     if (tahunKurikulumId) whereClause.siakTahunKurikulumId = tahunKurikulumId;
 
     if (search) {
-        if (searchBy === 'kode') {
-            whereClause.kode = { [Op.iLike]: `%${search}%` };
-        } else if (searchBy === 'nama') {
-            whereClause.nama = { [Op.iLike]: `%${search}%` };
-        } else {
-            whereClause[Op.or] = [
-                { nama: { [Op.iLike]: `%${search}%` } },
-                { kode: { [Op.iLike]: `%${search}%` } }
-            ];
-        }
+        whereClause[Op.or] = [
+            { nama: { [Op.iLike]: `%${search}%` } },
+            { kode: { [Op.iLike]: `%${search}%` } }
+        ];
     }
 
     // 4. Query ke Database
@@ -131,23 +125,13 @@ export const getDetailMataKuliahObe = async (id) => {
     return {
         id: mk.id,
         tahunKurikulum: mk.tahunKurikulum?.tahun || '-',
-        siakTahunKurikulumId: mk.siakTahunKurikulumId,
         kodeMataKuliah: mk.kode,
         namaMataKuliahInd: mk.nama,
         namaMataKuliahEn: mk.namaEn || '-',
         jenisMataKuliah: mk.jenis,
         totalSks: mk.totalSks,
-        sksTatapMuka: mk.sksTatapMuka,
-        sksPraktikum: mk.sksPraktikum,
-        sksPraktikLapangan: mk.sksPraktikLapangan,
-        sksSimulasi: mk.sksSimulasi,
         unitPengampu: mk.programStudi?.nama || '-',
-        siakProgramStudiId: mk.siakProgramStudiId,
         kelompokMataKuliah: mk.kelompokMk?.nama || '-',
-        kelompokMataKuliahId: mk.siakKelompokMataKuliahId,
-        prasyaratMataKuliah1Id: mk.prasyaratMataKuliah1,
-        prasyaratMataKuliah2Id: mk.prasyaratMataKuliah2,
-        prasyaratMataKuliah3Id: mk.prasyaratMataKuliah3,
         atribut: {
             merupakanMku: mk.merupakanMku,
             adaSap: mk.adaSap,
@@ -478,7 +462,6 @@ export const deleteMataKuliah = async (id) => {
     }
 
     await cekDataMataKuliah.destroy()
-    return true
 }
 
 // Private function
@@ -640,7 +623,6 @@ export const getCplForMapping = async (mataKuliahId) => {
             prodi: mk.programStudi?.nama || '-',
             kurikulum: mk.tahunKurikulum?.tahun || '-'
         },
-        isObe: !!obe,
         daftarCpl,
         cplTerpilih: mk.cplDipetakan || []
     };
@@ -652,11 +634,6 @@ export const getCplForMapping = async (mataKuliahId) => {
 export const savePemetaanCpl = async (mataKuliahId, cplIdsArray) => {
     const mk = await MataKuliah.findByPk(mataKuliahId);
     if (!mk) throw new CustomError.NotFoundError(`Mata Kuliah tidak ditemukan`);
-
-    const obe = await models.Obe.findOne({
-        where: { siakProgramStudiId: mk.siakProgramStudiId, siakTahunKurikulumId: mk.siakTahunKurikulumId }
-    });
-    if (!obe) throw new CustomError.NotFoundError("Program studi mata kuliah ini belum di-set OBE untuk tahun kurikulum tersebut. Atur dulu lewat menu Tahun Kurikulum sebelum memetakan CPL.");
 
     // Sequelize 'set...' otomatis menghapus yang lama dan memasukkan yang baru
     await mk.setCplDipetakan(cplIdsArray || []);

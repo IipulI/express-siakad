@@ -14,12 +14,6 @@ export const validateGetEkivalensi = [
     validate
 ];
 
-export const validateGetDropdownMkLama = [
-    query('prodiId').isUUID().withMessage('Prodi ID tidak valid'),
-    query('kurikulumLamaId').isUUID().withMessage('ID Kurikulum Lama tidak valid'),
-    validate
-];
-
 export const validateBulkSaveEkivalensi = [
     body('dataEkivalensi').isArray({ min: 1 }).withMessage('Data ekivalensi harus berupa array'),
     body('dataEkivalensi.*.mkBaruId').isUUID().withMessage('ID Mata Kuliah Baru tidak valid'),

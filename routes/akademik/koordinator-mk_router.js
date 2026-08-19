@@ -8,7 +8,6 @@ import * as CapaianController from '../../controllers/akademik/capaian-pembelaja
 import * as ExportNilaiKelasController from '../../controllers/akademik/export-nilai-kelas.controller.js';
 import * as ExportController from '../../controllers/akademik/export.controller.js';
 import { normalizeFilePath, upload, uploadExcel } from '../../utils/upload-file.js';
-import { validateSaveDetailRps, validateGetPratinjauSalinDetailRps, validateSalinDetailRps } from '../../validators/rps.validator.js';
 
 /**
  * MIDDLEWARE PLACEHOLDER - KOORDINATOR MK
@@ -42,10 +41,10 @@ router.post('/mata-kuliah/:id/pemetaan-cpmk', CpmkController.savePemetaanCpmk);
 
 // [4] Detail RPS
 router.get('/mata-kuliah/:mataKuliahId/detail-rps', RpsController.getFormDetailRps);
-router.get('/mata-kuliah/:mataKuliahId/detail-rps/pratinjau-salin', validateGetPratinjauSalinDetailRps, RpsController.pratinjauSalinDetailRps);
-router.post('/mata-kuliah/:mataKuliahId/detail-rps/salin', validateSalinDetailRps, RpsController.salinDetailRps);
+router.get('/mata-kuliah/:mataKuliahId/detail-rps/pratinjau-salin', RpsController.pratinjauSalinDetailRps);
+router.post('/mata-kuliah/:mataKuliahId/detail-rps/salin', RpsController.salinDetailRps);
 router.post('/mata-kuliah/:mataKuliahId/detail-rps',
-    upload.single('dokumenRps'), normalizeFilePath, validateSaveDetailRps, RpsController.saveDetailRps);
+    upload.single('dokumenRps'), normalizeFilePath, RpsController.saveDetailRps);
 router.delete('/detail-rps/:id', RpsController.deleteDetailRps);
 
 // [5] Rencana Pembelajaran

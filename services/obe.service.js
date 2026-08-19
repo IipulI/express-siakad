@@ -832,8 +832,8 @@ export const getListManajemenCapaian = async (filters) => {
                                     ON cpl.siak_obe_id = obe.id AND cpl.deleted_at IS NULL
         LEFT JOIN siak_pemetaan_pl_cpl ppc
                                     ON ppc.siak_profil_lulusan_id = pl.id AND ppc.deleted_at IS NULL
-        LEFT JOIN siak_pemetaan_cpl_mata_kuliah pcm
-                                    ON pcm.siak_capaian_pembelajaran_lulusan_id = cpl.id AND pcm.deleted_at IS NULL
+        LEFT JOIN siak_pemetaan_cpl_cpmk pcc
+                                    ON pcc.siak_capaian_pembelajaran_lulusan_id = cpl.id AND pcc.deleted_at IS NULL
         WHERE ps.deleted_at IS NULL AND tk.deleted_at IS NULL
         ${whereClause}
     `;
@@ -862,7 +862,7 @@ export const getListManajemenCapaian = async (filters) => {
                 COUNT(DISTINCT pl.id)  AS total_pl,
                 COUNT(DISTINCT cpl.id) AS total_cpl,
                 COUNT(DISTINCT ppc.siak_profil_lulusan_id)                    AS pl_terpetakan,
-                COUNT(DISTINCT pcm.siak_capaian_pembelajaran_lulusan_id)      AS cpl_terpetakan
+                COUNT(DISTINCT pcc.siak_capaian_pembelajaran_lulusan_id)      AS cpl_terpetakan
             ${baseQuery}
             GROUP BY ps.id, ps.kode, ps.nama, tk.id, tk.tahun, j.jenjang, d.nama, obe.id
             ORDER BY (obe.id IS NOT NULL) DESC, tk.tahun DESC, ps.nama ASC
@@ -1147,15 +1147,15 @@ export const getManajemenCplByObeId = async (obeId) => {
         include: [
             { model: ProgramStudi, as: 'programStudi', attributes: ['kode', 'nama', 'siakJenjangId'],
               include: [{ model: Jenjang, as: 'jenjang', attributes: ['jenjang'] }] },
-            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['id', 'tahun'] },
-
-            {
-                model: CapaianPembelajaranLulusan, as: 'capaianPembelajaranLulusan',
+            { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] },
+          
+            { 
+                model: CapaianPembelajaranLulusan, as: 'capaianPembelajaranLulusan', 
                 attributes: ['id', 'kode', 'deskripsi', 'deskripsiEn', 'targetCpl', 'kategori'],
                 include: [
-                    {
-                        model: models.IndikatorKinerja,
-                        as: 'indikatorKinerja',
+                    { 
+                        model: models.IndikatorKinerja, 
+                        as: 'indikatorKinerja', 
                         attributes: ['id', 'kode', 'deskripsi','deskripsiEn']
                     }
                 ]
@@ -1170,10 +1170,7 @@ export const getManajemenCplByObeId = async (obeId) => {
         header: {
             kodeProdi: data.programStudi?.kode,
             programStudi: `${data.programStudi?.jenjang?.jenjang || 'S1'} - ${data.programStudi?.nama}`,
-            tahunKurikulum: data.tahunKurikulum?.tahun,
-            // Ditambahin buat kebutuhan FE (modal "Tambah CPL Umum" perlu UUID-nya,
-            // bukan cuma label tahun, buat manggil GET /cpl-umum/:tahunKurikulumId)
-            tahunKurikulumId: data.tahunKurikulum?.id
+            tahunKurikulum: data.tahunKurikulum?.tahun
         },
         dataCpl: (data.capaianPembelajaranLulusan || []).map(cpl => ({
             id: cpl.id,

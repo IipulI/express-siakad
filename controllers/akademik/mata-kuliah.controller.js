@@ -146,23 +146,20 @@ export const destroy = async (req, res) => {
 export const getDaftarMataKuliahObe = async (req, res, next) => {
     try {
         // 1. Ambil parameter dari query string
-        // (FE ada yang ngirim "limit", ada yang "size" -- terima dua-duanya)
-        const { page, size, limit, search, searchBy, prodiId, tahunKurikulumId } = req.query;
-        const finalSize = size || limit;
+        const { page, size, search, prodiId, tahunKurikulumId } = req.query;
 
         // 2. Panggil Service
         const result = await MataKuliahService.getListMataKuliahObe(
             page,
-            finalSize,
+            size,
             search,
             prodiId,
-            tahunKurikulumId,
-            searchBy
+            tahunKurikulumId
         );
 
         // 3. Bungkus data mentah dengan utilitas pagination milik Abang
         // result berisi { count, rows }
-        const payload = getPagingData(result, page, finalSize);
+        const payload = getPagingData(result, page, size);
 
         // 4. Kirim response sukses menggunakan ResponseBuilder
         return new ResponseBuilder(res)
@@ -170,7 +167,7 @@ export const getDaftarMataKuliahObe = async (req, res, next) => {
             .message("Berhasil mengambil daftar mata kuliah OBE")
             .json({
                 ...payload,
-                isPaginated: page !== null && finalSize !== null // Tambahan flag seperti di JSON Abang
+                isPaginated: page !== null && size !== null // Tambahan flag seperti di JSON Abang
             });
 
     } catch (error) {
@@ -217,7 +214,7 @@ export const createMataKuliahObe = async (req, res, next) => {
 export const updateMataKuliahObe = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const data = await MataKuliahService.updateMataKuliah(id, req.body);
+        const data = await MataKuliahService.updateMataKuliahObe(id, req.body);
 
         return new ResponseBuilder(res)
             .code(200)

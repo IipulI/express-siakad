@@ -208,7 +208,6 @@ export const getCplPerProgramStudi = async (filters) => {
         };
 
     } catch (error) {
-        if (error.status) throw error;
         throw new CustomError.InternalServerError("Gagal menghitung Monitoring CPL: " + error.message);
     }
 };
@@ -384,7 +383,6 @@ export const getLaporanCplPerMahasiswa = async (filters) => {
             }
         };
     } catch (error) {
-        if (error.status) throw error;
         throw new CustomError.InternalServerError("Gagal menghitung Laporan: " + error.message);
     }
 };
@@ -529,7 +527,6 @@ export const getLaporanCplPerMataKuliah = async (filters) => {
             }
         };
     } catch (error) {
-        if (error.status) throw error;
         throw new CustomError.InternalServerError("Gagal menghitung Laporan Mata Kuliah: " + error.message);
     }
 };
@@ -639,7 +636,6 @@ export const getLaporanMkPerMahasiswa = async (filters) => {
             dataMahasiswa: resultMahasiswa
         };
     } catch (error) {
-        if (error.status) throw error;
         throw new CustomError.InternalServerError("Gagal menghitung Laporan: " + error.message);
     }
 };
@@ -956,7 +952,6 @@ export const getTranskripObeMahasiswa = async (filters) => {
             }
         };
     } catch (error) {
-        if (error.status) throw error;
         throw new CustomError.InternalServerError("Gagal menghitung Transkrip OBE: " + error.message);
     }
 };
@@ -1331,7 +1326,7 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
             `, { replacements: { mataKuliahId }, type: sequelize.QueryTypes.SELECT });
 
             if (cekJalurCatauD.length > 0) {
-                // Jalur C atau D aktif untuk MK ini, baca nilai CPMK yang sudah akurat
+                // Jalur C atau D aktif untuk MK ini — baca nilai CPMK yang sudah akurat
                 const queryScoresJalurC = `
                     SELECT
                         m.id AS mahasiswa_id,
@@ -1440,7 +1435,6 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
             dataMahasiswa: dataMahasiswa
         };
     } catch (error) {
-        if (error.status) throw error;
-        throw new CustomError.InternalServerError("Gagal menghitung CPMK per Mahasiswa: " + error.message);
+        throw new Error("Gagal menghitung CPMK per Mahasiswa: " + error.message);
     }
 };

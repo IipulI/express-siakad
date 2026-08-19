@@ -15,10 +15,7 @@ export const validateSaveCpmk = [
     body('cpmkList.*.bobot').isFloat({ min: 0, max: 100 }).withMessage('Bobot CPMK harus 0-100'),
 
     // 2. Validasi Sub-Array 1 (Pemetaan CPL di dalam CPMK Induk)
-    // Optional -- di levelPemetaan='Sub-CPMK', bobot CPL dipetakan di level
-    // subCpmk[].cplPemetaan (lihat di bawah), bukan di sini, jadi field ini
-    // boleh tidak ada sama sekali untuk payload mode Sub-CPMK.
-    body('cpmkList.*.cplPemetaan').optional().isArray().withMessage('Pemetaan CPL harus berupa array'),
+    body('cpmkList.*.cplPemetaan').isArray().withMessage('Pemetaan CPL harus berupa array'),
     body('cpmkList.*.cplPemetaan.*.idCpl').isUUID().withMessage('ID CPL tidak valid'),
     body('cpmkList.*.cplPemetaan.*.bobotCpl').isFloat({ min: 0, max: 100 }).withMessage('Bobot CPL tidak valid'),
 
@@ -30,9 +27,6 @@ export const validateSaveCpmk = [
         .notEmpty().withMessage('Kode Sub-CPMK wajib diisi jika ada'),
     body('cpmkList.*.subCpmk.*.deskripsi')
         .notEmpty().withMessage('Deskripsi Sub-CPMK wajib diisi jika ada'),
-    body('cpmkList.*.subCpmk.*.cplPemetaan').optional().isArray().withMessage('Pemetaan CPL Sub-CPMK harus berupa array'),
-    body('cpmkList.*.subCpmk.*.cplPemetaan.*.idCpl').isUUID().withMessage('ID CPL tidak valid'),
-    body('cpmkList.*.subCpmk.*.cplPemetaan.*.bobotCpl').isFloat({ min: 0, max: 100 }).withMessage('Bobot CPL tidak valid'),
 
     // Eksekutor
     (req, res, next) => {

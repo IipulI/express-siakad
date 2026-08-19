@@ -10,7 +10,7 @@ export const findAll = async (req, res, next) => {
     const filter = {
         siakPeriodeAkademikId : req.query.siakPeriodeAkademikId,
         siakProgramStudiId : req.query.siakProgramStudiId,
-        sistemKuliah : req.query.sistemKuliah,
+        siakSistemKuliahId : req.query.siakSistemKuliahId,
         siakTahunKurikulumId: req.query.siakTahunKurikulumId,
         search: req.query.search,
         npm: req.query.npm,
