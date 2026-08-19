@@ -41,6 +41,7 @@ router.get('/callback', async (req, res, next) => {
 
         const eportalUser = parsedRes.user;
         const institutionalRole = eportalUser.institutional_role || eportalUser.role;
+        const roleUpper = institutionalRole?.toUpperCase();
         const rolePermissions = parsedRes.access.role_permissions
 
         // Helper cek nilai valid (bukan null, undefined, atau string "null")
@@ -92,7 +93,15 @@ router.get('/callback', async (req, res, next) => {
                 siakadRole = 'DOSEN';
             }
 
-        } else if (rolePermissions.includes('admin.siakad.view')) {
+        } else if (rolePermissions.includes('admin.siakad.view') || ['PEGAWAI', 'ADMIN'].includes(roleUpper)) {
+            // FIX 2026-08-19: commit 28a7d8e ganti cek admin dari institutional_role
+            // (broad: PEGAWAI/ADMIN) ke rolePermissions.includes('admin.siakad.view')
+            // doang (sempit: butuh permission spesifik itu ada di e-portal). Beberapa
+            // role kayak Kabiro/Admin Kepegawaian institutional_role-nya PEGAWAI/ADMIN
+            // tapi belum tentu punya permission granular 'admin.siakad.view' di
+            // e-portal -- jadi ketolak padahal dulu jalan. Sekarang diterima kalau
+            // SALAH SATU kriteria (permission spesifik ATAU institutional_role lama)
+            // kepenuhan, biar gak nge-exclude role yang dulu udah bisa masuk.
             // Cari di siak_pegawai by email
             const pegawaiResult = await models.sequelize.query(
                 `SELECT sp.id, sp.siak_user_id, sp.nama 
