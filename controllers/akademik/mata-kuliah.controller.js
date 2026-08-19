@@ -1,6 +1,7 @@
 import * as MataKuliahService from "../../services/mata-kuliah.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import {getPagingData} from "../../utils/pagination.js";
+import { isAdminAkademik } from "../../middleware/require-koordinator-mk.middleware.js";
 
 export const findAll = async (req, res) => {
     const page = req.query.page ? parseInt(req.query.page) : null;
@@ -150,6 +151,12 @@ export const getDaftarMataKuliahObe = async (req, res, next) => {
         const { page, size, limit, search, searchBy, prodiId, tahunKurikulumId } = req.query;
         const finalSize = size || limit;
 
+        // FIX 2026-08-19: sebelumnya endpoint ini SELALU nampilin SEMUA mata
+        // kuliah, gak peduli yang minta admin atau dosen biasa -- padahal
+        // dosen cuma boleh liat MK yang dia ajar atau koordinatorkan. Admin
+        // (AKADEMIK_UNIV, termasuk yang login lewat SSO) tetap lihat semua.
+        const dosenId = isAdminAkademik(req) ? null : (req.user?.dosen?.id || null);
+
         // 2. Panggil Service
         const result = await MataKuliahService.getListMataKuliahObe(
             page,
@@ -157,7 +164,8 @@ export const getDaftarMataKuliahObe = async (req, res, next) => {
             search,
             prodiId,
             tahunKurikulumId,
-            searchBy
+            searchBy,
+            dosenId
         );
 
         // 3. Bungkus data mentah dengan utilitas pagination milik Abang
