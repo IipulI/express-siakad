@@ -66,13 +66,16 @@ router.get('/callback', async (req, res, next) => {
             }
 
         } else if (rolePermissions.includes('dosen.siakad.view')) {
-            const nidn = eportalUser.nidn;
+            // FIX 2026-08-19: e-portal kadang ngirim NIP di field nidn (dengan
+            // spasi nempel), bukan NIDN asli -- tambah trim + fallback cocokin
+            // ke kolom nip juga, supaya dosen kayak gini tetap kebaca.
+            const nidn = (eportalUser.nidn || '').trim();
             const nidnWithZero = nidn.startsWith('0') ? nidn : '0' + nidn;
             const nidnWithoutZero = nidn.replace(/^0+/, '');
 
             const dosenResult = await models.sequelize.query(
                 `SELECT id, siak_user_id, nama FROM siak_pegawai
-                 WHERE nidn IN (:nidn, :nidnWithZero, :nidnWithoutZero)
+                 WHERE (nidn IN (:nidn, :nidnWithZero, :nidnWithoutZero) OR nip = :nidn)
                  AND deleted_at IS NULL LIMIT 1`,
                 {
                     replacements: { nidn, nidnWithZero, nidnWithoutZero },
