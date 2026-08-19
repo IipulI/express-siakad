@@ -52,7 +52,12 @@ router.get('/callback', async (req, res, next) => {
         let siakadRole = null
 
         let accountInfo = {}
-        if (rolePermissions.includes('mahasiswa.siakad.view')) {
+        // FIX 2026-08-19: sama kayak cabang admin di bawah -- commit 28a7d8e
+        // ganti cek dari institutional_role (roleUpper === 'MAHASISWA'/'DOSEN')
+        // ke rolePermissions doang, jadi lebih sempit. Digabung lagi biar gak
+        // nge-exclude akun yang institutional_role-nya udah bener tapi
+        // permission granularnya belum di-setting di e-portal.
+        if (rolePermissions.includes('mahasiswa.siakad.view') || (roleUpper === 'MAHASISWA' && isValid(eportalUser.npm))) {
             const mahasiswa = await Mahasiswa.findOne({
                 where: { npm: eportalUser.npm },
                 attributes: ['id', 'nama', 'npm', 'semester', 'siakUserId'],
@@ -66,7 +71,7 @@ router.get('/callback', async (req, res, next) => {
                 siakadRole = 'MAHASISWA';
             }
 
-        } else if (rolePermissions.includes('dosen.siakad.view')) {
+        } else if (rolePermissions.includes('dosen.siakad.view') || (roleUpper === 'DOSEN' && isValid(eportalUser.nidn))) {
             // FIX 2026-08-19: e-portal kadang ngirim NIP di field nidn (dengan
             // spasi nempel), bukan NIDN asli -- tambah trim + fallback cocokin
             // ke kolom nip juga, supaya dosen kayak gini tetap kebaca.
