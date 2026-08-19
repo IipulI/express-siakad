@@ -22,9 +22,12 @@ export const login = async(req, res) => {
         }
 
         // If it's a real server crash (like database down), send 500
+        // FIX 2026-08-19: sebelumnya gak ada .json() di sini -- response gak
+        // pernah beneran dikirim, request nge-hang sampai timeout klien.
         console.error("Login System Error:", error);
         responseBuilder
             .code(500)
-            .message("Terjadi kesalahan pada server");
+            .message("Terjadi kesalahan pada server")
+            .json(null);
     }
 }

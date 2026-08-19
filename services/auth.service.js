@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import { Op } from "sequelize"
 
-const { Mahasiswa, Dosen, Pegawai, User, UserRole, Role } = models;
+const { Mahasiswa, Dosen, User, UserRole, Role } = models;
 
 export const login = async(data) => {
     // 1. Build the query safely so we don't pass 'undefined' to Sequelize
@@ -37,15 +37,14 @@ export const login = async(data) => {
                 required: false,
             },
             {
-                attributes: ["id", "nama"],
+                // FIX 2026-08-19: model Pegawai udah gak ada (digabung ke Dosen
+                // waktu merge siak_pegawai lama -> siak_pegawai baru, lihat
+                // migration merge-siak-pegawai-into-siak-dosen) -- include-nya
+                // sebelumnya nunjuk ke model undefined, bikin login langsung
+                // (bukan SSO) SELALU error "Include unexpected".
+                attributes: ["id", "nama", "nidn", "nip", "isDosen", "isPegawai"],
                 model: Dosen,
                 as: "dosen",
-                required: false,
-            },
-            {
-                attributes: ["id", "nama"],
-                model: Pegawai,
-                as: "pegawai",
                 required: false,
             }
         ]
@@ -81,17 +80,13 @@ export const login = async(data) => {
         }
     }
     else if (user.dosen !== null){
+        // siak_pegawai sekarang tabel gabungan dosen & pegawai non-dosen (lihat
+        // migration merge-siak-pegawai-into-siak-dosen) -- pakai nidn kalau ada,
+        // fallback ke nip buat pegawai yang bukan dosen.
         accountInfo = {
             id: user.dosen.id,
             nama: user.dosen.nama,
-            code: user.dosen.nidn
-        }
-    }
-    else if (user.pegawai !== null) {
-        accountInfo = {
-            id: user.pegawai.id,
-            nama: user.pegawai.nama,
-            code: user.pegawai.nip
+            code: user.dosen.nidn || user.dosen.nip
         }
     }
 

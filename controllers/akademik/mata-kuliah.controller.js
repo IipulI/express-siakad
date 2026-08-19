@@ -184,7 +184,7 @@ export const getDetailMataKuliahObe = async (req, res, next) => {
         const { id } = req.params;
 
         // 1. Panggil Service Detail
-        const data = await MataKuliahService.getDetailMataKuliahObe(id);
+        const data = await MataKuliahService.getDetailMataKuliahObe(id, req.user?.dosen?.id || null);
 
         // 2. Kirim Response Sukses
         return new ResponseBuilder(res)

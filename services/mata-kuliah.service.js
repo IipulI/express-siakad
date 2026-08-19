@@ -101,7 +101,7 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
 // =========================================================
 // 2. GET DETAIL MATA KULIAH OBE (Tampilan Detail Frontend)
 // =========================================================
-export const getDetailMataKuliahObe = async (id) => {
+export const getDetailMataKuliahObe = async (id, currentDosenId = null) => {
     // 👇 KUNCI: Tarik semua model dari 'models' supaya gak "is not defined"
     const {
         MataKuliah,
@@ -162,7 +162,11 @@ export const getDetailMataKuliahObe = async (id) => {
         pengembangRps: mk.pengembangRps ? mk.pengembangRps.map(dosen => ({
             id: dosen.id,
             label: `${dosen.nidn} - ${dosen.nama}`
-        })) : []
+        })) : [],
+        // FIX 2026-08-19: dipakai FE buat nentuin nampilin tombol edit atau
+        // enggak -- dosen pengampu biasa cuma bisa lihat, cuma koordinator MK
+        // ini yang boleh edit CPL/CPMK/RPS/Rencana Pembelajaran/Rencana Evaluasi.
+        isKoordinator: !!(currentDosenId && mk.koordinatorMkId === currentDosenId)
     };
 };
 // =========================================================
