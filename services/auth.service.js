@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import { Op } from "sequelize"
 
-const { Mahasiswa, Dosen, User, UserRole, Role } = models;
+const { Mahasiswa, Dosen, User, UserRole, Role, ProgramStudi } = models;
 
 export const login = async(data) => {
     // 1. Build the query safely so we don't pass 'undefined' to Sequelize
@@ -61,11 +61,35 @@ export const login = async(data) => {
         throw new Error("Passwords don't match");
     }
 
+    // FIX 2026-08-19: kalau siak_user_role kosong (banyak akun emang gak
+    // pernah dapet baris eksplisit di sana -- role selama ini kebanyakan
+    // ditentuin lewat SSO, dititipin di token doang, gak pernah disinkron ke
+    // tabel ini), roles balik [] dan FE (FormLogin.tsx: data.user.roles[0])
+    // gak nemu cabang manapun yang cocok -- macet di "Login Berhasil", gak
+    // pernah pindah ke dashboard. Sekarang kalau kosong, infer role DASAR
+    // dari record yang udah ada (mirip cara SSO nentuin role dari
+    // rolePermissions, bukan nge-hardcode). Dosen yang jadi kaprodi (ditunjuk
+    // di siak_program_studi.kaprodi_id) di-treat kayak AKADEMIK_UNIV --
+    // sesuai arahan: kaprodi tampilannya kayak admin akademik. Dihitung SEBELUM
+    // sign token biar klaim `roles` ikut kebawa di JWT-nya sendiri (bukan cuma
+    // di response body) -- isAdminAkademik() di middleware baca req.auth.roles
+    // dari token ini buat request-request SETELAH login, bukan cuma pas login.
+    let roles = user.userRole.map(ur => ur.role.nama);
+    if (roles.length === 0) {
+        if (user.dosen !== null) {
+            const kaprodiDi = await ProgramStudi.findOne({ where: { kaprodiId: user.dosen.id }, attributes: ['id'] });
+            roles = kaprodiDi ? ['AKADEMIK_UNIV'] : ['DOSEN'];
+        } else if (user.mahasiswa !== null) {
+            roles = ['MAHASISWA'];
+        }
+    }
+
     // 4. Generate Token (Remember to move "secret text" to a .env file later!)
     const token = jwt.sign(
         {
             id: user.id,
             username: user.username,
+            roles,
         },
         "mGrp2pcdUoy2GJcGQgmKOuutNccZJgOrwRXDzbeYwOhA8vyggf2QOiZBTNl65Lf3",
         { expiresIn: "30d" }
@@ -91,21 +115,6 @@ export const login = async(data) => {
     }
 
     console.log(user.userRole)
-
-    // FIX 2026-08-19: kalau siak_user_role kosong (banyak akun emang gak
-    // pernah dapet baris eksplisit di sana -- role selama ini kebanyakan
-    // ditentuin lewat SSO, dititipin di token doang, gak pernah disinkron ke
-    // tabel ini), roles balik [] dan FE (FormLogin.tsx: data.user.roles[0])
-    // gak nemu cabang manapun yang cocok -- macet di "Login Berhasil", gak
-    // pernah pindah ke dashboard. Sekarang kalau kosong, infer role DASAR
-    // dari record yang udah ada (mirip cara SSO nentuin role dari
-    // rolePermissions, bukan nge-hardcode admin/koordinator) -- BUKAN
-    // AKADEMIK_UNIV, itu tetap harus eksplisit di siak_user_role.
-    let roles = user.userRole.map(ur => ur.role.nama);
-    if (roles.length === 0) {
-        if (user.dosen !== null) roles = ['DOSEN'];
-        else if (user.mahasiswa !== null) roles = ['MAHASISWA'];
-    }
 
     const res = {
         token,
