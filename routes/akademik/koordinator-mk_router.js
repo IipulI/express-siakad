@@ -10,8 +10,9 @@ import * as ExportNilaiKelasController from '../../controllers/akademik/export-n
 import * as ExportController from '../../controllers/akademik/export.controller.js';
 import { normalizeFilePath, upload, uploadExcel } from '../../utils/upload-file.js';
 import { validateSaveDetailRps, validateGetPratinjauSalinDetailRps, validateSalinDetailRps } from '../../validators/rps.validator.js';
+import { requireKoordinatorMK, requireDosenLogin } from '../../middleware/require-koordinator-mk.middleware.js';
 
-const { MataKuliah, Rps, RencanaPembelajaran, RencanaEvaluasi } = models;
+const { Rps, RencanaPembelajaran, RencanaEvaluasi } = models;
 
 // FIX 2026-08-19: middleware ini sebelumnya CUMA placeholder (`next()` doang,
 // gak ada pengecekan apapun) -- artinya siapa aja yang login (mahasiswa, dosen
@@ -23,14 +24,13 @@ const { MataKuliah, Rps, RencanaPembelajaran, RencanaEvaluasi } = models;
 // yang dituju. Pengecualian: role AKADEMIK_UNIV (admin akademik) selalu boleh
 // lewat, gak peduli koordinator atau bukan -- sesuai arahan, admin harus tetap
 // bisa akses endpoint ini juga (bukan cuma lewat /akademik/obe/...).
-// userRole itu hasMany (lihat models/user.models.js) walau praktiknya tiap user
-// baru punya 1 role -- tetep di-treat sebagai array biar bener sesuai model.
-const isAdminAkademik = (req) => (req.user?.userRole || []).some((ur) => ur?.role?.nama === 'AKADEMIK_UNIV');
+// Logic-nya sekarang dipindah ke middleware/require-koordinator-mk.middleware.js
+// biar bisa dipakai bareng sama obe.router.js (endpoint pemetaan-cpmk lama di
+// sana punya celah yang sama).
 
 // resolveMataKuliahId: cara ekstrak siak_mata_kuliah_id dari request, beda-beda
 // tergantung bentuk route-nya (langsung di params, atau harus nengok dulu ke
 // resource turunannya kayak RencanaPembelajaran/:id).
-const resolveDariParamsMk = async (req) => req.params.id || req.params.mataKuliahId || null;
 const resolveDariRencanaPembelajaranId = async (req) => {
     const row = await RencanaPembelajaran.findByPk(req.params.id, { attributes: ['siakMataKuliahId'] });
     return row?.siakMataKuliahId || null;
@@ -42,42 +42,6 @@ const resolveDariRencanaEvaluasiId = async (req) => {
 const resolveDariDetailRpsId = async (req) => {
     const row = await Rps.findByPk(req.params.id, { attributes: ['siakMataKuliahId'] });
     return row?.siakMataKuliahId || null;
-};
-
-const requireKoordinatorMK = (resolveMataKuliahId = resolveDariParamsMk) => async (req, res, next) => {
-    try {
-        if (isAdminAkademik(req)) return next();
-
-        const dosenId = req.user?.dosen?.id;
-        if (!dosenId) {
-            return res.status(403).json({ status: 403, message: 'Hanya dosen (koordinator mata kuliah) atau admin akademik yang bisa mengakses menu ini.' });
-        }
-
-        const mataKuliahId = await resolveMataKuliahId(req);
-        if (!mataKuliahId) {
-            return res.status(404).json({ status: 404, message: 'Mata kuliah/data terkait tidak ditemukan.' });
-        }
-
-        const mk = await MataKuliah.findByPk(mataKuliahId, { attributes: ['id', 'koordinatorMkId'] });
-        if (!mk || mk.koordinatorMkId !== dosenId) {
-            return res.status(403).json({ status: 403, message: 'Anda bukan koordinator mata kuliah ini, tidak dapat mengakses/mengubah datanya.' });
-        }
-
-        next();
-    } catch (error) {
-        next(error);
-    }
-};
-
-// Dipakai buat bagian [SIDEBAR KELAS KULIAH] di bawah -- belum ada resolver
-// "kelas ini punya mata kuliah yang dikoordinatori dosen ini" (beda konsep
-// dari kepemilikan kelas biasa), jadi baru sebatas mewajibkan requester itu
-// dosen asli atau admin akademik. Verifikasi penuh per-kelas masih perlu
-// disusul terpisah, sama kayak cekKepemilikanKelas di dosen-pengampu_router.js
-// yang juga masih TODO.
-const requireDosenLogin = (req, res, next) => {
-    if (isAdminAkademik(req) || req.user?.dosen?.id) return next();
-    return res.status(403).json({ status: 403, message: 'Hanya dosen atau admin akademik yang bisa mengakses menu ini.' });
 };
 
 const router = express.Router();

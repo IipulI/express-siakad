@@ -20,6 +20,7 @@ import {
 } from "../../validators/mata-kuliah.validator.js";
 
 import { validateSaveCpmk } from "../../validators/cpmk.validator.js";
+import { requireKoordinatorMK } from "../../middleware/require-koordinator-mk.middleware.js";
 
 const router = new Router();
 
@@ -122,10 +123,13 @@ router.delete('/mata-kuliah/:id/pemetaan-cpl', MataKuliahController.clearCplMapp
 // ... (route mata kuliah lainnya) ...
 
 // Rute untuk Form Pemetaan CPMK
-// router.get('/mata-kuliah/:id/pemetaan-cpmk', CpmkController.getFormPemetaanCpmk);
-// router.post('/mata-kuliah/:id/pemetaan-cpmk', CpmkController.savePemetaanCpmk);
+// GET dibiarkan kebuka buat semua yang login (dipakai buat tampilan VIEW-only
+// dosen pengampu biasa di halaman dosen, lihat useObeCpmkMk.ts). POST-nya
+// (Simpan/ubah data) sebelumnya kebuka juga buat siapa aja yang login --
+// dibenerin 2026-08-19, sekarang cuma koordinator MK terkait / admin akademik
+// yang boleh, sama kayak endpoint sejenis di koordinator-mk_router.js.
 router.get('/mata-kuliah/:id/pemetaan-cpmk', CpmkController.getFormPemetaanCpmk);
-router.post('/mata-kuliah/:id/pemetaan-cpmk', validateSaveCpmk, CpmkController.savePemetaanCpmk);
+router.post('/mata-kuliah/:id/pemetaan-cpmk', requireKoordinatorMK(), validateSaveCpmk, CpmkController.savePemetaanCpmk);
 
 
 
