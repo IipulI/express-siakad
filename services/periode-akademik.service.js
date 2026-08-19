@@ -77,7 +77,38 @@ export const updatePeriodeAkademik = async (id, updateData) => {
         throw new NotFoundError(`Periode Akademik tidak dapat ditemukan`)
     }
 
-    return existDataPeriodeAkademik.update(updateData)
+    // FIX: sebelumnya .update(updateData) dikirim mentah-mentah -- attribute
+    // model ini ditulis snake_case langsung (siak_tahun_ajaran_id, tanggal_mulai,
+    // tanggal_selesai, bukan di-mapping ke camelCase kayak model lain), padahal
+    // body request dari FE camelCase (siakTahunAjaranId, tanggalMulai, dst).
+    // Sequelize .update() diam-diam SKIP key yang gak match attribute apapun,
+    // jadi update-nya "sukses" tapi gak beneran ngubah apa-apa. Sekarang
+    // di-map eksplisit sama kayak createPeriodeAkademik di atas.
+    const { siakTahunAjaranId, nama, kode, tanggalMulai, tanggalSelesai, status } = updateData;
+    const payload = {};
+    if (siakTahunAjaranId !== undefined) payload.siak_tahun_ajaran_id = siakTahunAjaranId;
+    if (nama !== undefined) payload.nama = nama;
+    if (kode !== undefined) payload.kode = kode;
+    if (tanggalMulai !== undefined) payload.tanggal_mulai = tanggalMulai;
+    if (tanggalSelesai !== undefined) payload.tanggal_selesai = tanggalSelesai;
+    if (status !== undefined) payload.status = status;
+
+    // Banyak fitur lain (dashboard jadwal, default periode di RPS/Rencana
+    // Pembelajaran/Evaluasi, dst) asumsinya cuma ADA SATU periode berstatus
+    // "Aktif". Kalau baris ini diubah jadi Aktif, matiin dulu semua periode
+    // lain biar gak dobel -- pakai transaksi biar atomik.
+    if (payload.status === 'Aktif') {
+        return db.sequelize.transaction(async (t) => {
+            await PeriodeAkademik.update(
+                { status: 'Inaktif' },
+                { where: { id: { [db.Sequelize.Op.ne]: id } }, transaction: t }
+            );
+            await existDataPeriodeAkademik.update(payload, { transaction: t });
+            return existDataPeriodeAkademik;
+        });
+    }
+
+    return existDataPeriodeAkademik.update(payload)
 };
 
 export const deletePeriodeAkademik = async (id) => {

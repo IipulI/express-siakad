@@ -1,6 +1,6 @@
 import models from '../models/index.js';
 
-const { MataKuliah, JadwalKuliah } = models;
+const { MataKuliah, JadwalKuliah, KelasKuliah, ProgramStudi } = models;
 
 // userRole itu hasMany (lihat models/user.models.js) walau praktiknya tiap user
 // baru punya 1 role -- tetep di-treat sebagai array biar bener sesuai model.
@@ -67,6 +67,39 @@ export const cekKepemilikanKelas = async (req, res, next) => {
         });
         if (!ampu) {
             return res.status(403).json({ status: 403, message: 'Anda bukan pengajar kelas ini, tidak dapat mengakses datanya.' });
+        }
+
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
+
+// requireKaprodi: cuma boleh lewat kalau requester itu kaprodi_id dari program
+// studi PEMILIK kelas kuliah yang dituju (siak_program_studi.kaprodi_id), atau
+// admin akademik. FIX 2026-08-19: middleware ini di kaprodi_router.js
+// sebelumnya CUMA placeholder (`next()` doang) -- siapa aja yang login bisa
+// akses (termasuk RESET NILAI & FINALISASI) kelas kuliah MANAPUN, gak peduli
+// prodi apa. kaprodi_id sendiri sudah ada dari sononya di data ProgramStudi
+// (dosen yang ditunjuk jadi kaprodi tiap prodi), jadi dicek langsung dari situ.
+export const requireKaprodi = async (req, res, next) => {
+    try {
+        if (isAdminAkademik(req)) return next();
+
+        const dosenId = req.user?.dosen?.id;
+        if (!dosenId) {
+            return res.status(403).json({ status: 403, message: 'Hanya Kaprodi atau admin akademik yang bisa mengakses menu ini.' });
+        }
+
+        const kelasKuliahId = req.params.id || req.params.kelasId || req.params.krsId;
+        const kelas = await KelasKuliah.findByPk(kelasKuliahId, { attributes: ['id', 'siakProgramStudiId'] });
+        if (!kelas) {
+            return res.status(404).json({ status: 404, message: 'Kelas kuliah tidak ditemukan.' });
+        }
+
+        const prodi = await ProgramStudi.findByPk(kelas.siakProgramStudiId, { attributes: ['id', 'kaprodiId'] });
+        if (!prodi || prodi.kaprodiId !== dosenId) {
+            return res.status(403).json({ status: 403, message: 'Anda bukan Kaprodi program studi pemilik kelas ini.' });
         }
 
         next();

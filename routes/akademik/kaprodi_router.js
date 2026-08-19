@@ -3,19 +3,14 @@ import * as PenilaianController from '../../controllers/akademik/penilaian.contr
 import * as KelasKuliahController from '../../controllers/akademik/kelas-kuliah.controller.js';
 import * as CapaianController from '../../controllers/akademik/capaian-pembelajaran.controller.js';
 import * as ExportNilaiKelasController from '../../controllers/akademik/export-nilai-kelas.controller.js';
+import { requireKaprodi } from '../../middleware/require-koordinator-mk.middleware.js';
 
-/**
- * MIDDLEWARE PLACEHOLDER - KAPRODI
- * TODO: diisi tim SSO/RBAC dengan JWT verify
- * decoded.role === 'kaprodi'
- * Kaprodi memiliki akses supervisor tertinggi di level program studi,
- * termasuk kunci nilai dan finalisasi (setara Admin Akademik di SEVIMA).
- * Route ini juga dapat digunakan oleh BAAK jika diberikan role yang sesuai.
- */
-const requireKaprodi = (req, res, next) => {
-    // TODO: JWT verify oleh tim SSO
-    next();
-};
+// FIX 2026-08-19: requireKaprodi sebelumnya CUMA placeholder (`next()` doang,
+// gak ada pengecekan apapun) -- siapa aja yang login bisa akses SEMUA endpoint
+// di router ini buat kelas kuliah MANAPUN, termasuk Reset Nilai dan Finalisasi
+// yang destruktif/gak bisa dibatalin. Sekarang beneran ngecek lewat
+// requireKaprodi di middleware bersama (dosen itu harus kaprodi_id dari
+// program studi pemilik kelasnya, atau admin akademik).
 
 const router = express.Router();
 router.use(requireKaprodi);
