@@ -6,46 +6,14 @@ import * as PenilaianController from '../../controllers/akademik/penilaian.contr
 import * as KelasKuliahController from '../../controllers/akademik/kelas-kuliah.controller.js';
 import * as CapaianController from '../../controllers/akademik/capaian-pembelajaran.controller.js';
 import * as exportExcelCapaianKelas from '../../controllers/akademik/export-nilai-kelas.controller.js';
-import models from '../../models/index.js';
-import { isAdminAkademik } from '../../middleware/require-koordinator-mk.middleware.js';
-
-const { JadwalKuliah } = models;
+import { requireDosenLogin as requireDosenPengampu, cekKepemilikanKelas } from '../../middleware/require-koordinator-mk.middleware.js';
 
 // FIX 2026-08-19: dua middleware ini sebelumnya CUMA placeholder (`next()` doang,
 // gak ada pengecekan apapun) -- artinya siapa aja yang login bisa lihat DAN UBAH
 // nilai/kunci nilai/capaian kelas kuliah MANAPUN, bukan cuma kelas yang dia ampu
-// sendiri. Sekarang beneran ngecek lewat siak_jadwal_kuliah (tabel yang sama yang
-// nentuin kelas mana yang muncul di "Kelas Kuliah"-nya dosen), sama kayak pola
-// requireKoordinatorMK di koordinator-mk_router.js. Admin akademik selalu boleh
-// lewat (dia yang pakai endpoint yang sama ini juga dari halaman admin).
-const requireDosenPengampu = (req, res, next) => {
-    if (isAdminAkademik(req) || req.user?.dosen?.id) return next();
-    return res.status(403).json({ status: 403, message: 'Hanya dosen atau admin akademik yang bisa mengakses menu ini.' });
-};
-
-const cekKepemilikanKelas = async (req, res, next) => {
-    try {
-        if (isAdminAkademik(req)) return next();
-
-        const dosenId = req.user?.dosen?.id;
-        if (!dosenId) {
-            return res.status(403).json({ status: 403, message: 'Hanya dosen atau admin akademik yang bisa mengakses menu ini.' });
-        }
-
-        const kelasKuliahId = req.params.id || req.params.kelasId || req.params.krsId;
-        const ampu = await JadwalKuliah.findOne({
-            where: { siakKelasKuliahId: kelasKuliahId, siakDosenId: dosenId },
-            attributes: ['id'],
-        });
-        if (!ampu) {
-            return res.status(403).json({ status: 403, message: 'Anda bukan pengajar kelas ini, tidak dapat mengakses datanya.' });
-        }
-
-        next();
-    } catch (error) {
-        next(error);
-    }
-};
+// sendiri. Sekarang dipindah ke middleware/require-koordinator-mk.middleware.js
+// (cekKepemilikanKelas beneran ngecek lewat siak_jadwal_kuliah) biar bisa dipakai
+// bareng sama routes/dosen/kelas-kuliah.routes.js yang punya celah sama persis.
 
 const router = express.Router();
 router.use(requireDosenPengampu);

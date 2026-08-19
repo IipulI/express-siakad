@@ -1,6 +1,6 @@
 import models from '../models/index.js';
 
-const { MataKuliah } = models;
+const { MataKuliah, JadwalKuliah } = models;
 
 // userRole itu hasMany (lihat models/user.models.js) walau praktiknya tiap user
 // baru punya 1 role -- tetep di-treat sebagai array biar bener sesuai model.
@@ -42,4 +42,35 @@ export const requireKoordinatorMK = (resolveMataKuliahId = resolveDariParamsMk) 
 export const requireDosenLogin = (req, res, next) => {
     if (isAdminAkademik(req) || req.user?.dosen?.id) return next();
     return res.status(403).json({ status: 403, message: 'Hanya dosen atau admin akademik yang bisa mengakses menu ini.' });
+};
+
+// cekKepemilikanKelas: cuma boleh lewat kalau requester itu dosen yang beneran
+// PUNYA jadwal di kelas kuliah yang dituju (siak_jadwal_kuliah.siak_dosen_id),
+// atau admin akademik. Dipakai di semua endpoint kelas-kuliah sisi dosen (nilai,
+// capaian, RPS-dari-kelas, dst) yang sebelumnya jadi placeholder kosong (lihat
+// dosen-pengampu_router.js) atau gak ada pengecekan sama sekali (lihat
+// routes/dosen/kelas-kuliah.routes.js) -- siapa aja yang login bisa lihat/ubah
+// nilai kelas dosen lain kalau tau ID kelasnya.
+export const cekKepemilikanKelas = async (req, res, next) => {
+    try {
+        if (isAdminAkademik(req)) return next();
+
+        const dosenId = req.user?.dosen?.id;
+        if (!dosenId) {
+            return res.status(403).json({ status: 403, message: 'Hanya dosen atau admin akademik yang bisa mengakses menu ini.' });
+        }
+
+        const kelasKuliahId = req.params.id || req.params.kelasId || req.params.krsId;
+        const ampu = await JadwalKuliah.findOne({
+            where: { siakKelasKuliahId: kelasKuliahId, siakDosenId: dosenId },
+            attributes: ['id'],
+        });
+        if (!ampu) {
+            return res.status(403).json({ status: 403, message: 'Anda bukan pengajar kelas ini, tidak dapat mengakses datanya.' });
+        }
+
+        next();
+    } catch (error) {
+        next(error);
+    }
 };
