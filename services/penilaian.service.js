@@ -705,6 +705,58 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
     }
 }
 
+// ============================================================================
+// Rincian nilai mentah per komponen x Sub-CPMK/CPMK untuk 1 mahasiswa -- dipakai
+// FE buat nunjukin ke dosen/kaprodi "nilai yang diinput itu ada di mana", karena
+// selama ini yang keliatan cuma hasil akhirnya. Dibaca LANGSUNG dari ledger
+// siak_nilai_subcpmk_evaluasi_mahasiswa (sumber CBT & MANUAL digabung per
+// (rencanaEvaluasiId, cpmkId) sebelum dihitung %), bukan dari NilaiCpmkMahasiswa
+// yang sudah di-rollup ke CPMK induk -- di sini levelnya tetap per baris ledger.
+// ============================================================================
+export const getRincianNilaiSubcpmk = async (rincianKrsId) => {
+    const rows = await NilaiSubcpmkEvaluasiMahasiswa.findAll({
+        where: { siakRincianKrsMahasiswaId: rincianKrsId },
+        include: [
+            { model: RencanaEvaluasi, as: 'rencanaEvaluasi', attributes: ['id', 'metodeEvaluasi'] },
+            { model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['id', 'kode'] }
+        ]
+    });
+
+    const grouped = {};
+    rows.forEach((r) => {
+        const revId = r.siakRencanaEvaluasiId;
+        if (!grouped[revId]) {
+            grouped[revId] = {
+                rencanaEvaluasiId: revId,
+                namaKomponen: (r.rencanaEvaluasi?.metodeEvaluasi || '-').toUpperCase(),
+                subCpmk: {}
+            };
+        }
+        const cpmkId = r.siakCpmkId;
+        if (!grouped[revId].subCpmk[cpmkId]) {
+            grouped[revId].subCpmk[cpmkId] = {
+                cpmkId,
+                kode: r.capaianMataKuliah?.kode || cpmkId,
+                skorTerbobot: 0,
+                totalBobot: 0
+            };
+        }
+        grouped[revId].subCpmk[cpmkId].skorTerbobot += parseFloat(r.skorTerbobot || 0);
+        grouped[revId].subCpmk[cpmkId].totalBobot += parseFloat(r.totalBobot || 0);
+    });
+
+    return Object.values(grouped).map((k) => ({
+        rencanaEvaluasiId: k.rencanaEvaluasiId,
+        namaKomponen: k.namaKomponen,
+        subCpmk: Object.values(k.subCpmk)
+            .sort((a, b) => a.kode.localeCompare(b.kode))
+            .map((s) => ({
+                cpmkId: s.cpmkId,
+                kode: s.kode,
+                nilaiPersen: s.totalBobot > 0 ? Math.round((s.skorTerbobot / s.totalBobot) * 10000) / 100 : 0
+            }))
+    }));
+};
 
 export const getDropdownMasterEvaluasi = async () => {
     try {

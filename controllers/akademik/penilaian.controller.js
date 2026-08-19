@@ -114,6 +114,18 @@ export const getRaporOBE = async (req, res) => {
     }
 };
 
+// Rincian nilai mentah per komponen x Sub-CPMK untuk 1 mahasiswa (bukti nilai yang diinput dosen)
+export const getRincianNilaiMahasiswa = async (req, res) => {
+    const responseBuilder = new ResponseBuilder(res);
+    const rincianKrsId = req.params.rincianKrsId;
+    try {
+        const data = await penilaianService.getRincianNilaiSubcpmk(rincianKrsId);
+        return responseBuilder.code(200).message("Berhasil mengambil rincian nilai mahasiswa").json(data);
+    } catch (error) {
+        return responseBuilder.status('failure').code(500).json(error.message);
+    }
+};
+
 // =====================================================================
 // 2. MODUL MANAJEMEN OBE (SISTEM LAMA: PROFIL LULUSAN, CPL, CPMK)
 // =====================================================================

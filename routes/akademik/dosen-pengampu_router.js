@@ -85,6 +85,10 @@ router.post('/kelas/:kelasId/nilai-cpmk/:krsId', cekKepemilikanKelas, PenilaianC
 router.patch('/kelas/:kelasId/nilai/kunci', cekKepemilikanKelas, PenilaianController.kunciNilaiKelas);
 router.patch('/kelas/:kelasId/nilai/:rincianKrsId/kunci', cekKepemilikanKelas, PenilaianController.kunciNilaiMahasiswa);
 
+// GET: rincian nilai mentah per komponen (UTS/UAS/Tugas dst) x Sub-CPMK untuk 1 mahasiswa
+// -- bukti nilai yang diinput dosen per Sub-CPMK, bukan cuma hasil akhirnya
+router.get('/kelas/:kelasId/nilai/:rincianKrsId/rincian', cekKepemilikanKelas, PenilaianController.getRincianNilaiMahasiswa);
+
 // [Capaian Pembelajaran] - tab CPMK dan tab CPL
 // ?tab=cpmk -> tabel nilai CPMK per mahasiswa
 // ?tab=cpl  -> tabel nilai CPL per mahasiswa (setelah nilai dikunci)
