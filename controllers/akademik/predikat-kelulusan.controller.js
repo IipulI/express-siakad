@@ -193,7 +193,8 @@ export const getDetail = async (req, res, next) => {
 
 export const savePredikat = async (req, res, next) => {
     try {
-        const data = await PredikatService.createOrUpdate(req.body);
+        const payload = req.params.id ? { ...req.body, id: req.params.id } : req.body;
+        const data = await PredikatService.createOrUpdate(payload);
         return new ResponseBuilder(res).code(200).message("Data berhasil disimpan").json(data);
     } catch (error) { next(error); }
 };

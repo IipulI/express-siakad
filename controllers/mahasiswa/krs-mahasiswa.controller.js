@@ -58,7 +58,7 @@ export const infoKrs = async (req, res, next) => {
 
 export const saveKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
-  const kelasKuliahIds = req.body.kelasIds;
+  const kelasKuliahIds = req.body.kelasKuliahIds;
 
   try {
     const user = req.user;
@@ -105,7 +105,7 @@ export const submitKrs = async (req, res, next) => {
 
 export const updateKrs = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
-  const kelasKuliahIds = req.body.kelasIds;
+  const kelasKuliahIds = req.body.kelasKuliahIds;
   const user = req.user;
   const mahasiswa = user?.mahasiswa;
 

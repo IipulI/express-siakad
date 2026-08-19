@@ -6,8 +6,9 @@ import {
     validateSaveSesiPembelajaran, 
     validateSaveEvaluasi,
     validateSaveSesi,
+    validateUpdateSesi,
     validateSaveEvaluasiList
-} from "../../validators/rps.validator.js"; 
+} from "../../validators/rps.validator.js";
 const router = new Router();
 
 
@@ -51,7 +52,7 @@ router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', RpsController.getR
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', validateSaveSesi, RpsController.createRencanaPembelajaran);
 
 // PUT: Update Sesi (pake ID Sesi langsung)
-router.put('/rencana-pembelajaran/:id', RpsController.updateRencanaPembelajaran);
+router.put('/rencana-pembelajaran/:id', validateUpdateSesi, RpsController.updateRencanaPembelajaran);
 
 // DELETE: Hapus Sesi
 router.delete('/rencana-pembelajaran/:id', RpsController.deleteRencanaPembelajaran);

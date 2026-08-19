@@ -28,20 +28,32 @@ export const getSkalaNilaiList = async (params) => {
         tanggalAkhir: formatIndoDate(kurikulum.tanggalSelesai)
     };
 
-    const whereClause = { siak_jenjang_id: jenjangId, siak_tahun_kurikulum_id: tahunKurikulumId };
-    if (periodeId) {
-        whereClause.siak_periode_akademik_id = periodeId;
-    }
-
     const daftarPeriode = await PeriodeAkademik.findAll({
         attributes: ['id', 'nama', 'status'],
         order: [['nama', 'DESC']]
     });
 
-    const listSkalaNilai = await SkalaPenilaian.findAll({
+    const whereClause = { siak_jenjang_id: jenjangId, siak_tahun_kurikulum_id: tahunKurikulumId };
+    if (periodeId) {
+        whereClause.siak_periode_akademik_id = periodeId;
+    }
+
+    let listSkalaNilai = await SkalaPenilaian.findAll({
         where: whereClause,
         order: [['angkaMutu', 'DESC']]
     });
+
+    // Kalau periode spesifik dipilih tapi belum pernah di-set skala nilai khusus
+    // buat periode itu, fallback ke skala nilai periode awal kurikulum (periode null)
+    // -- biar gak tampil kosong padahal sebenarnya masih pakai skala nilai default.
+    let usingFallbackAwal = false;
+    if (periodeId && listSkalaNilai.length === 0) {
+        usingFallbackAwal = true;
+        listSkalaNilai = await SkalaPenilaian.findAll({
+            where: { siak_jenjang_id: jenjangId, siak_tahun_kurikulum_id: tahunKurikulumId, siak_periode_akademik_id: null },
+            order: [['angkaMutu', 'DESC']]
+        });
+    }
 
     const formattedSkalaNilai = listSkalaNilai.map(item => ({
         id: item.id,
@@ -56,7 +68,8 @@ export const getSkalaNilaiList = async (params) => {
     return {
         header: headerLengkap,
         daftarPeriode: daftarPeriode,
-        skalaNilai: formattedSkalaNilai
+        skalaNilai: formattedSkalaNilai,
+        usingFallbackAwal
     };
 };
 

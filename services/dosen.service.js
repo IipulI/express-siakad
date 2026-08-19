@@ -1,23 +1,42 @@
 import db from "../models/index.js"
 import { Op } from "sequelize";
 import { getPagination } from "../utils/pagination.js";
+import { NotFoundError } from "../utils/custom-error.js";
 
 const {
     Dosen
 } = db
 
+export const findOneById = async (id) => {
+    const dosen = await Dosen.findOne({
+        where: { id, isDosen: true },
+        attributes: ADMIN_LIST_ATTRIBUTES
+    });
+
+    if (!dosen) {
+        throw new NotFoundError('Data dosen tidak ditemukan');
+    }
+
+    return dosen;
+}
+
 export const fetchAllDosen = async (page, size, filter) => {
     const isPaginated = page !== null && size !== null;
     const queryBuilder = {
-        attributes: ['id', 'nama', 'nidn'],
-        order: [['id', 'DESC']]
+        attributes: [
+            'id', 'nama', 'nidn', 'nip', 'gelarDepan', 'gelarBelakang',
+            'jenisKelamin', 'emailPegawai', 'jabatanFungsional', 'statusAktif'
+        ],
+        where: { isDosen: true },
+        order: [['nama', 'ASC']]
     }
 
     if (filter?.search) {
         queryBuilder.where = {
             [Op.or]: [
                 { nama: { [Op.iLike]: `%${filter.search}%` } },
-                { nidn: { [Op.iLike]: `%${filter.search}%` } }
+                { nidn: { [Op.iLike]: `%${filter.search}%` } },
+                { nip: { [Op.iLike]: `%${filter.search}%` } }
             ]
         };
     }

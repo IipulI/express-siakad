@@ -2,7 +2,7 @@ import * as mahasiswaService from '../../services/mahasiswa.service.js'
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 
-export const findAll = async (req, res) => {
+export const findAll = async (req, res, next) => {
     const response = new ResponseBuilder(res)
 
     const page = req.query.page ? parseInt(req.query.page) : null;
@@ -24,11 +24,8 @@ export const findAll = async (req, res) => {
             .json(payload)
     }
     catch (error) {
-        response
-            .status('failure')
-            .code(500)
-            .message("Gagal mengambil data")
-            .json(error.message)
+        console.error(error);
+        next(error)
     }
 }
 

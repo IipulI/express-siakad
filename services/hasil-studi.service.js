@@ -10,7 +10,49 @@ const {
   MataKuliah,
   PeriodeAkademik,
   RincianKrsMahasiswa,
+  NilaiCpmkMahasiswa,
+  CapaianMataKuliah,
 } = db;
+
+// Susun daftar CPMK datar (dari siak_nilai_cpmk_mahasiswa) jadi hierarki
+// CPMK induk -> Sub-CPMK anak, plus status "Memenuhi"/"Belum Memenuhi" vs target.
+// Dipakai KHS & Transkrip mahasiswa (detail per mata kuliah), TIDAK mengubah
+// field yang sudah ada -- cuma ditambahkan sebagai field baru (capaianCpmk),
+// supaya FE yang sudah konsumsi struktur lama tetap jalan seperti biasa.
+const susunHirarkiCpmk = (nilaiCpmkRows) => {
+  const byId = new Map();
+  nilaiCpmkRows.forEach(n => {
+    const cpmk = n.capaianMataKuliah;
+    if (!cpmk) return;
+    byId.set(cpmk.id, {
+      kode: cpmk.kode,
+      deskripsi: cpmk.deskripsi,
+      nilai: n.nilai != null ? parseFloat(n.nilai) : null,
+      target: cpmk.target != null ? parseFloat(cpmk.target) : null,
+      parentId: cpmk.parentId,
+      // Target cuma beneran diisi di level CPMK induk -- Sub-CPMK targetnya 0/kosong
+      // di RPS, jadi "Memenuhi/Belum Memenuhi" cuma masuk akal kalau target > 0.
+      // Kalau target 0 (kebanyakan Sub-CPMK anak), tampilin "Tanpa Target" -- jangan
+      // ikut dibilang "Memenuhi" cuma karena nilai >= 0 (menyesatkan).
+      status: n.nilai == null
+        ? 'Belum Dinilai'
+        : (cpmk.target != null && parseFloat(cpmk.target) > 0)
+          ? (parseFloat(n.nilai) >= parseFloat(cpmk.target) ? 'Memenuhi' : 'Belum Memenuhi')
+          : 'Tanpa Target',
+      subCpmk: [],
+    });
+  });
+  const roots = [];
+  byId.forEach(item => {
+    if (item.parentId && byId.has(item.parentId)) {
+      byId.get(item.parentId).subCpmk.push(item);
+    } else {
+      roots.push(item);
+    }
+  });
+  roots.forEach(r => { delete r.parentId; r.subCpmk.forEach(s => delete s.parentId); });
+  return roots;
+};
 
 export const getHasilStudi = async (mahasiswaId, periodeId) => {
   const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
@@ -91,9 +133,34 @@ export const getHasilStudi = async (mahasiswaId, periodeId) => {
     }
   });
 
+  // Tambahan: detail capaian CPMK/Sub-CPMK per mata kuliah -- diisi HANYA kalau
+  // ada datanya (kelas yang belum pakai Jalur D/OBE tetap tampil seperti biasa,
+  // cuma capaianCpmk-nya array kosong). Ini field BARU, tidak mengubah field
+  // yang sudah ada, supaya tidak breaking FE yang sudah konsumsi struktur lama.
+  const rincianArray = Array.from(rincianPerKelas.values()).map((item) => item.get({ plain: true }));
+  const kelasIds = rincianArray.map((item) => item.kelasKuliah?.id).filter(Boolean);
+  if (kelasIds.length > 0) {
+    const semuaNilaiCpmk = await NilaiCpmkMahasiswa.findAll({
+      where: { siakKelasKuliahId: { [Op.in]: kelasIds }, siakMahasiswaId: mahasiswaId },
+      include: [{ model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['id', 'kode', 'deskripsi', 'target', 'parentId'] }],
+    });
+    const nilaiCpmkPerKelas = new Map();
+    semuaNilaiCpmk.forEach((n) => {
+      const list = nilaiCpmkPerKelas.get(n.siakKelasKuliahId) || [];
+      list.push(n);
+      nilaiCpmkPerKelas.set(n.siakKelasKuliahId, list);
+    });
+    rincianArray.forEach((item) => {
+      const rows = nilaiCpmkPerKelas.get(item.kelasKuliah?.id) || [];
+      item.capaianCpmk = susunHirarkiCpmk(rows);
+    });
+  } else {
+    rincianArray.forEach((item) => { item.capaianCpmk = []; });
+  }
+
   return {
     hasilStudi: hasilStudi,
-    rincianKrs: Array.from(rincianPerKelas.values()),
+    rincianKrs: rincianArray,
   };
 };
 

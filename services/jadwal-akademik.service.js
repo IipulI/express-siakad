@@ -120,6 +120,11 @@ export const getDailyScheduleStudent = async (mahasiswaId, periodeId, hari) => {
         });
     }
 
+    let hariWhere = {}
+    if (hari !== undefined && hari !== '') {
+        hariWhere = { hari : hari }
+    }
+
     if (!activePeriod) {
         throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
     }
@@ -146,6 +151,7 @@ export const getDailyScheduleStudent = async (mahasiswaId, periodeId, hari) => {
                         attributes: ['id', 'siakDosenId', 'siakRuanganId', 'hari', 'jamMulai', 'jamSelesai'],
                         model: JadwalKuliah,
                         as: 'jadwalKuliah',
+                        // where: { hari : hari },
                         include: [
                             { attributes: ['id', 'nama'], model : Dosen, as: 'dosen' },
                             { attributes: ['id', 'nama', 'ruangan'], model: Ruangan, as: 'ruangan' }

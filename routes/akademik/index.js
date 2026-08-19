@@ -9,6 +9,7 @@ import RuanganRouter from "./ruangan.router.js";
 import JenjangRouter from "./jenjang.router.js";
 import FakultasRouter from "./fakultas.router.js";
 import PembimbingAkademikRouter from "./pembimbing-akademik.router.js";
+import DosenRouter from "./dosen.router.js";
 import AgamaRouter from "./agama.router.js";
 import SukuRouter from "./suku.router.js";
 import KebutuhanKhususRouter from "./kebutuhan-khusus.router.js";
@@ -58,7 +59,7 @@ const router = Router();
 // "hasil-studi" itu :id, error invalid UUID) sebelum sempat sampai ke HasilStudiRouter.
 router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
 router.use("/mahasiswa", MahasiswaRouter)
-// Todo : Dosen (pegawai)
+router.use("/dosen", DosenRouter)
 router.use('/pengumuman', PengumumanRouter)
 
 // --- PERKULIAHAN ---

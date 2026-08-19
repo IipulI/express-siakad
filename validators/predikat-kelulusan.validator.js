@@ -20,6 +20,7 @@ export const validateIdParam = [
 ];
 
 export const validateSavePredikat = [
+    param('id').optional().isUUID().withMessage('ID tidak valid'),
     body('siakTahunKurikulumId').isUUID().withMessage('Tahun Kurikulum ID wajib'),
     body('siakJenjangId').isUUID().withMessage('Jenjang ID wajib'),
     body('kode').notEmpty().withMessage('Kode wajib diisi'),

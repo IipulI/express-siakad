@@ -1,7 +1,7 @@
 import models from "../models/index.js";
 import * as CustomError from "../utils/custom-error.js";
 
-const { MataKuliah, CapaianMataKuliah, CapaianPembelajaranLulusan, ProgramStudi, TahunKurikulum, Jenjang, PemetaanCplCpmk, Obe, sequelize } = models;
+const { MataKuliah, CapaianMataKuliah, CapaianPembelajaranLulusan, ProgramStudi, TahunKurikulum, Jenjang, PemetaanCplCpmk, PemetaanEvaluasiCpmk, PemetaanSoalCpmk, NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, Obe, sequelize } = models;
 
 // =========================================================
 // GET: Ambil Data untuk Render UI Pemetaan CPMK
@@ -87,7 +87,7 @@ const { MataKuliah, CapaianMataKuliah, CapaianPembelajaranLulusan, ProgramStudi,
 // }
 export const getFormPemetaanCpmk = async (mataKuliahId) => {
     const mk = await MataKuliah.findByPk(mataKuliahId, {
-        attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis', 'levelPemetaan', 'metodePembobotan'],
+        attributes: ['id', 'kode', 'nama', 'totalSks', 'jenis', 'levelPemetaan', 'metodePembobotan', 'siakProgramStudiId', 'siakTahunKurikulumId'],
         include: [
             { model: ProgramStudi, as: 'programStudi', attributes: ['nama'] },
             { model: TahunKurikulum, as: 'tahunKurikulum', attributes: ['tahun'] }
@@ -95,6 +95,14 @@ export const getFormPemetaanCpmk = async (mataKuliahId) => {
     });
 
     if (!mk) throw new CustomError.NotFoundError("Mata Kuliah tidak ditemukan");
+
+    // Prodi mata kuliah ini belum tentu di-set OBE utk tahun kurikulumnya --
+    // halaman tetap kebuka (biar bisa lihat data), tapi FE pakai flag ini buat
+    // nonaktifin/mudarin bagian pemetaan (gak ada gunanya diisi kalau gak OBE).
+    const obe = await Obe.findOne({
+        where: { siakProgramStudiId: mk.siakProgramStudiId, siakTahunKurikulumId: mk.siakTahunKurikulumId }
+    });
+    const isObe = !!obe;
 
     // 1. Ambil Header CPL
     const cplHeaders = await CapaianPembelajaranLulusan.findAll({
@@ -128,6 +136,7 @@ export const getFormPemetaanCpmk = async (mataKuliahId) => {
 
     return {
         mataKuliah: { ...mk.toJSON(), unitPengampu: `S1 - ${mk.programStudi?.nama || '-'}` },
+        isObe,
         cplHeaders,
         cpmkData: formattedCpmk
     };
@@ -341,7 +350,8 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
     const obe = mk ? await Obe.findOne({
         where: { siakProgramStudiId: mk.siakProgramStudiId, siakTahunKurikulumId: mk.siakTahunKurikulumId }
     }) : null;
-    const siakObeId = obe?.id || null;
+    if (!obe) throw new CustomError.NotFoundError("Program studi mata kuliah ini belum di-set OBE untuk tahun kurikulum tersebut. Atur dulu lewat menu Tahun Kurikulum sebelum memetakan CPMK.");
+    const siakObeId = obe.id;
 
     // 💾 2. EKSEKUSI DATABASE
     // Upsert by kode -- CPMK yang kode-nya tidak berubah dipertahankan id-nya,
@@ -440,6 +450,31 @@ export const savePemetaanCpmk = async (mataKuliahId, payload) => {
         if (removedIds.length > 0) {
             await PemetaanCplCpmk.destroy({
                 where: { siakCapaianMataKuliahId: removedIds },
+                force: true,
+                transaction: t
+            });
+            // Bersihkan juga pemetaan bobot di Rencana Evaluasi & Soal yang nunjuk ke
+            // CPMK/Sub-CPMK yang barusan dihapus -- kalau tidak, baris ini jadi yatim
+            // (siak_cpmk_id nunjuk ke row yang sudah deleted_at terisi), bikin rollup
+            // nilai ke CPMK induk (hitungDanOverrideNilaiCpmkDariKomponen, paranoid
+            // query) diam-diam gagal dan monitoring CPL/CPMK jadi kosong.
+            await PemetaanEvaluasiCpmk.destroy({
+                where: { siakCpmkId: removedIds },
+                force: true,
+                transaction: t
+            });
+            await PemetaanSoalCpmk.destroy({
+                where: { siakCpmkId: removedIds },
+                force: true,
+                transaction: t
+            });
+            await NilaiCpmkMahasiswa.destroy({
+                where: { siakCapaianMataKuliahId: removedIds },
+                force: true,
+                transaction: t
+            });
+            await NilaiSubcpmkEvaluasiMahasiswa.destroy({
+                where: { siakCpmkId: removedIds },
                 force: true,
                 transaction: t
             });

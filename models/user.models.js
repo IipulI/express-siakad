@@ -15,11 +15,6 @@ export default (sequelize) => {
                 as: "mahasiswa",
             })
 
-            this.hasOne(models.Pegawai, {
-                foreignKey: "siak_user_id",
-                as: "pegawai",
-            })
-
             this.hasMany(models.UserRole, {
                 foreignKey: "siak_user_id",
                 as: "userRole",
