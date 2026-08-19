@@ -41,17 +41,17 @@ router.get('/callback', async (req, res, next) => {
 
         const eportalUser = parsedRes.user;
         const institutionalRole = eportalUser.institutional_role || eportalUser.role;
-        const roleUpper = institutionalRole?.toUpperCase();
+        const rolePermissions = parsedRes.access.role_permissions
 
         // Helper cek nilai valid (bukan null, undefined, atau string "null")
         const isValid = (val) => val && val.toString().trim() !== 'null' && val.toString().trim() !== 'undefined' && val.toString().trim() !== '';
 
         let nama = eportalUser.email;
         let siakadUserId = null;
-        let siakadRole = 'MAHASISWA';
+        let siakadRole = null
 
         let accountInfo = {}
-        if (roleUpper === 'MAHASISWA' && isValid(eportalUser.npm)) {
+        if (rolePermissions.includes('mahasiswa.siakad.view')) {
             const mahasiswa = await Mahasiswa.findOne({
                 where: { npm: eportalUser.npm },
                 attributes: ['id', 'nama', 'npm', 'semester', 'siakUserId'],
@@ -65,7 +65,7 @@ router.get('/callback', async (req, res, next) => {
                 siakadRole = 'MAHASISWA';
             }
 
-        } else if (roleUpper === 'DOSEN' && isValid(eportalUser.nidn)) {
+        } else if (rolePermissions.includes('dosen.siakad.view')) {
             const nidn = eportalUser.nidn;
             const nidnWithZero = nidn.startsWith('0') ? nidn : '0' + nidn;
             const nidnWithoutZero = nidn.replace(/^0+/, '');
@@ -89,13 +89,12 @@ router.get('/callback', async (req, res, next) => {
                 siakadRole = 'DOSEN';
             }
 
-        } else if (['PEGAWAI', 'ADMIN'].includes(roleUpper)) {
+        } else if (rolePermissions.includes('admin.siakad.view')) {
             // Cari di siak_pegawai by email
             const pegawaiResult = await models.sequelize.query(
                 `SELECT sp.id, sp.siak_user_id, sp.nama 
                 FROM siak_pegawai sp
-                JOIN siak_user su ON su.id = sp.siak_user_id
-                WHERE su.email = :email
+                WHERE sp.email = :email
                 AND sp.deleted_at IS NULL LIMIT 1`,
                 {
                     replacements: { email: eportalUser.email },
@@ -104,8 +103,8 @@ router.get('/callback', async (req, res, next) => {
             );
 
             if (pegawaiResult.length > 0) {
-                accountInfo.nama = dosenResult.nama
-                accountInfo.code = dosenResult.nip
+                accountInfo.nama = pegawaiResult.nama
+                accountInfo.code = pegawaiResult.nip
 
                 nama = pegawaiResult[0].nama;
                 siakadUserId = pegawaiResult[0].siak_user_id;
