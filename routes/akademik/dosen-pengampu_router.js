@@ -6,28 +6,45 @@ import * as PenilaianController from '../../controllers/akademik/penilaian.contr
 import * as KelasKuliahController from '../../controllers/akademik/kelas-kuliah.controller.js';
 import * as CapaianController from '../../controllers/akademik/capaian-pembelajaran.controller.js';
 import * as exportExcelCapaianKelas from '../../controllers/akademik/export-nilai-kelas.controller.js';
+import models from '../../models/index.js';
+import { isAdminAkademik } from '../../middleware/require-koordinator-mk.middleware.js';
 
-/**
- * MIDDLEWARE PLACEHOLDER - DOSEN PENGAMPU
- * TODO: diisi tim SSO/RBAC dengan JWT verify
- * decoded.role === 'dosen_pengampu'
- * req.dosenId = decoded.dosenId
- */
+const { JadwalKuliah } = models;
+
+// FIX 2026-08-19: dua middleware ini sebelumnya CUMA placeholder (`next()` doang,
+// gak ada pengecekan apapun) -- artinya siapa aja yang login bisa lihat DAN UBAH
+// nilai/kunci nilai/capaian kelas kuliah MANAPUN, bukan cuma kelas yang dia ampu
+// sendiri. Sekarang beneran ngecek lewat siak_jadwal_kuliah (tabel yang sama yang
+// nentuin kelas mana yang muncul di "Kelas Kuliah"-nya dosen), sama kayak pola
+// requireKoordinatorMK di koordinator-mk_router.js. Admin akademik selalu boleh
+// lewat (dia yang pakai endpoint yang sama ini juga dari halaman admin).
 const requireDosenPengampu = (req, res, next) => {
-    // TODO: JWT verify oleh tim SSO
-    next();
+    if (isAdminAkademik(req) || req.user?.dosen?.id) return next();
+    return res.status(403).json({ status: 403, message: 'Hanya dosen atau admin akademik yang bisa mengakses menu ini.' });
 };
 
-/**
- * MIDDLEWARE CEK KEPEMILIKAN KELAS
- * TODO: diisi tim SSO/RBAC
- * Cek apakah dosenId adalah pengampu kelas ini
- * if (!isAmpu) return 403
- * -> Ini yang membuat "dosen tidak bisa lihat nilai kelas dosen lain"
- */
-const cekKepemilikanKelas = (req, res, next) => {
-    // TODO: JWT verify oleh tim SSO
-    next();
+const cekKepemilikanKelas = async (req, res, next) => {
+    try {
+        if (isAdminAkademik(req)) return next();
+
+        const dosenId = req.user?.dosen?.id;
+        if (!dosenId) {
+            return res.status(403).json({ status: 403, message: 'Hanya dosen atau admin akademik yang bisa mengakses menu ini.' });
+        }
+
+        const kelasKuliahId = req.params.id || req.params.kelasId || req.params.krsId;
+        const ampu = await JadwalKuliah.findOne({
+            where: { siakKelasKuliahId: kelasKuliahId, siakDosenId: dosenId },
+            attributes: ['id'],
+        });
+        if (!ampu) {
+            return res.status(403).json({ status: 403, message: 'Anda bukan pengajar kelas ini, tidak dapat mengakses datanya.' });
+        }
+
+        next();
+    } catch (error) {
+        next(error);
+    }
 };
 
 const router = express.Router();
@@ -105,7 +122,7 @@ router.get('/kelas/:krsId/rapor-obe/export', cekKepemilikanKelas, async (req, re
     if (req.query.format === 'pdf') return exportExcelCapaianKelas.exportPdfRaporObe(req, res, next);
     return exportExcelCapaianKelas.exportExcelRaporObe(req, res, next);
 });
-router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
+router.get('/kelas/:kelasId/nilai/export', cekKepemilikanKelas, async (req, res, next) => {
     if (req.query.format === 'pdf') {
         if (req.query.jenis === 'daftar-nilai') {
             return exportExcelCapaianKelas.exportPdfDaftarNilai(req, res, next);
@@ -114,7 +131,7 @@ router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
     }
     return exportExcelCapaianKelas.exportExcelNilaiKelas(req, res, next);
 });
-router.get('/kelas/:kelasId/capaian/export', async (req, res, next) => {
+router.get('/kelas/:kelasId/capaian/export', cekKepemilikanKelas, async (req, res, next) => {
     if (req.query.format === 'pdf') {
         if (req.query.jenis === 'cpl') return exportExcelCapaianKelas.exportPdfCapaianCplKelas(req, res, next);
         return exportExcelCapaianKelas.exportPdfCapaianKelas(req, res, next);
