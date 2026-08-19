@@ -2,9 +2,23 @@ import models from '../models/index.js';
 
 const { MataKuliah, JadwalKuliah, KelasKuliah, ProgramStudi } = models;
 
+// FIX 2026-08-19: role admin sebelumnya CUMA dicek dari tabel siak_user_role
+// (req.user.userRole, di-populate attachUser.middleware.js) -- ini beres buat
+// akun yang role-nya di-assign manual di DB (kayak akun test adminakademik).
+// TAPI login lewat SSO (routes/sso/sso.js) SAMA SEKALI GAK NULIS ke tabel itu
+// -- role dari SSO cuma "dititipin" di dalam JWT-nya sendiri (klaim `roles`,
+// ditentukan dari rolePermissions e-portal tiap kali login), gak pernah
+// disinkronkan ke siak_user_role. Makanya user yang admin/kaprodi/koordinator
+// beneran menurut SSO tapi belum (atau gak pernah) punya baris siak_user_role
+// bakal ke-anggap "bukan admin" oleh checker manapun yang cuma baca DB --
+// diblok padahal harusnya boleh. Sekarang dicek DUA-DUANYA: klaim `roles` di
+// token (req.auth, punya SSO) ATAU baris di siak_user_role (punya direct
+// login/manual) -- salah satu match AKADEMIK_UNIV udah cukup.
 // userRole itu hasMany (lihat models/user.models.js) walau praktiknya tiap user
 // baru punya 1 role -- tetep di-treat sebagai array biar bener sesuai model.
-export const isAdminAkademik = (req) => (req.user?.userRole || []).some((ur) => ur?.role?.nama === 'AKADEMIK_UNIV');
+export const isAdminAkademik = (req) =>
+    (req.auth?.roles || []).includes('AKADEMIK_UNIV') ||
+    (req.user?.userRole || []).some((ur) => ur?.role?.nama === 'AKADEMIK_UNIV');
 
 export const resolveDariParamsMk = async (req) => req.params.id || req.params.mataKuliahId || null;
 
