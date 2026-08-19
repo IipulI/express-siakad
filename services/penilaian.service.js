@@ -7,7 +7,8 @@ const {
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
     ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
-    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi, NilaiSubcpmkEvaluasiMahasiswa, HasilStudi
+    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi, NilaiSubcpmkEvaluasiMahasiswa, HasilStudi,
+    NilaiUnitCbtManual
 } = models;
 
 export const DEFAULT_SKALA = [
@@ -714,13 +715,31 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
 // yang sudah di-rollup ke CPMK induk -- di sini levelnya tetap per baris ledger.
 // ============================================================================
 export const getRincianNilaiSubcpmk = async (rincianKrsId) => {
-    const rows = await NilaiSubcpmkEvaluasiMahasiswa.findAll({
-        where: { siakRincianKrsMahasiswaId: rincianKrsId },
-        include: [
-            { model: RencanaEvaluasi, as: 'rencanaEvaluasi', attributes: ['id', 'metodeEvaluasi'] },
-            { model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['id', 'kode'] }
-        ]
-    });
+    const [rows, unitRows] = await Promise.all([
+        NilaiSubcpmkEvaluasiMahasiswa.findAll({
+            where: { siakRincianKrsMahasiswaId: rincianKrsId },
+            include: [
+                { model: RencanaEvaluasi, as: 'rencanaEvaluasi', attributes: ['id', 'metodeEvaluasi'] },
+                { model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['id', 'kode'] }
+            ]
+        }),
+        // Skor MENTAH persis yang diketik dosen di CBT Manual (bukan hasil hitungan
+        // per Sub-CPMK) -- lihat siak_nilai_unit_cbt_manual, arahan 2026-08-19.
+        NilaiUnitCbtManual.findAll({
+            where: { siakRincianKrsMahasiswaId: rincianKrsId },
+            order: [['createdAt', 'ASC']]
+        })
+    ]);
+
+    // Semua cpmkId yang muncul di breakdown unit mentah, buat resolve kode-nya
+    // sekali jalan (bukan per-unit) -- sumbernya JSONB jadi gak ada include langsung.
+    const cpmkIdSet = new Set();
+    unitRows.forEach((u) => (u.pemetaanCpmk || []).forEach((p) => cpmkIdSet.add(p.cpmkId)));
+    const daftarCpmkUnit = cpmkIdSet.size > 0
+        ? await CapaianMataKuliah.findAll({ where: { id: Array.from(cpmkIdSet) }, attributes: ['id', 'kode'] })
+        : [];
+    const kodeCpmkMap = {};
+    daftarCpmkUnit.forEach((c) => { kodeCpmkMap[c.id] = c.kode; });
 
     const grouped = {};
     rows.forEach((r) => {
@@ -729,7 +748,8 @@ export const getRincianNilaiSubcpmk = async (rincianKrsId) => {
             grouped[revId] = {
                 rencanaEvaluasiId: revId,
                 namaKomponen: (r.rencanaEvaluasi?.metodeEvaluasi || '-').toUpperCase(),
-                subCpmk: {}
+                subCpmk: {},
+                unitMentah: []
             };
         }
         const cpmkId = r.siakCpmkId;
@@ -745,6 +765,29 @@ export const getRincianNilaiSubcpmk = async (rincianKrsId) => {
         grouped[revId].subCpmk[cpmkId].totalBobot += parseFloat(r.totalBobot || 0);
     });
 
+    unitRows.forEach((u) => {
+        const revId = u.siakRencanaEvaluasiId;
+        // Komponen ini mungkin belum ada di `grouped` kalau breakdown-nya semua
+        // ke-skip pas agregasi (bobotPoin 0 dst) -- tetap tampilkan raw-nya.
+        if (!grouped[revId]) {
+            grouped[revId] = { rencanaEvaluasiId: revId, namaKomponen: '-', subCpmk: {}, unitMentah: [] };
+        }
+        grouped[revId].unitMentah.push({
+            nomorUnit: u.nomorUnit,
+            skorDiperoleh: parseFloat(u.skorDiperoleh || 0),
+            skorMaksimal: parseFloat(u.skorMaksimal || 0),
+            // Waktu input TERKINI -- karena tiap resend wipe & replace baris lama
+            // (lihat simpanNilaiKomponenDariCbt), createdAt selalu reflect submit
+            // yang terakhir, bukan histori semua percobaan input.
+            waktuInput: u.createdAt,
+            pemetaanCpmk: (u.pemetaanCpmk || []).map((p) => ({
+                cpmkId: p.cpmkId,
+                kode: kodeCpmkMap[p.cpmkId] || p.cpmkId,
+                bobotPoin: parseFloat(p.bobotPoin || 0)
+            }))
+        });
+    });
+
     return Object.values(grouped).map((k) => ({
         rencanaEvaluasiId: k.rencanaEvaluasiId,
         namaKomponen: k.namaKomponen,
@@ -754,7 +797,8 @@ export const getRincianNilaiSubcpmk = async (rincianKrsId) => {
                 cpmkId: s.cpmkId,
                 kode: s.kode,
                 nilaiPersen: s.totalBobot > 0 ? Math.round((s.skorTerbobot / s.totalBobot) * 10000) / 100 : 0
-            }))
+            })),
+        unitMentah: k.unitMentah.sort((a, b) => a.nomorUnit.localeCompare(b.nomorUnit, undefined, { numeric: true }))
     }));
 };
 
@@ -1591,6 +1635,14 @@ export const resetNilaiMahasiswa = async (rincianKrsId) => {
             WHERE siak_rincian_krs_mahasiswa_id = :rincianKrsId
         `, { replacements: { rincianKrsId }, transaction: trx });
 
+        // Skor mentah per soal CBT Manual (arahan 2026-08-19: kalau nilai direset,
+        // raw input-nya juga harus ikut hilang, jangan jadi data basi yang gak
+        // nyambung ke ledger/nilai akhir manapun).
+        await sequelize.query(`
+            DELETE FROM siak_nilai_unit_cbt_manual
+            WHERE siak_rincian_krs_mahasiswa_id = :rincianKrsId
+        `, { replacements: { rincianKrsId }, transaction: trx });
+
         if (mhsId) {
             await sequelize.query(`
                 DELETE FROM siak_nilai_cpmk_mahasiswa
@@ -1650,6 +1702,11 @@ export const resetNilaiBeberapa = async (rincianKrsIds) => {
             WHERE siak_rincian_krs_mahasiswa_id IN (:ids)
         `, { replacements: { ids: idsValid }, transaction: trx });
 
+        await sequelize.query(`
+            DELETE FROM siak_nilai_unit_cbt_manual
+            WHERE siak_rincian_krs_mahasiswa_id IN (:ids)
+        `, { replacements: { ids: idsValid }, transaction: trx });
+
         for (const { kelasId, mhsId } of pasanganKelasMhs) {
             await sequelize.query(`
                 DELETE FROM siak_nilai_cpmk_mahasiswa
@@ -1691,6 +1748,13 @@ export const resetNilaiKelas = async (kelasId) => {
             DELETE FROM siak_nilai_subcpmk_evaluasi_mahasiswa nsc
             USING siak_rincian_krs_mahasiswa rkm
             WHERE nsc.siak_rincian_krs_mahasiswa_id = rkm.id
+              AND rkm.siak_kelas_kuliah_id = :kelasId
+        `, { replacements: { kelasId }, transaction: trx });
+
+        await sequelize.query(`
+            DELETE FROM siak_nilai_unit_cbt_manual nuc
+            USING siak_rincian_krs_mahasiswa rkm
+            WHERE nuc.siak_rincian_krs_mahasiswa_id = rkm.id
               AND rkm.siak_kelas_kuliah_id = :kelasId
         `, { replacements: { kelasId }, transaction: trx });
 

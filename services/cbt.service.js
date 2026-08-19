@@ -4,7 +4,7 @@ import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, update
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
-    NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, PemetaanEvaluasiCpmk
+    NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, PemetaanEvaluasiCpmk, NilaiUnitCbtManual
 } = models;
 
 // BUG FIX 2026-08-19: nama variabel ini sejak awal bilang "final ATAU kunci",
@@ -187,6 +187,11 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
 
         // 2. Wipe & replace hasil agregat komponen ini -- resend dari CBT (mis. dosen
         //    minta koreksi ulang) otomatis MENGGANTIKAN data lama, bukan menumpuk.
+        //    Raw breakdown per unit/soal DIIKUTKAN wipe & replace yang SAMA (1
+        //    transaksi) supaya siak_nilai_unit_cbt_manual (arahan 2026-08-19: dosen
+        //    harus bisa lihat skor MENTAH yang dia input, bukan cuma hasil per
+        //    Sub-CPMK) selalu akurat & atomik bareng ledger -- resend TIDAK PERNAH
+        //    menyisakan baris lama atau numpuk duplikat.
         await sequelize.transaction(async (trx) => {
             await NilaiSubcpmkEvaluasiMahasiswa.destroy({
                 where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
@@ -201,6 +206,25 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
             }));
             if (payloadAgregat.length > 0) {
                 await NilaiSubcpmkEvaluasiMahasiswa.bulkCreate(payloadAgregat, { transaction: trx });
+            }
+
+            await NilaiUnitCbtManual.destroy({
+                where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
+                force: true, transaction: trx
+            });
+            const payloadUnitMentah = (breakdown || []).map((unit, idx) => ({
+                siakRincianKrsMahasiswaId: krsId,
+                siakRencanaEvaluasiId: rencanaEvaluasiId,
+                nomorUnit: String(unit.nomor ?? idx + 1),
+                skorDiperoleh: parseFloat(unit.skorDiperoleh || 0),
+                skorMaksimal: parseFloat(unit.skorMaksimal || 0),
+                pemetaanCpmk: (unit.pemetaanCpmk || []).map(p => ({
+                    cpmkId: p.cpmkId,
+                    bobotPoin: parseFloat(p.bobotPoin || 0)
+                }))
+            }));
+            if (payloadUnitMentah.length > 0) {
+                await NilaiUnitCbtManual.bulkCreate(payloadUnitMentah, { transaction: trx });
             }
         });
 
