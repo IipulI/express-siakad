@@ -92,12 +92,27 @@ export const login = async(data) => {
 
     console.log(user.userRole)
 
+    // FIX 2026-08-19: kalau siak_user_role kosong (banyak akun emang gak
+    // pernah dapet baris eksplisit di sana -- role selama ini kebanyakan
+    // ditentuin lewat SSO, dititipin di token doang, gak pernah disinkron ke
+    // tabel ini), roles balik [] dan FE (FormLogin.tsx: data.user.roles[0])
+    // gak nemu cabang manapun yang cocok -- macet di "Login Berhasil", gak
+    // pernah pindah ke dashboard. Sekarang kalau kosong, infer role DASAR
+    // dari record yang udah ada (mirip cara SSO nentuin role dari
+    // rolePermissions, bukan nge-hardcode admin/koordinator) -- BUKAN
+    // AKADEMIK_UNIV, itu tetap harus eksplisit di siak_user_role.
+    let roles = user.userRole.map(ur => ur.role.nama);
+    if (roles.length === 0) {
+        if (user.dosen !== null) roles = ['DOSEN'];
+        else if (user.mahasiswa !== null) roles = ['MAHASISWA'];
+    }
+
     const res = {
         token,
         user: {
             id: user.id,
             username: user.username,
-            roles: user.userRole.map(ur => ur.role.nama)
+            roles
         },
         account_info: accountInfo
     }
