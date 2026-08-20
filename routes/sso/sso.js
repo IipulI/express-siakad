@@ -98,7 +98,19 @@ router.get('/callback', async (req, res, next) => {
                 siakadRole = 'DOSEN';
             }
 
-        } else if (rolePermissions.includes('admin.siakad.view') || ['PEGAWAI', 'ADMIN'].includes(roleUpper)) {
+        } else if (
+            rolePermissions.includes('admin.siakad.view') ||
+            ['PEGAWAI', 'ADMIN'].includes(roleUpper) ||
+            // FIX 2026-08-19b: ['PEGAWAI','ADMIN'].includes(roleUpper) itu exact-match,
+            // padahal jabatan riil di e-portal namanya majemuk kayak "Admin Kepegawaian"
+            // atau "Kabiro" (bukan cuma "Admin" polos) -- roleUpper-nya jadi gak pernah
+            // sama persis, ketolak ke branch else (mentok di 500 "User tidak dapat
+            // ditemukan") walau role_permissions utk role_id itu emang belum di-set
+            // e-portal. Tambah partial-match utk 2 jabatan yang udah kekonfirmasi dites
+            // user (Admin Kepegawaian, Kabiro) -- role lain yang belum pernah disebut
+            // TETAP gak ditambah, sengaja gak nebak2.
+            roleUpper?.includes('ADMIN') || roleUpper?.includes('PEGAWAI') || roleUpper?.includes('KABIRO')
+        ) {
             // FIX 2026-08-19: commit 28a7d8e ganti cek admin dari institutional_role
             // (broad: PEGAWAI/ADMIN) ke rolePermissions.includes('admin.siakad.view')
             // doang (sempit: butuh permission spesifik itu ada di e-portal). Beberapa
@@ -107,14 +119,22 @@ router.get('/callback', async (req, res, next) => {
             // e-portal -- jadi ketolak padahal dulu jalan. Sekarang diterima kalau
             // SALAH SATU kriteria (permission spesifik ATAU institutional_role lama)
             // kepenuhan, biar gak nge-exclude role yang dulu udah bisa masuk.
-            // Cari di siak_pegawai by email
+            // Cari di siak_pegawai by email, fallback ke nidn/nip -- email e-portal
+            // kadang beda sama email lokal siak_pegawai (kasus nyata: Fitrah Satrya,
+            // email e-portal fitrah.satrya@gmail.com vs email lokal beda), NIDN lebih
+            // stabil buat dicocokin (sama kayak yang dipakai cabang DOSEN di atas).
+            const nidnRaw = (eportalUser.nidn || '').trim();
+            const nidn = isValid(nidnRaw) ? nidnRaw : null;
+            const nidnWithZero = nidn ? (nidn.startsWith('0') ? nidn : '0' + nidn) : null;
+            const nidnWithoutZero = nidn ? nidn.replace(/^0+/, '') : null;
+
             const pegawaiResult = await models.sequelize.query(
-                `SELECT sp.id, sp.siak_user_id, sp.nama 
+                `SELECT sp.id, sp.siak_user_id, sp.nama, sp.nip
                 FROM siak_pegawai sp
-                WHERE sp.email = :email
+                WHERE (sp.email = :email OR sp.nidn IN (:nidn, :nidnWithZero, :nidnWithoutZero) OR sp.nip = :nidn)
                 AND sp.deleted_at IS NULL LIMIT 1`,
                 {
-                    replacements: { email: eportalUser.email },
+                    replacements: { email: eportalUser.email, nidn, nidnWithZero, nidnWithoutZero },
                     type: models.sequelize.QueryTypes.SELECT,
                 }
             );
