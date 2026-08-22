@@ -40,6 +40,56 @@ export const findAll = async (req, res, next) => {
     }
 }
 
+// FIX 2026-08-23: dipakai KHUSUS di /dosen/kelas (dosen-pengampu_router.js).
+// findAll() di atas cuma nyaring by nip/nidn kalau CALLER kirim query param
+// itu sendiri -- gak pernah otomatis kepasang dari identitas dosen yang
+// login. Akibatnya /dosen/kelas tanpa filter nampilin kelas SEMUA dosen
+// (bukan cuma punya sendiri), dan dosen bisa lihat jadwal dosen lain cuma
+// dengan ganti param ?nidn=. Di sini scope-nya DIPAKSA dari req.user.dosen.id
+// (hasil attachUser, sumbernya siak_user_id di token -> Dosen), gak bisa
+// dioverride lewat query -- caller cuma boleh mempersempit (periode/prodi/
+// search/dst), gak bisa memperlebar ke dosen lain.
+export const findAllForDosen = async (req, res, next) => {
+    const page = req.query.page ?? 1;
+    const size = req.query.size ?? 10;
+    const responseBuilder = new ResponseBuilder(res);
+
+    const dosenId = req.user?.dosen?.id;
+    if (!dosenId) {
+        return res.status(403).json({ status: 403, message: 'Hanya dosen yang bisa mengakses menu ini.' });
+    }
+
+    const filter = {
+        siakPeriodeAkademikId : req.query.siakPeriodeAkademikId,
+        siakProgramStudiId : req.query.siakProgramStudiId,
+        siakSistemKuliahId : req.query.siakSistemKuliahId,
+        siakTahunKurikulumId: req.query.siakTahunKurikulumId,
+        search: req.query.search,
+        isActive: req.query.isActive,
+        siakDosenId: dosenId,
+    }
+
+    try {
+        const classes = await KelasKuliahService.findAll(page, size, filter);
+
+        let payload
+        if (classes.isPaginated === true) {
+            payload = getPagingData(classes, page, size);
+        } else {
+            payload = classes
+        }
+
+        return responseBuilder
+            .code(200)
+            .message("Data berhasil diambil")
+            .json(payload)
+    }
+    catch (error) {
+        console.error(error);
+        next(error);
+    }
+}
+
 export const create = async (req, res) => {
     const responseBuilder = new ResponseBuilder(res);
     try {

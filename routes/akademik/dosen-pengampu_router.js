@@ -48,7 +48,7 @@ router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.getRenca
 // ============================================================
 
 // [Detail Kelas]
-router.get('/kelas', KelasKuliahController.findAll);
+router.get('/kelas', KelasKuliahController.findAllForDosen);
 router.get('/kelas/:id', cekKepemilikanKelas, KelasKuliahController.findOne);
 
 // [Peserta Kelas]
