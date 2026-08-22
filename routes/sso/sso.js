@@ -5,9 +5,38 @@ import models from '../../models/index.js';
 import { addUserToBlacklist, removeUserFromBlacklist } from '../../utils/tokenBlacklist.js';
 import { UnprocessableEntityError } from "../../utils/custom-error.js";
 
-const { Mahasiswa } = models;
+const { Mahasiswa, User } = models;
 const router = express.Router();
 const EPORTAL_API = process.env.EPORTAL_API_URL || 'https://eportal.uika-bogor.ac.id';
+
+// FIX 2026-08-23: siak_pegawai/siak_mahasiswa yang ketemu (lewat NIDN/NIP/NPM)
+// tapi belum pernah dipakai login SSO SIAKAD siak_user_id-nya NULL -- ratusan
+// baris kayak gini di produksi (392 pegawai per audit). Sebelum fix ini,
+// siakadUserId dari branch manapun langsung dipakai apa adanya walau NULL,
+// hasilnya JWT ber-id:null yang "berhasil" di E-Portal tapi mental pas
+// dipakai ke SIAKAD. Sekarang: kalau NULL, cari dulu siak_user existing by
+// email (siapa tau udah pernah dibikin tapi link-nya putus), kalau masih
+// gak ada baru bikin baru & link balik ke pegawai/mahasiswa-nya.
+async function ensureSiakUserId(existingId, email, usernameFallback) {
+    if (existingId) return existingId;
+
+    if (email) {
+        const existingUser = await User.findOne({ where: { email } });
+        if (existingUser) return existingUser.id;
+    }
+
+    try {
+        const created = await User.create({ username: usernameFallback || email, email: email || null });
+        return created.id;
+    } catch (error) {
+        // race condition: dibikin barengan dari request lain di antara cek & create
+        if (email) {
+            const existingUser = await User.findOne({ where: { email } });
+            if (existingUser) return existingUser.id;
+        }
+        throw error;
+    }
+}
 
 router.get('/callback', async (req, res, next) => {
     const { token, role_id, appModule_id, unit_id } = req.query;
@@ -67,8 +96,12 @@ router.get('/callback', async (req, res, next) => {
                 accountInfo.npm = mahasiswa.npm
                 accountInfo.semester = mahasiswa.semester
                 nama = mahasiswa.nama;
-                siakadUserId = mahasiswa.siakUserId;
                 siakadRole = 'MAHASISWA';
+
+                siakadUserId = await ensureSiakUserId(mahasiswa.siakUserId, isValid(eportalUser.email) ? eportalUser.email : null, mahasiswa.npm);
+                if (siakadUserId !== mahasiswa.siakUserId) {
+                    await mahasiswa.update({ siakUserId: siakadUserId });
+                }
             }
 
         } else if (rolePermissions.includes('dosen.siakad.view') || (roleUpper === 'DOSEN' && isValid(eportalUser.nidn))) {
@@ -94,8 +127,15 @@ router.get('/callback', async (req, res, next) => {
                 accountInfo.code = dosenResult.nip
 
                 nama = dosenResult[0].nama;
-                siakadUserId = dosenResult[0].siak_user_id;
                 siakadRole = 'DOSEN';
+
+                siakadUserId = await ensureSiakUserId(dosenResult[0].siak_user_id, isValid(eportalUser.email) ? eportalUser.email : null, dosenResult[0].nip || nidn);
+                if (siakadUserId !== dosenResult[0].siak_user_id) {
+                    await models.sequelize.query(
+                        `UPDATE siak_pegawai SET siak_user_id = :userId WHERE id = :pegawaiId`,
+                        { replacements: { userId: siakadUserId, pegawaiId: dosenResult[0].id } }
+                    );
+                }
             }
 
         } else if (
@@ -144,8 +184,15 @@ router.get('/callback', async (req, res, next) => {
                 accountInfo.code = pegawaiResult.nip
 
                 nama = pegawaiResult[0].nama;
-                siakadUserId = pegawaiResult[0].siak_user_id;
                 siakadRole = 'AKADEMIK_UNIV';
+
+                siakadUserId = await ensureSiakUserId(pegawaiResult[0].siak_user_id, isValid(eportalUser.email) ? eportalUser.email : null, pegawaiResult[0].nip || nidn || eportalUser.email);
+                if (siakadUserId !== pegawaiResult[0].siak_user_id) {
+                    await models.sequelize.query(
+                        `UPDATE siak_pegawai SET siak_user_id = :userId WHERE id = :pegawaiId`,
+                        { replacements: { userId: siakadUserId, pegawaiId: pegawaiResult[0].id } }
+                    );
+                }
             }
         } else {
             throw new UnprocessableEntityError("User tidak dapat ditemukan")
