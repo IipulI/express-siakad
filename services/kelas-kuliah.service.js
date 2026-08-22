@@ -30,6 +30,17 @@ export const test = async () => {
     await test.destroy()
 }
 
+// FIX 2026-08-23: filter dari query string kadang keisi literal string
+// "undefined"/"null" (bukan JS undefined beneran) kalau caller nge-construct
+// URL dari variabel yang belum keisi (mis. ${siakPeriodeAkademikId} pas
+// variabelnya undefined) -- sebelumnya lolos semua pengecekan di bawah
+// (bukan `undefined` asli, bukan string kosong), diteruskan apa adanya ke
+// where clause Sequelize, lalu Postgres nolak 500 karena bukan UUID valid
+// (kolom2 id di sini semua UUID). Ketauan dari gejala nyata: dosen buka
+// list kelasnya sendiri tanpa milih Periode dulu -> kosong/500, giliran
+// pilih periode manual baru muncul. isValid() nyaring ketiganya sekaligus.
+const isValid = (val) => val !== undefined && val !== null && val !== '' && val !== 'undefined' && val !== 'null'
+
 export const findAll = async (page, size, filter) => {
     let kelasKuliahWhere = {}
     let mataKuliahWhere = {}
@@ -38,34 +49,34 @@ export const findAll = async (page, size, filter) => {
     let activePeriodWhere = {}
     let mahasiswaInclude = null
 
-    if (filter.siakPeriodeAkademikId !== undefined && filter.siakPeriodeAkademikId !== '') {
+    if (isValid(filter.siakPeriodeAkademikId)) {
         kelasKuliahWhere.siakPeriodeAkademikId = filter.siakPeriodeAkademikId
     }
-    if (filter.siakProgramStudiId !== undefined && filter.siakProgramStudiId !== '') {
+    if (isValid(filter.siakProgramStudiId)) {
         kelasKuliahWhere.siakProgramStudiId = filter.siakProgramStudiId
     }
-    if (filter.sistemKuliah !== undefined && filter.sistemKuliah !== '') {
+    if (isValid(filter.sistemKuliah)) {
         kelasKuliahWhere.sistemKuliah = filter.sistemKuliah
     }
-    if (filter.siakTahunKurikulumId !== undefined && filter.siakTahunKurikulumId !== '') {
+    if (isValid(filter.siakTahunKurikulumId)) {
         mataKuliahWhere.siakTahunKurikulumId = filter.siakTahunKurikulumId
     }
-    if (filter.siakDosenId !== undefined && filter.siakDosenId !== '') {
+    if (isValid(filter.siakDosenId)) {
         dosenWhere.id = filter.siakDosenId
     }
-    if (filter.search !== undefined && filter.search !== '') {
+    if (isValid(filter.search)) {
         mataKuliahWhere.nama = { [Op.iLike]: `%${filter.search}%` }
     }
-    if (filter.nip !== undefined && filter.nip !== '') {
+    if (isValid(filter.nip)) {
         dosenNipNidnWhere.nip = filter.nip
     }
-    if (filter.nidn !== undefined && filter.nidn !== '') {
+    if (isValid(filter.nidn)) {
         dosenNipNidnWhere.nidn = filter.nidn
     }
-    if (filter.isActive !== undefined && filter.isActive !== '') {
+    if (isValid(filter.isActive)) {
         activePeriodWhere.status = filter.isActive === "true" ? { [Op.iLike]: "Aktif" } : { [Op.iLike]: "Inaktif" }
     }
-    if (filter.npm !== undefined && filter.npm !== '') {
+    if (isValid(filter.npm)) {
         const mahasiswa = await Mahasiswa.findOne({
             attributes: ['id'],
             where: { npm: filter.npm }
