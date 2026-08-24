@@ -227,6 +227,19 @@ export const getLaporanCplPerMahasiswa = async (filters) => {
 
         if (!obeData) throw new CustomError.NotFoundError("Data OBE tidak ditemukan.");
 
+        // Kurikulum yang gak pakai CPMK sama sekali (mis. KKNI) gak punya nilai CPL
+        // per mahasiswa buat dihitung -- daripada nampilin laporan "Belum Dinilai" di
+        // semua baris (bisa disalahartikan belum dinilai sama sekali), tolak eksplisit.
+        const cekCpmkKurikulum = await sequelize.query(`
+            SELECT 1 FROM siak_capaian_mata_kuliah cmk
+            JOIN siak_mata_kuliah mk ON cmk.siak_mata_kuliah_id = mk.id AND mk.deleted_at IS NULL
+            WHERE mk.siak_tahun_kurikulum_id = :tahunKurikulumId AND cmk.deleted_at IS NULL
+            LIMIT 1
+        `, { replacements: { tahunKurikulumId }, type: QueryTypes.SELECT });
+        if (cekCpmkKurikulum.length === 0) {
+            throw new CustomError.NotFoundError("Kurikulum ini tidak menggunakan sistem penilaian CPMK, jadi laporan CPL per Mahasiswa tidak berlaku. Gunakan Transkrip Akademik reguler.");
+        }
+
         // 1. Ambil & Filter Duplikat CPL (Tambahkan target_cpl)
         const cplList = await CapaianPembelajaranLulusan.findAll({
             where: { siak_obe_id: obeData.id },
@@ -810,7 +823,7 @@ export const getTranskripObeMahasiswa = async (filters) => {
         // milik prodi itu (bukan 500 crash karena named replacement kosong).
         const prodiIdAsli = prodiId || infoMhs.siak_program_studi_id;
         const queryInfo = `
-            SELECT o.id AS obe_id, ps.nama AS prodi_nama, tk.tahun AS tahun_kurikulum
+            SELECT o.id AS obe_id, o.siak_tahun_kurikulum_id AS tahun_kurikulum_id, ps.nama AS prodi_nama, tk.tahun AS tahun_kurikulum
             FROM siak_obe o
             LEFT JOIN siak_program_studi ps ON o.siak_program_studi_id = ps.id
             LEFT JOIN siak_tahun_kurikulum tk ON o.siak_tahun_kurikulum_id = tk.id
@@ -823,6 +836,20 @@ export const getTranskripObeMahasiswa = async (filters) => {
         const obeData = await sequelize.query(queryInfo, { replacements: { tahunKurikulumId: tahunKurikulumId || null, prodiId: prodiIdAsli }, type: QueryTypes.SELECT });
         if (!obeData || obeData.length === 0) throw new CustomError.NotFoundError("Data OBE tidak ditemukan.");
         const infoObe = obeData[0];
+
+        // Kurikulum yang gak pakai CPMK sama sekali (mis. KKNI) gak punya nilai CPL
+        // level mahasiswa buat dihitung -- daripada nampilin transkrip "Belum Dinilai"
+        // di semua baris (bisa disalahartikan mahasiswa belum dinilai sama sekali,
+        // padahal nilainya ada di sistem nilai biasa), tolak eksplisit dari sini.
+        const cekCpmkKurikulum = await sequelize.query(`
+            SELECT 1 FROM siak_capaian_mata_kuliah cmk
+            JOIN siak_mata_kuliah mk ON cmk.siak_mata_kuliah_id = mk.id AND mk.deleted_at IS NULL
+            WHERE mk.siak_tahun_kurikulum_id = :tahunKurikulumId AND cmk.deleted_at IS NULL
+            LIMIT 1
+        `, { replacements: { tahunKurikulumId: infoObe.tahun_kurikulum_id }, type: QueryTypes.SELECT });
+        if (cekCpmkKurikulum.length === 0) {
+            throw new CustomError.NotFoundError("Kurikulum ini tidak menggunakan sistem penilaian CPMK, jadi Transkrip OBE tidak berlaku untuk mahasiswa jenjang ini. Gunakan Transkrip Akademik reguler.");
+        }
 
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
@@ -1296,6 +1323,13 @@ export const getLaporanCpmkPerMahasiswa = async (filters) => {
 
         // 3. AMBIL DATA CPMK (leaf-level: Sub-CPMK jika ada, atau CPMK itu sendiri jika tidak)
         const { columns: cpmkList, hasSubCpmk } = await getCpmkColumnsForMataKuliah(mataKuliahId);
+
+        // Mata kuliah dari kurikulum yang gak pakai CPMK sama sekali (mis. KKNI) --
+        // daripada nampilin laporan kosong tanpa kolom nilai (bisa disalahartikan
+        // belum dinilai sama sekali), tolak eksplisit dari sini.
+        if (cpmkList.length === 0) {
+            throw new CustomError.NotFoundError("Mata kuliah ini tidak memiliki data CPMK (kurikulumnya tidak menggunakan sistem penilaian CPMK), jadi laporan CPMK per Mahasiswa tidak berlaku. Gunakan Transkrip Akademik reguler.");
+        }
 
         // 4. AMBIL DATA MAHASISWA
         const queryMhs = `SELECT id, npm, nama FROM siak_mahasiswa WHERE siak_program_studi_id = :prodiId AND angkatan = :angkatan ORDER BY npm ASC`;
