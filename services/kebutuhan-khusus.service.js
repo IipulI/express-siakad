@@ -44,7 +44,7 @@ export const findAll = async (page, size) => {
   }
 };
 
-export const createKebutuhanKhusus = async (ruanganData) => {
+export const createKebutuhanKhusus = async (kebutuhanKhususData) => {
   const { nama } = kebutuhanKhususData;
 
   const existingKebutuhanKhusus = await KebutuhanKhusus.findOne({

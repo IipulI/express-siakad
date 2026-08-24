@@ -37,6 +37,9 @@ import SistemKuliahRouter from "./sistem-kuliah.router.js";
 import StatusMahasiswaRouter from "./status-mahasiswa.router.js";
 import TransportasiRouter from "./transportasi.router.js";
 import JenisTinggalRouter from "./jenis-tinggal.router.js";
+import JenisPertemuanRouter from "./jenis-pertemuan.router.js";
+import JasAlmamaterRouter from "./jas-almamater.router.js";
+import SlotWaktuRouter from "./slot-waktu.router.js";
 
 import EkivalensiMataKuliah from "./ekivalensi-mata-kuliah.router.js";
 import SoalRouter from "./soal.route.js";
@@ -78,7 +81,7 @@ router.use('/aturan-evaluasi', AturanEvaluasiRouter);
 
 // kelas kuliah
 router.use("/kelas-kuliah", KelasKuliahRouter);
-// Todo : Monitoring ruangan
+// Monitoring ruangan: lihat GET /akademik/ruangan/monitoring
 
 // Administrasi
 // Todo : status semester mahasiswa (rekap status mahasiswa pada semester ini)
@@ -90,7 +93,7 @@ router.use("/pembimbing-akademik", PembimbingAkademikRouter);
 // --- MASTER DATA ---
 // perguruan tinggi
 // Todo : Data Perguruan Tinggi
-// Todo : router.use("/fakultas", )
+// Todo : router.use("/fakultas", ) -- lihat GET /public/fakultas untuk dropdown read-only
 // Todo : router.use("/program-studi", )
 // Todo : konsentrasi
 router.use("/jenjang", JenjangRouter);
@@ -102,13 +105,15 @@ router.use("/pendidikan", PendidikanRouter);
 router.use("/bidang-ilmu", BidangIlmuRouter)
 router.use("/jenis-mata-kuliah", JenisMataKuliahRouter)
 router.use("/kelompok-mata-kuliah", KelompokMataKuliahRouter)
-// Todo : jenis pertemuan
+router.use("/jenis-pertemuan", JenisPertemuanRouter)
+router.use("/slot-waktu", SlotWaktuRouter)
 
 // biodata
 router.use("/agama", AgamaRouter);
 router.use("/pekerjaan", PekerjaanRouter);
 router.use("/penghasilan-pekerjaan", PenghasilanPekerjaan);
 router.use("/suku", SukuRouter);
+router.use("/jas-almamater", JasAlmamaterRouter);
 
 // mahasiswa
 router.use("/status-mahasiswa", StatusMahasiswaRouter)
