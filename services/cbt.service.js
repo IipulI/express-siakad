@@ -1,7 +1,7 @@
 import { Op } from 'sequelize';
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
-import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap, refreshNilaiAkhirJalurD } from './penilaian.service.js';
+import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap, refreshNilaiAkhirJalurD, cekKelengkapanKelas } from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
@@ -400,14 +400,10 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
         // ada yang kunci manual.
         const kelasId = rincian.siakKelasKuliahId;
         if (kelasId) {
-            const [cekRows] = await sequelize.query(
-                `SELECT COUNT(*) AS total,
-                        SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
-                 FROM siak_rincian_krs_mahasiswa
-                 WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
-                { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
-            );
-            if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+            // Auto-kunci cuma kalau SEMUA komponen (bukan cuma nilai_akhir) sudah
+            // terisi -- lihat komentar lengkap di cekKelengkapanKelas (penilaian.service.js).
+            const { lengkapSemua } = await cekKelengkapanKelas(kelasId);
+            if (lengkapSemua) {
                 await sequelize.query(
                     `UPDATE siak_rincian_krs_mahasiswa
                      SET status = 'Dikunci', updated_at = NOW()

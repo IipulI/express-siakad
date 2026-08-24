@@ -87,6 +87,63 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
     }
 }
 
+// Cek kelengkapan nilai SATU KELAS -- dipakai buat gating auto-kunci di
+// hitungNilaiAkhir (Jalur A), refreshNilaiAkhirJalurD (Jalur D/CBT), dan
+// simpanNilaiAkhirDariCbt (cbt.service.js). Sebelum ada fungsi ini, auto-kunci
+// cuma cek "nilai_akhir IS NOT NULL" per mahasiswa -- padahal nilai_akhir bisa
+// kepenuhi cuma dari 1 komponen (mis. UTS doang) karena hitungNilaiAkhirDariLedgerJalurD
+// & hitungNilaiAkhir menulis nilai_akhir begitu ADA data, bukan begitu LENGKAP.
+// Akibatnya: begitu mahasiswa TERAKHIR di kelas kebetulan dapat nilai apa pun
+// (walau baru 1 komponen), COUNT(total) == COUNT(nilai_akhir IS NOT NULL) jadi
+// TRUE untuk pertama kalinya → seluruh kelas ikut ter-kunci, padahal komponen
+// lain (UAS/Tugas/Kehadiran) mahasiswa itu -- dan siapa tahu mahasiswa lain --
+// belum tentu semuanya sudah terisi. Fungsi ini cek langsung ke ledger
+// (siak_nilai_subcpmk_evaluasi_mahasiswa, tempat Jalur A & Jalur D/CBT SAMA-SAMA
+// menulis kontribusi per komponen) apakah SETIAP mahasiswa di kelas sudah punya
+// data utk SETIAP komponen RencanaEvaluasi yang terdaftar di MK+periode itu.
+export const cekKelengkapanKelas = async (kelasId, trx = null) => {
+    const [row] = await sequelize.query(
+        `WITH komponen_wajib AS (
+            SELECT re.id
+            FROM siak_kelas_kuliah kk
+            JOIN siak_rencana_evaluasi re
+              ON re.siak_mata_kuliah_id = kk.siak_mata_kuliah_id
+             AND re.siak_periode_akademik_id = kk.siak_periode_akademik_id
+             AND re.deleted_at IS NULL
+            WHERE kk.id = :kelasId
+        ),
+        mahasiswa_kelas AS (
+            SELECT id FROM siak_rincian_krs_mahasiswa
+            WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL
+        ),
+        kelengkapan AS (
+            SELECT ns.siak_rincian_krs_mahasiswa_id AS krs_id,
+                   COUNT(DISTINCT ns.siak_rencana_evaluasi_id) AS jumlah_terisi
+            FROM siak_nilai_subcpmk_evaluasi_mahasiswa ns
+            WHERE ns.siak_rincian_krs_mahasiswa_id IN (SELECT id FROM mahasiswa_kelas)
+              AND ns.siak_rencana_evaluasi_id IN (SELECT id FROM komponen_wajib)
+              AND ns.deleted_at IS NULL
+              AND ns.total_bobot > 0
+            GROUP BY ns.siak_rincian_krs_mahasiswa_id
+        )
+        SELECT
+            (SELECT COUNT(*) FROM mahasiswa_kelas) AS total,
+            (SELECT COUNT(*) FROM komponen_wajib) AS jumlah_komponen_wajib,
+            (SELECT COUNT(*) FROM kelengkapan
+             WHERE jumlah_terisi = (SELECT COUNT(*) FROM komponen_wajib)) AS sudah_lengkap`,
+        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+    );
+    const total = parseInt(row.total);
+    const jumlahKomponenWajib = parseInt(row.jumlah_komponen_wajib);
+    const sudahLengkap = parseInt(row.sudah_lengkap);
+    // Kalau MK ini belum punya RencanaEvaluasi sama sekali, jangan pernah
+    // auto-kunci -- "0 komponen wajib" gak boleh dianggap "semua sudah lengkap".
+    return {
+        total,
+        lengkapSemua: total > 0 && jumlahKomponenWajib > 0 && total === sudahLengkap,
+    };
+};
+
 // 3. KALKULATOR HASIL AKHIR OBE (VERSI DINAMIS SKALA NILAI)
 export const hitungNilaiAkhir = async (krsId) => {
     // GUARD Jalur D: begitu CBT betulan sudah kirim data (sumber='CBT' di
@@ -272,15 +329,12 @@ export const hitungNilaiAkhir = async (krsId) => {
                 if (kelasId && mhsId) {
                     await tulisManualRowsKeLedger(krsId, listNilai, trx);
 
-                    // Auto-kunci: jika semua mahasiswa di kelas sudah punya nilai_akhir → kunci semua
-                    const [cekRows] = await sequelize.query(
-                        `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
-                         FROM siak_rincian_krs_mahasiswa
-                         WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
-                        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT, transaction: trx }
-                    );
-                    if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+                    // Auto-kunci: cek SEMUA komponen (bukan cuma "nilai_akhir sudah
+                    // terisi") -- lihat komentar lengkap di cekKelengkapanKelas.
+                    // trx diteruskan supaya ledger yang baru saja ditulis di atas
+                    // (masih dalam transaksi ini, belum commit) ikut kebaca.
+                    const { lengkapSemua } = await cekKelengkapanKelas(kelasId, trx);
+                    if (lengkapSemua) {
                         await sequelize.query(
                             `UPDATE siak_rincian_krs_mahasiswa
                              SET status = 'Dikunci', updated_at = NOW()
@@ -593,16 +647,11 @@ export const refreshNilaiAkhirJalurD = async (krsId, kelasId) => {
     );
 
     // Auto-kunci per-kelas -- pola identik simpanNilaiAkhirDariCbt (cbt.service.js):
-    // begitu SEMUA mahasiswa di kelas ini sudah punya nilai_akhir, kelas otomatis
-    // dikunci, supaya nilai kebuka di KHS/Transkrip.
-    const [cekRows] = await sequelize.query(
-        `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
-         FROM siak_rincian_krs_mahasiswa
-         WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
-        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
-    );
-    if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+    // begitu SEMUA mahasiswa di kelas ini SEMUA KOMPONENnya sudah terisi, kelas
+    // otomatis dikunci, supaya nilai kebuka di KHS/Transkrip. Lihat komentar
+    // lengkap di cekKelengkapanKelas.
+    const { lengkapSemua } = await cekKelengkapanKelas(kelasId);
+    if (lengkapSemua) {
         await sequelize.query(
             `UPDATE siak_rincian_krs_mahasiswa
              SET status = 'Dikunci', updated_at = NOW()
