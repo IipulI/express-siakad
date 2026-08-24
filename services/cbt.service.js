@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
 import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap, refreshNilaiAkhirJalurD } from './penilaian.service.js';
@@ -192,9 +193,22 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
         //    harus bisa lihat skor MENTAH yang dia input, bukan cuma hasil per
         //    Sub-CPMK) selalu akurat & atomik bareng ledger -- resend TIDAK PERNAH
         //    menyisakan baris lama atau numpuk duplikat.
+        //
+        // FIX 2026-08-24: wipe SEBELUMNYA cuma di-scope (krsId, rencanaEvaluasiId)
+        // TANPA cpmkId -- artinya breakdown PARSIAL (mis. remedial 1 Sub-CPMK doang
+        // dalam komponen yang sama) ikut menghapus Sub-CPMK LAIN yang gak ada di
+        // breakdown ini, padahal mahasiswa udah benar di situ. Sekarang breakdown
+        // yang gak kosong cuma boleh nimpa cpmkId yang beneran dikirim; breakdown
+        // KOSONG (sengaja mengosongkan seluruh komponen ini) tetap wipe semua,
+        // sesuai perilaku lama.
+        const cpmkIdsDikirim = Object.keys(agregatKomponenIni);
+        const scopeDestroy = { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId };
+        if (cpmkIdsDikirim.length > 0) {
+            scopeDestroy.siakCpmkId = { [Op.in]: cpmkIdsDikirim };
+        }
         await sequelize.transaction(async (trx) => {
             await NilaiSubcpmkEvaluasiMahasiswa.destroy({
-                where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
+                where: scopeDestroy,
                 force: true, transaction: trx
             });
             const payloadAgregat = Object.entries(agregatKomponenIni).map(([cpmkId, agg]) => ({
