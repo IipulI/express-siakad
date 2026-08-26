@@ -1,3 +1,4 @@
+// routes/krs-mahasiswa.router.js
 import { Router } from "express";
 import * as KrsMahasiswaController from "../../controllers/mahasiswa/krs-mahasiswa.controller.js";
 
@@ -10,13 +11,11 @@ router.get("/riwayat-krs", KrsMahasiswaController.getKrsHistory);
 // router.get('/pembayaran', KrsMahasiswaController.)
 
 router.post("/", KrsMahasiswaController.saveKrs);
+router.post("/ajukan", KrsMahasiswaController.submitKrs);
 
 router.put("/", KrsMahasiswaController.updateKrs);
-router.put("/status", KrsMahasiswaController.submitKrs);
+// router.put("/status", KrsMahasiswaController.submitKrs);
 
 router.delete("/:id", KrsMahasiswaController.deleteKrs);
-
-
-// Riwayat KRS
 
 export default router;

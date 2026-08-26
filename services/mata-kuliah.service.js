@@ -218,8 +218,6 @@ export const findAll = async (page, size, filter) => {
             }
         })
 
-        console.log(activePeriod)
-
         dosenInclude = {
             attributes: ['id', 'siakMataKuliahId'],
             model: KelasKuliah,
@@ -234,6 +232,20 @@ export const findAll = async (page, size, filter) => {
         }
     }
 
+    let tahunKurikulumWhere = {}
+    if (filter.tahunKurikulumId) {
+        tahunKurikulumWhere = {
+            id: filter.tahunKurikulumId,
+        }
+    }
+
+    let programStudiWhere = {}
+    if (filter.programStudiId) {
+        programStudiWhere = {
+            id: filter.programStudiId,
+        }
+    }
+
     const queryBuilder = {
         attributes: {
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
@@ -242,11 +254,13 @@ export const findAll = async (page, size, filter) => {
         include: [
             {
                 attributes: ['id', 'kode', 'nama'],
+                where: programStudiWhere,
                 model: ProgramStudi,
                 as: 'programStudi',
             },
             {
                 attributes: ['id', 'tahun'],
+                where: tahunKurikulumWhere,
                 model: TahunKurikulum,
                 as: 'tahunKurikulum',
             }
@@ -264,8 +278,6 @@ export const findAll = async (page, size, filter) => {
             { kode: { [Op.iLike]: `%${filter.search}%` } }
         ];
     }
-    if (filter.tahunKurikulumId) queryBuilder.where.siakTahunKurikulumId = filter.tahunKurikulumId;
-    if (filter.siakProgramStudiId) queryBuilder.where.siakProgramStudiId = filter.siakProgramStudiId;
 
     if (isPaginated) {
         const { limit, offset } = getPagination(page, size);
@@ -354,6 +366,18 @@ export const createMataKuliah = async (mataKuliahData) => {
     const newMataKuliah = await sequelize.transaction(async (t) => {
         await validatePrasyarat(mataKuliahData, t);
 
+        const existing = await MataKuliah.findOne({
+            where: {
+                kode: mataKuliahData.kode,
+                siakTahunKurikulumId: mataKuliahData.siakTahunKurikulumId,
+                siakProgramStudiId: mataKuliahData.siakProgramStudiId
+            },
+            transaction: t
+        });
+        if (existing) {
+            throw new CustomError.ConflictError(`Kode MK ${mataKuliahData.kode} sudah ada di prodi & kurikulum ini!`);
+        }
+
         const createdMataKuliah = await MataKuliah.create(
             {
                 siakProgramStudiId: mataKuliahData.siakProgramStudiId,
@@ -372,9 +396,9 @@ export const createMataKuliah = async (mataKuliahData) => {
                 sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
                 totalSks: mataKuliahData.sksTatapMuka + mataKuliahData.sksPraktikum + mataKuliahData.sksPraktikLapangan,
 
-                prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1Id,
-                prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2Id,
-                prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3Id
+                prasyaratMataKuliah1: mataKuliahData.prasyaratMataKuliah1,
+                prasyaratMataKuliah2: mataKuliahData.prasyaratMataKuliah2,
+                prasyaratMataKuliah3: mataKuliahData.prasyaratMataKuliah3
             },
             {
                 transaction: t,
@@ -401,10 +425,14 @@ export const createMataKuliahObe = async (payload) => {
 
         // 1. Cek duplikasi kode (Conflict 409)
         const existing = await MataKuliah.findOne({
-            where: { kode: payload.kode, siakTahunKurikulumId: payload.siakTahunKurikulumId },
+            where: {
+                kode: payload.kode,
+                siakTahunKurikulumId: payload.siakTahunKurikulumId,
+                siakProgramStudiId: payload.siakProgramStudiId
+            },
             transaction: t
         });
-        if (existing) throw new CustomError.ConflictError(`Kode MK ${payload.kode} sudah ada di kurikulum ini!`);
+        if (existing) throw new CustomError.ConflictError(`Kode MK ${payload.kode} sudah ada di prodi & kurikulum ini!`);
 
         // 2. Create Data Utama
         const newMk = await MataKuliah.create({

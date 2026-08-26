@@ -1,3 +1,4 @@
+// routes/dosen/pembimbing-akademik.router.js
 import { Router } from 'express';
 import * as dosenPembimbingAkademikController from '../../controllers/dosen/pembimbing-akademik.controller.js'
 import { acceptKrsMahasiswa, rejectKrsMahasiswa } from '../../controllers/akademik/pembimbing-akademik.controller.js'

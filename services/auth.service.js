@@ -31,17 +31,12 @@ export const login = async(data) => {
                 }
             },
             {
-                attributes: ["id", "nama", 'npm'],
+                attributes: ["id", "nama", 'npm', 'semester'],
                 model: Mahasiswa,
                 as: "mahasiswa",
                 required: false,
             },
             {
-                // FIX 2026-08-19: model Pegawai udah gak ada (digabung ke Dosen
-                // waktu merge siak_pegawai lama -> siak_pegawai baru, lihat
-                // migration merge-siak-pegawai-into-siak-dosen) -- include-nya
-                // sebelumnya nunjuk ke model undefined, bikin login langsung
-                // (bukan SSO) SELALU error "Include unexpected".
                 attributes: ["id", "nama", "nidn", "nip", "isDosen", "isPegawai"],
                 model: Dosen,
                 as: "dosen",
@@ -61,19 +56,6 @@ export const login = async(data) => {
         throw new Error("Passwords don't match");
     }
 
-    // FIX 2026-08-19: kalau siak_user_role kosong (banyak akun emang gak
-    // pernah dapet baris eksplisit di sana -- role selama ini kebanyakan
-    // ditentuin lewat SSO, dititipin di token doang, gak pernah disinkron ke
-    // tabel ini), roles balik [] dan FE (FormLogin.tsx: data.user.roles[0])
-    // gak nemu cabang manapun yang cocok -- macet di "Login Berhasil", gak
-    // pernah pindah ke dashboard. Sekarang kalau kosong, infer role DASAR
-    // dari record yang udah ada (mirip cara SSO nentuin role dari
-    // rolePermissions, bukan nge-hardcode). Dosen yang jadi kaprodi (ditunjuk
-    // di siak_program_studi.kaprodi_id) di-treat kayak AKADEMIK_UNIV --
-    // sesuai arahan: kaprodi tampilannya kayak admin akademik. Dihitung SEBELUM
-    // sign token biar klaim `roles` ikut kebawa di JWT-nya sendiri (bukan cuma
-    // di response body) -- isAdminAkademik() di middleware baca req.auth.roles
-    // dari token ini buat request-request SETELAH login, bukan cuma pas login.
     let roles = user.userRole.map(ur => ur.role.nama);
     if (roles.length === 0) {
         if (user.dosen !== null) {
@@ -104,9 +86,6 @@ export const login = async(data) => {
         }
     }
     else if (user.dosen !== null){
-        // siak_pegawai sekarang tabel gabungan dosen & pegawai non-dosen (lihat
-        // migration merge-siak-pegawai-into-siak-dosen) -- pakai nidn kalau ada,
-        // fallback ke nip buat pegawai yang bukan dosen.
         accountInfo = {
             id: user.dosen.id,
             nama: user.dosen.nama,

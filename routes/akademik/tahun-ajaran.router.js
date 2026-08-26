@@ -5,6 +5,7 @@ import { validateCreateTahunAjaran } from '../../validators/tahun-ajaran.validat
 const router = new Router();
 
 router.get('/', tahunAjaranController.findAll)
+router.get('/:id', tahunAjaranController.findOne)
 router.post('/', validateCreateTahunAjaran, tahunAjaranController.create)
 router.put('/:id', tahunAjaranController.updateTahunAjaran)
 router.delete('/:id', tahunAjaranController.deleteTahunAjaran)

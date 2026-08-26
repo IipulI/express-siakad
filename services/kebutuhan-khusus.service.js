@@ -1,5 +1,6 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError } from "../utils/custom-error.js";
 
 const { KebutuhanKhusus } = models;
 
@@ -44,7 +45,7 @@ export const findAll = async (page, size) => {
   }
 };
 
-export const createKebutuhanKhusus = async (ruanganData) => {
+export const createKebutuhanKhusus = async (kebutuhanKhususData) => {
   const { nama } = kebutuhanKhususData;
 
   const existingKebutuhanKhusus = await KebutuhanKhusus.findOne({
@@ -52,7 +53,7 @@ export const createKebutuhanKhusus = async (ruanganData) => {
   });
 
   if (existingKebutuhanKhusus) {
-    throw new Error(`Kebutuhan Khusus dengan nama "${nama}" sudah ada`);
+    throw new ConflictError(`Kebutuhan Khusus dengan nama "${nama}" sudah ada`);
   }
 
   try {

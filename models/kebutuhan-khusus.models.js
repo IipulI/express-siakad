@@ -5,10 +5,7 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
   class KebutuhanKhusus extends Model {
     static associate(models) {
-      this.belongsTo(models.Fakultas, {
-        foreignKey: "siak_fakultas_id",
-        as: "fakultas",
-      });
+      // Tidak ada relasi ke Fakultas: tabel siak_kebutuhan_khusus tidak punya kolom siak_fakultas_id.
     }
   }
 

@@ -34,6 +34,28 @@ export const getHasilStudi = async (req, res) => {
   }
 };
 
+export const getMataKuliahMengulang = async (req, res) => {
+  const responseBuilder = new ResponseBuilder(res);
+
+  const user = req.user;
+  const mahasiswa = user.mahasiswa;
+
+  try {
+    const data = await hasilStudiService.getMataKuliahMengulang(mahasiswa.id);
+
+    responseBuilder
+      .code(200)
+      .message("Berhasil mengambil data")
+      .json(data);
+  } catch (error) {
+    responseBuilder
+      .status("failure")
+      .code(error.status || 500)
+      .message(error.message || "Gagal mengambil data")
+      .json();
+  }
+};
+
 export const getHistoryHasilStudi = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
 

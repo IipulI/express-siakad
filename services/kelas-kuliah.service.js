@@ -2,7 +2,7 @@ import {getPagination} from "../utils/pagination.js";
 import models from "../models/index.js"
 import { QueryTypes, Op } from "sequelize";
 import ResponseBuilder from "../utils/response.js";
-import { NotFoundError } from "../utils/custom-error.js";
+import { BadRequestError, NotFoundError, ConflictError } from "../utils/custom-error.js";
 
 const {
     BidangIlmu,
@@ -249,6 +249,73 @@ const withStatusPenilaian = async (rows) => {
     return plain.map(r => ({ ...r, statusPenilaian: statusMap[r.id] || 'Belum Ada Peserta' }));
 };
 
+const checkScheduleConflict = async (jadwalList, siakPeriodeAkademikId, transaction) => {
+    for (let i = 0; i < jadwalList.length; i++) {
+        const a = jadwalList[i];
+
+        for (let j = i + 1; j < jadwalList.length; j++) {
+            const b = jadwalList[j];
+            if (a.hari !== b.hari) continue;
+            const overlap = a.jamMulai < b.jamSelesai && a.jamSelesai > b.jamMulai;
+            if (!overlap) continue;
+
+            if (a.siakRuanganId === b.siakRuanganId) {
+                throw new ConflictError(`Jadwal bentrok: ruangan sudah dipakai pada hari ${a.hari} jam ${a.jamMulai}-${a.jamSelesai}`);
+            }
+            if (a.siakDosenId && b.siakDosenId && a.siakDosenId === b.siakDosenId) {
+                throw new ConflictError(`Jadwal bentrok: dosen sudah mengajar pada hari ${a.hari} jam ${a.jamMulai}-${a.jamSelesai}`);
+            }
+        }
+
+        const orConditions = [{ siakRuanganId: a.siakRuanganId }];
+        if (a.siakDosenId) orConditions.push({ siakDosenId: a.siakDosenId });
+
+        const conflict = await JadwalKuliah.findOne({
+            where: {
+                hari: a.hari,
+                jamMulai: { [Op.lt]: a.jamSelesai },
+                jamSelesai: { [Op.gt]: a.jamMulai },
+                [Op.or]: orConditions
+            },
+            include: {
+                model: KelasKuliah,
+                as: 'kelasKuliah',
+                attributes: [],
+                required: true,
+                where: { siakPeriodeAkademikId }
+            },
+            transaction
+        });
+
+        if (conflict) {
+            const isRuanganConflict = conflict.siakRuanganId === a.siakRuanganId;
+            throw new ConflictError(
+                isRuanganConflict
+                    ? `Ruangan sudah terpakai pada hari ${a.hari} jam ${a.jamMulai}-${a.jamSelesai}`
+                    : `Dosen sudah memiliki jadwal lain pada hari ${a.hari} jam ${a.jamMulai}-${a.jamSelesai}`
+            );
+        }
+    }
+};
+
+const validateRuanganCapacity = async (jadwalList, kapasitasKelas) => {
+    const ruanganIds = [...new Set(jadwalList.map((j) => j.siakRuanganId).filter(Boolean))];
+    if (ruanganIds.length === 0) return;
+
+    const ruanganList = await Ruangan.findAll({
+        where: { id: ruanganIds },
+        attributes: ['id', 'nama', 'ruangan', 'kapasitas']
+    });
+
+    for (const ruangan of ruanganList) {
+        if (kapasitasKelas > ruangan.kapasitas) {
+            throw new ConflictError(
+                `Kapasitas kelas (${kapasitasKelas}) melebihi kapasitas ruangan ${ruangan.nama} - ${ruangan.ruangan} (${ruangan.kapasitas})`
+            );
+        }
+    }
+};
+
 export const createClass = async (payload) => {
     try {
         const {
@@ -257,32 +324,60 @@ export const createClass = async (payload) => {
             namaKelas, // For backward compatibility or if they use namaKelas
             nama,      // The actual field name in their new JSON example might be 'nama'
             kapasitas,
-            sistem_kuliah,
-            jumlah_pertemuan,
-            tanggal_mulai,
-            tanggal_selesai
+            sistemKuliah,
+            jumlahPertemuan,
+            tanggalMulai,
+            tanggalSelesai,
+            jadwalKuliah
         } = payload;
 
         // Cari MK untuk dapetin prodi
         const mk = await MataKuliah.findByPk(siakMataKuliahId);
-        if (!mk) throw new Error("Mata Kuliah tidak ditemukan");
+        if (!mk) throw new NotFoundError("Mata Kuliah tidak ditemukan");
 
-        const newClass = await KelasKuliah.create({
-            siakMataKuliahId: siakMataKuliahId,
-            siakPeriodeAkademikId: siakPeriodeAkademikId,
-            siakProgramStudiId: mk.siakProgramStudiId,
-            nama: nama || namaKelas,
-            kapasitas: kapasitas || 40,
-            jumlahPeminat: 0,
-            sistemKuliah: sistem_kuliah,
-            statusKelas: "Dibuka",
-            jumlahPertemuan: jumlah_pertemuan,
-            tanggalMulai: tanggal_mulai,
-            tanggalSelesai: tanggal_selesai
+        const kapasitasKelas = kapasitas || 40;
+
+        if (Array.isArray(jadwalKuliah) && jadwalKuliah.length > 0) {
+            await validateRuanganCapacity(jadwalKuliah, kapasitasKelas);
+        }
+
+        return await sequelize.transaction(async (t) => {
+            const newClass = await KelasKuliah.create({
+                siakMataKuliahId: siakMataKuliahId,
+                siakPeriodeAkademikId: siakPeriodeAkademikId,
+                siakProgramStudiId: mk.siakProgramStudiId,
+                nama: nama || namaKelas,
+                kapasitas: kapasitasKelas,
+                jumlahPeminat: 0,
+                sistemKuliah: sistemKuliah,
+                statusKelas: "Dibuka",
+                jumlahPertemuan: jumlahPertemuan,
+                tanggalMulai: tanggalMulai,
+                tanggalSelesai: tanggalSelesai
+            }, { transaction: t });
+
+            if (Array.isArray(jadwalKuliah) && jadwalKuliah.length > 0) {
+                await checkScheduleConflict(jadwalKuliah, siakPeriodeAkademikId, t);
+
+                await JadwalKuliah.bulkCreate(
+                    jadwalKuliah.map((jadwal) => ({
+                        siakKelasKuliahId: newClass.id,
+                        siakRuanganId: jadwal.siakRuanganId,
+                        siakDosenId: jadwal.siakDosenId || null,
+                        hari: jadwal.hari,
+                        jamMulai: jadwal.jamMulai,
+                        jamSelesai: jadwal.jamSelesai,
+                        jenisPertemuan: jadwal.jenisPertemuan,
+                        metodePembelajaran: jadwal.metodePembelajaran
+                    })),
+                    { transaction: t }
+                );
+            }
+
+            return newClass;
         });
-
-        return newClass;
     } catch (error) {
+        if (error.status) throw error;
         throw new Error(`Gagal membuat kelas: ${error.message}`);
     }
 }
@@ -344,6 +439,59 @@ export const detailClass = async (id) => {
     return dataClass
 }
 
+export const updateClass = async (id, payload) => {
+    const existClass = await KelasKuliah.findByPk(id)
+    if (!existClass) {
+        throw new NotFoundError(`Kelas Kuliah tidak dapat ditemukan`)
+    }
+
+    const {
+        nama,
+        kapasitas,
+        sistemKuliah,
+        statusKelas,
+        jumlahPertemuan,
+        tanggalMulai,
+        tanggalSelesai
+    } = payload;
+
+    if (kapasitas !== undefined && kapasitas !== null) {
+        const jadwalList = await JadwalKuliah.findAll({
+            where: { siakKelasKuliahId: id },
+            attributes: ['siakRuanganId']
+        });
+        if (jadwalList.length > 0) {
+            await validateRuanganCapacity(jadwalList.map(j => ({ siakRuanganId: j.siakRuanganId })), kapasitas);
+        }
+    }
+
+    return existClass.update({
+        nama,
+        kapasitas,
+        sistemKuliah,
+        statusKelas,
+        jumlahPertemuan,
+        tanggalMulai,
+        tanggalSelesai
+    })
+}
+
+export const deleteClass = async (id) => {
+    const existClass = await KelasKuliah.findByPk(id)
+    if (!existClass) {
+        throw new NotFoundError(`Kelas Kuliah tidak dapat ditemukan`)
+    }
+
+    const enrolledCount = await RincianKrsMahasiswa.count({
+        where: { siakKelasKuliahId: id }
+    })
+    if (enrolledCount > 0) {
+        throw new ConflictError(`Kelas Kuliah tidak dapat dihapus karena sudah memiliki ${enrolledCount} mahasiswa terdaftar`)
+    }
+
+    await existClass.destroy()
+}
+
 export const classSchedule = async(id) => {
     const existClass = await KelasKuliah.findByPk(id)
     if (!existClass) {
@@ -374,6 +522,48 @@ export const classSchedule = async(id) => {
             }
         ]
     });
+}
+
+export const addClassSchedule = async (id, jadwalKuliah) => {
+    const existClass = await KelasKuliah.findByPk(id, { attributes: ['id', 'kapasitas', 'siakPeriodeAkademikId'] });
+    if (!existClass) {
+        throw new NotFoundError(`Kelas Kuliah tidak ditemukan`);
+    }
+
+    if (!Array.isArray(jadwalKuliah) || jadwalKuliah.length === 0) {
+        throw new BadRequestError("Data jadwal tidak boleh kosong");
+    }
+
+    await validateRuanganCapacity(jadwalKuliah, existClass.kapasitas);
+
+    return await sequelize.transaction(async (t) => {
+        await checkScheduleConflict(jadwalKuliah, existClass.siakPeriodeAkademikId, t);
+
+        return await JadwalKuliah.bulkCreate(
+            jadwalKuliah.map((jadwal) => ({
+                siakKelasKuliahId: id,
+                siakRuanganId: jadwal.siakRuanganId,
+                siakDosenId: jadwal.siakDosenId || null,
+                hari: jadwal.hari,
+                jamMulai: jadwal.jamMulai,
+                jamSelesai: jadwal.jamSelesai,
+                jenisPertemuan: jadwal.jenisPertemuan,
+                metodePembelajaran: jadwal.metodePembelajaran
+            })),
+            { transaction: t }
+        );
+    });
+}
+
+export const deleteClassSchedule = async (id, jadwalId) => {
+    const jadwal = await JadwalKuliah.findOne({
+        where: { id: jadwalId, siakKelasKuliahId: id }
+    });
+    if (!jadwal) {
+        throw new NotFoundError(`Jadwal kuliah tidak ditemukan`);
+    }
+
+    await jadwal.destroy();
 }
 
 export const classParticipant = async(id) => {

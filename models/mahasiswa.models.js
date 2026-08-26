@@ -122,15 +122,6 @@ export default (sequelize) => {
             gelombang: {
                 type: DataTypes.STRING,
             },
-            // TODO : Tanggal daftar ulang dan masuk
-            // tanggalDaftarUlang: {
-            //     type: DataTypes.DATEONLY,
-            //     field: "tanggal_daftar_ulang"
-            // },
-            // tanggalAwalMasuk: {
-            //     type: DataTypes.DATEONLY,
-            //     field: "tanggal_awal_masuk"
-            // },
             kebutuhanKhusus: {
                 type: DataTypes.BOOLEAN,
                 field: "kebutuhan_khusus"

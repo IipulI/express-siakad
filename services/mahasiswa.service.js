@@ -3,6 +3,7 @@ import { getPagination } from "../utils/pagination.js";
 import { Op, QueryTypes } from "sequelize";
 import slug from 'slug'
 import bcrypt from 'bcrypt';
+import { ConflictError, NotFoundError, UnprocessableEntityError } from "../utils/custom-error.js";
 
 const {
     sequelize,
@@ -196,28 +197,115 @@ export const findAll = async (filter, page, size) => {
     }
     catch (error) {
         console.log(error);
-        throw new Error(error.message);
+        throw error;
     }
 }
 
+// Field mahasiswa sebagaimana dipakai FE (CreateStudentData/StudentDetail) yang
+// namanya berbeda dari atribut model Sequelize. Key = nama field FE, value =
+// nama atribut di Mahasiswa model. Field yang tidak terdaftar di sini punya
+// nama yang sama persis di FE maupun di model.
+const MAHASISWA_FIELD_TO_MODEL = {
+    desaKtp: 'kelurahanKtp',
+    dusunRt: 'dusunKtp',
+    kotaRt: 'kabupatenKtp',
+    kecamatanRt: 'kecamatanKtp',
+    alamatDomisili: 'alamat',
+    rtDomisili: 'rt',
+    rwDomisili: 'rw',
+    desaDomisili: 'kelurahan',
+    provinsiDomisili: 'provinsi',
+    kodePosDomisili: 'kodePos',
+    statusTinggalDomisili: 'statusTinggal',
+    dusunDomisili: 'dusun',
+    kotaDomisili: 'kabupaten',
+    kecamatanDomisili: 'kecamatan',
+    provinsiSekolah: 'provinsiPendidikanAsal',
+    kotaKabSekolah: 'kotaKabPendidikanAsal',
+    alamatSekolah: 'alamatPendidikanAsal',
+    teleponSekolah: 'teleponPendidikanAsal',
+    noIjazahSekolah: 'noIjazah',
+    // Field ini di FE masih berupa dropdown string bebas, tapi di DB sudah
+    // punya kolom relasi FK ke master data - FE dropdown-nya sudah diarahkan
+    // untuk mengirim id master data tsb di key yang sama.
+    kurikulum: 'siakTahunKurikulumId',
+    sistemKuliah: 'siakSistemKuliahId',
+    jalurPendaftaran: 'siakJalurPendaftaranId',
+    pendidikanAsal: 'siakPendidikanTerakhirId',
+    agama: 'siakAgamaId',
+    transportasi: 'siakTransportasiId',
+};
+
+const MAHASISWA_MODEL_TO_FIELD = Object.fromEntries(
+    Object.entries(MAHASISWA_FIELD_TO_MODEL).map(([feField, modelField]) => [modelField, feField])
+);
+
+// Seluruh field mahasiswa (di luar data keluarga & di luar statusMahasiswa,
+// yang ditangani terpisah) yang dikirim dari form FE dan punya kolom di DB.
+//
+// Field berikut sengaja TIDAK disimpan karena belum ada kolom/master data yang
+// menaunginya di production (siak_mahasiswa): kelas, jenisPendaftaran (tidak
+// ada model/endpoint master data), tanggalMasuk, noHp, noTerdaftar,
+// statusTinggalKtp. Field-field ini tetap ada di form FE tapi tidak akan
+// tersimpan sampai ada keputusan desain (kolom baru atau FK ke master data).
+const MAHASISWA_FIELDS = [
+    'siakProgramStudiId', 'nama', 'angkatan', 'kurikulum', 'npm', 'periodeMasuk',
+    'sistemKuliah', 'jalurPendaftaran', 'gelombang',
+    'jenisKelamin', 'tempatLahir', 'tanggalLahir', 'noKk', 'nik',
+    'kebutuhanKhusus', 'alamatKtp', 'rtKtp', 'rwKtp', 'desaKtp',
+    'provinsiKtp', 'kodePosKtp', 'alamatDomisili', 'rtDomisili',
+    'rwDomisili', 'desaDomisili', 'provinsiDomisili', 'kodePosDomisili',
+    'statusTinggalDomisili', 'noTelepon', 'emailPribadi', 'emailKampus',
+    'pendidikanAsal', 'provinsiSekolah', 'kotaKabSekolah',
+    'namaPendidikanAsal', 'alamatSekolah', 'teleponSekolah', 'noIjazahSekolah',
+    'semester', 'dusunRt', 'kotaRt', 'kecamatanRt', 'dusunDomisili', 'kotaDomisili',
+    'kecamatanDomisili', 'agama', 'beratBadan', 'tinggiBadan', 'golonganDarah',
+    'transportasi', 'kewarganegaraan', 'paspor', 'statusNikah', 'ukuranJasAlmamater',
+    'pekerjaan', 'instansiPekerjaan', 'penghasilan', 'noRekening', 'namaRekening',
+    'namaBank', 'nisn',
+];
+
+const toModelAttribute = (feField) => MAHASISWA_FIELD_TO_MODEL[feField] ?? feField;
+
+// SelectInput di FE kadang mengirim seluruh option { value, label } alih-alih
+// value-nya saja. Jaga-jaga di sisi backend supaya tidak ikut tersimpan sebagai
+// "[object Object]" walau ada bug serupa di FE di kemudian hari.
+const unwrapSelectValue = (value) =>
+    (value && typeof value === 'object' && !Array.isArray(value) && 'value' in value)
+        ? value.value
+        : value;
+
 export const findOne = async (mahasiswaId) => {
     try {
-        const existMahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
-            attributes: ['id']
-        })
-        if (!existMahasiswa) {
-            throw new Error(`Mahasiswa dengan id ${mahasiswaId} tidak dapat ditemukan`);
-        }
-
-        return await Mahasiswa.findByPk(mahasiswaId, {
+        const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
             attributes: {
                 exclude: ['createdAt', 'updatedAt', 'deletedAt'],
-            }
+            },
+            include: [
+                {
+                    model: StatusMahasiswa,
+                    as: 'statusMahasiswa',
+                    attributes: ['id', 'nama'],
+                }
+            ],
         });
+        if (!mahasiswa) {
+            throw new NotFoundError(`Mahasiswa dengan id ${mahasiswaId} tidak dapat ditemukan`);
+        }
+
+        const plainMahasiswa = mahasiswa.get({ plain: true });
+        const result = {};
+        for (const [key, value] of Object.entries(plainMahasiswa)) {
+            if (key === 'statusMahasiswa') continue;
+            result[MAHASISWA_MODEL_TO_FIELD[key] ?? key] = value;
+        }
+        // FE hanya menampilkan label status mahasiswa sebagai teks, bukan dropdown.
+        result.statusMahasiswa = plainMahasiswa.statusMahasiswa?.nama ?? null;
+        return result;
     }
     catch (error) {
         console.log(error);
-        throw new Error(error.message);
+        throw error;
     }
 }
 
@@ -229,82 +317,24 @@ export const create = async (dataMahasiswa, dataKeluarga) => {
         });
 
         if (existingMahasiswa) {
-            throw new Error('NPM sudah terdaftar dalam sistem.');
+            throw new ConflictError('NPM sudah terdaftar dalam sistem.');
         }
 
         const parseValue = (value) => (value === "" || value == null) ? null : value;
 
+        // FE belum punya selector status mahasiswa (statis "Aktif" untuk mahasiswa
+        // baru), jadi status default diambil dari master data di sini.
+        const statusAktif = await StatusMahasiswa.findOne({
+            where: { nama: { [Op.iLike]: 'aktif' } }
+        });
+
         return await sequelize.transaction(async (trx) => {
-            const mapMahasiswaPayload = {
-                siakProgramStudiId: parseValue(dataMahasiswa?.siakProgramStudiId),
-                nama: parseValue(dataMahasiswa?.nama),
-                angkatan: parseValue(dataMahasiswa?.angkatan),
-                kurikulum: parseValue(dataMahasiswa?.kurikulum),
-                npm: parseValue(dataMahasiswa?.npm),
-                periodeMasuk: parseValue(dataMahasiswa?.periodeMasuk),
-                sistemKuliah: parseValue(dataMahasiswa?.sistemKuliah),
-                kelas: parseValue(dataMahasiswa?.kelas),
-                jenisPendaftaran: parseValue(dataMahasiswa?.jenisPendaftaran),
-                jalurPendaftaran: parseValue(dataMahasiswa?.jalurPendaftaran),
-                gelombang: parseValue(dataMahasiswa?.gelombang),
-                jenisKelamin: parseValue(dataMahasiswa?.jenisKelamin),
-                tempatLahir: parseValue(dataMahasiswa?.tempatLahir),
-                tanggalLahir: parseValue(dataMahasiswa?.tanggalLahir),
-                noKk: parseValue(dataMahasiswa?.noKk),
-                nik: parseValue(dataMahasiswa?.nik),
-                tanggalMasuk: parseValue(dataMahasiswa?.tanggalMasuk),
-                kebutuhanKhusus: parseValue(dataMahasiswa?.kebutuhanKhusus),
-                statusMahasiswa: parseValue(dataMahasiswa?.statusMahasiswa),
-                alamatKtp: parseValue(dataMahasiswa?.alamatKtp),
-                rtKtp: parseValue(dataMahasiswa?.rtKtp),
-                rwKtp: parseValue(dataMahasiswa?.rwKtp),
-                desaKtp: parseValue(dataMahasiswa?.desaKtp),
-                provinsiKtp: parseValue(dataMahasiswa?.provinsiKtp?.label),
-                kodePosKtp: parseValue(dataMahasiswa?.kodePosKtp),
-                statusTinggalKtp: parseValue(dataMahasiswa?.statusTinggalKtp),
-                alamatDomisili: parseValue(dataMahasiswa?.alamatDomisili),
-                rtDomisili: parseValue(dataMahasiswa?.rtDomisili),
-                rwDomisili: parseValue(dataMahasiswa?.rwDomisili),
-                desaDomisili: parseValue(dataMahasiswa?.desaDomisili),
-                provinsiDomisili: parseValue(dataMahasiswa?.provinsiDomisili?.label),
-                kodePosDomisili: parseValue(dataMahasiswa?.kodePosDomisili),
-                statusTinggalDomisili: parseValue(dataMahasiswa?.statusTinggalDomisili),
-                noTelepon: parseValue(dataMahasiswa?.noTelepon),
-                noHp: parseValue(dataMahasiswa?.noHp),
-                emailPribadi: parseValue(dataMahasiswa?.emailPribadi),
-                emailKampus: parseValue(dataMahasiswa?.emailKampus),
-                noTerdaftar: parseValue(dataMahasiswa?.noTerdaftar),
-                pendidikanAsal: parseValue(dataMahasiswa?.pendidikanAsal),
-                provinsiSekolah: parseValue(dataMahasiswa?.provinsiSekolah?.label),
-                kotaKabSekolah: parseValue(dataMahasiswa?.kotaKabSekolah),
-                namaPendidikanAsal: parseValue(dataMahasiswa?.namaPendidikanAsal),
-                alamatSekolah: parseValue(dataMahasiswa?.alamatSekolah),
-                teleponSekolah: parseValue(dataMahasiswa?.teleponSekolah),
-                noIjazahSekolah: parseValue(dataMahasiswa?.noIjazahSekolah),
-                semester: parseValue(dataMahasiswa?.semester),
-                dusunRt: parseValue(dataMahasiswa?.dusunRt),
-                kotaRt: parseValue(dataMahasiswa?.kotaRt),
-                kecamatanRt: parseValue(dataMahasiswa?.kecamatanRt),
-                dusunDomisili: parseValue(dataMahasiswa?.dusunDomisili),
-                kotaDomisili: parseValue(dataMahasiswa?.kotaDomisili),
-                kecamatanDomisili: parseValue(dataMahasiswa?.kecamatanDomisili),
-                agama: parseValue(dataMahasiswa?.agama),
-                beratBadan: parseValue(dataMahasiswa?.beratBadan),
-                tinggiBadan: parseValue(dataMahasiswa?.tinggiBadan),
-                golonganDarah: parseValue(dataMahasiswa?.golonganDarah),
-                transportasi: parseValue(dataMahasiswa?.transportasi),
-                kewarganegaraan: parseValue(dataMahasiswa?.kewarganegaraan),
-                paspor: parseValue(dataMahasiswa?.paspor),
-                statusNikah: parseValue(dataMahasiswa?.statusNikah),
-                ukuranJasAlmamater: parseValue(dataMahasiswa?.ukuranJasAlmamater),
-                pekerjaan: parseValue(dataMahasiswa?.pekerjaan),
-                instansiPekerjaan: parseValue(dataMahasiswa?.instansiPekerjaan),
-                penghasilan: parseValue(dataMahasiswa?.penghasilan),
-                noRekening: parseValue(dataMahasiswa?.noRekening),
-                namaRekening: parseValue(dataMahasiswa?.namaRekening),
-                namaBank: parseValue(dataMahasiswa?.namaBank),
-                nisn: parseValue(dataMahasiswa?.nisn)
-            };
+            const mapMahasiswaPayload = {};
+            for (const field of MAHASISWA_FIELDS) {
+                mapMahasiswaPayload[toModelAttribute(field)] =
+                    parseValue(unwrapSelectValue(dataMahasiswa?.[field]));
+            }
+            mapMahasiswaPayload.siakStatusMahasiswaId = statusAktif?.id ?? null;
 
             // const username = slug(dataMahasiswa.nama, '_')
             // const password = await bcrypt.hash(dataMahasiswa.noTelepon, 12)
@@ -326,14 +356,60 @@ export const create = async (dataMahasiswa, dataKeluarga) => {
     }
     catch (error) {
         console.log(error);
-        throw new Error(error.message);
+        throw error;
     }
 }
 
 export const updateMahasiswa = async (mahasiswaId, dataMahasiswa) => {
+    try {
+        const existMahasiswa = await Mahasiswa.findByPk(mahasiswaId);
+        if (!existMahasiswa) {
+            throw new NotFoundError(`Mahasiswa dengan id ${mahasiswaId} tidak dapat ditemukan`);
+        }
 
+        if (dataMahasiswa?.npm !== undefined && dataMahasiswa.npm !== existMahasiswa.npm) {
+            const existingNpm = await Mahasiswa.findOne({
+                where: { npm: dataMahasiswa.npm, id: { [Op.ne]: mahasiswaId } }
+            });
+            if (existingNpm) {
+                throw new ConflictError('NPM sudah terdaftar dalam sistem.');
+            }
+        }
+
+        const parseValue = (value) => (value === "" ? null : value);
+
+        const updatePayload = {};
+        for (const field of MAHASISWA_FIELDS) {
+            if (dataMahasiswa?.[field] === undefined) continue;
+            updatePayload[toModelAttribute(field)] = parseValue(unwrapSelectValue(dataMahasiswa[field]));
+        }
+
+        return await existMahasiswa.update(updatePayload);
+    }
+    catch (error) {
+        console.log(error);
+        throw error;
+    }
 }
 
 export const deleteMahasiswa = async (mahasiswaId) => {
+    try {
+        const existMahasiswa = await Mahasiswa.findByPk(mahasiswaId);
+        if (!existMahasiswa) {
+            throw new NotFoundError(`Mahasiswa dengan id ${mahasiswaId} tidak dapat ditemukan`);
+        }
 
+        const krsCount = await KrsMahasiswa.count({
+            where: { siakMahasiswaId: mahasiswaId }
+        });
+        if (krsCount > 0) {
+            throw new ConflictError(`Mahasiswa tidak dapat dihapus karena sudah memiliki ${krsCount} riwayat KRS`);
+        }
+
+        await existMahasiswa.destroy();
+    }
+    catch (error) {
+        console.log(error);
+        throw error;
+    }
 }

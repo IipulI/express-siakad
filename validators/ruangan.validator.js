@@ -1,6 +1,8 @@
 import { body } from "express-validator";
 
 export const validateCreateRuangan = [
+  // DB mengharuskan salah satu dari siak_fakultas_id / siak_program_studi_id terisi
+  // (siak_ruangan_owner_check). UI saat ini hanya menyediakan pilihan Fakultas.
   body("siakFakultasId")
     .notEmpty()
     .withMessage("Fakultas is required.")

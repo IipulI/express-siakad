@@ -1,7 +1,8 @@
+// services/pembiming-akademik.service.js
 import db from '../models/index.js'
 import { Op, Sequelize } from 'sequelize'
 import { getPagination } from "../utils/pagination.js";
-import { ConflictError, NotFoundError } from "../utils/custom-error.js";
+import { BadRequestError, ConflictError, NotFoundError } from "../utils/custom-error.js";
 
 const {
     Dosen,

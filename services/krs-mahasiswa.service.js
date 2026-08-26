@@ -1,3 +1,4 @@
+// service/krs-mahasiswa.service.js
 import db from '../models/index.js'
 import {findActive} from "./periode-akademik.service.js";
 import {Op} from 'sequelize'
@@ -111,36 +112,36 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
                 as: 'mataKuliah',
                 where: mataKuliahWhere,
                 required: true,
-                include: [
-                    {
-                        attributes: [
-                            'id', 'tahun'
-                        ],
-                        model: TahunKurikulum,
-                        as: 'tahunKurikulum'
-                    },
-                    {
-                        attributes: [
-                            'id', 'nama', 'kode'
-                        ],
-                        model:MataKuliah,
-                        as: 'prasyarat1'
-                    },
-                    {
-                        attributes: [
-                            'id', 'nama', 'kode'
-                        ],
-                        model:MataKuliah,
-                        as: 'prasyarat2'
-                    },
-                    {
-                        attributes: [
-                            'id', 'nama', 'kode'
-                        ],
-                        model:MataKuliah,
-                        as: 'prasyarat3'
-                    },
-                ]
+                // include: [
+                //     {
+                //         attributes: [
+                //             'id', 'tahun'
+                //         ],
+                //         model: TahunKurikulum,
+                //         as: 'tahunKurikulum'
+                //     },
+                //     {
+                //         attributes: [
+                //             'id', 'nama', 'kode'
+                //         ],
+                //         model:MataKuliah,
+                //         as: 'prasyarat1'
+                //     },
+                //     {
+                //         attributes: [
+                //             'id', 'nama', 'kode'
+                //         ],
+                //         model:MataKuliah,
+                //         as: 'prasyarat2'
+                //     },
+                //     {
+                //         attributes: [
+                //             'id', 'nama', 'kode'
+                //         ],
+                //         model:MataKuliah,
+                //         as: 'prasyarat3'
+                //     },
+                // ]
             },
             {
                 attributes: ['id', 'hari', 'jamMulai', 'jamSelesai'],
@@ -163,6 +164,8 @@ export const getAvailableKrs = async (mahasiswaId, searchQuery, semesterList) =>
             }
         ],
     });
+
+    console.log("Kelas :", availableKelas);
 
     // --- Step 5: Categorize, Sort, and Combine Results ---
     const notTaken = [];
@@ -227,6 +230,7 @@ export const infoKrs = async (mahasiswaId) => {
     }
 
     const mahasiswa = await Mahasiswa.findOne({
+        attributes: ['id', 'nama', 'semester'],
         where: {
             id: mahasiswaId,
         },
@@ -263,7 +267,8 @@ export const infoKrs = async (mahasiswaId) => {
 
     // Batas SKS
     let batasSks = null;
-    if (mahasiswa.hasilStudi !== null) {
+    console.log("mahasiswa : ",mahasiswa.hasilStudi)
+    if (mahasiswa.hasilStudi.length > 0) {
         const batas = await BatasSks.findOne({
             where: {
                 ipsMin: { [Op.lte]: mahasiswa.hasilStudi[0].ips },
@@ -313,18 +318,25 @@ export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
 
     // Get kelas kuliah berdasarkan yang dipilih
     const selectedClassCourse = await KelasKuliah.findAll({
-        attributes : ['id'],
+        attributes : ['id', 'nama', 'kapasitas', 'jumlahPeminat'],
         where: { id: kelasKuliahIds },
-        include: {
-            attributes: ['id', 'totalSks', 'prasyaratMataKuliah1', 'prasyaratMataKuliah2', 'prasyaratMataKuliah3'],
-            model: MataKuliah,
-            as: 'mataKuliah',
-            // include: {
-            //     attributes: ['id'],
-            //     model: MataKuliah, // Assuming a self-referencing model for prerequisites
-            //     as: 'prasyarat_mata_kuliah',
-            // }
-        },
+        include: [
+            {
+                attributes: ['id', 'nama', 'totalSks', 'prasyaratMataKuliah1', 'prasyaratMataKuliah2', 'prasyaratMataKuliah3'],
+                model: MataKuliah,
+                as: 'mataKuliah',
+                // include: {
+                //     attributes: ['id'],
+                //     model: MataKuliah, // Assuming a self-referencing model for prerequisites
+                //     as: 'prasyarat_mata_kuliah',
+                // }
+            },
+            {
+                attributes: ['id', 'hari', 'jamMulai', 'jamSelesai'],
+                model: JadwalKuliah,
+                as: 'jadwalKuliah',
+            }
+        ],
     });
     if (selectedClassCourse.length !== kelasKuliahIds.length) {
         throw new NotFoundError('Beberapa kelas tidak ditemukan');
@@ -334,7 +346,7 @@ export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
     const takenSubjectIds = await getTakenSubjectIds(mahasiswaId);
 
     // Now, perform validation using the private function
-    await _validateKrsRules(mahasiswa, selectedClassCourse, takenSubjectIds);
+    await _validateKrsRules(mahasiswa, selectedClassCourse, takenSubjectIds, activePeriod);
 
     const courseWithStatus = selectedClassCourse.map(kelas => {
         const isRetake = takenSubjectIds.includes(kelas.mataKuliah.id);
@@ -373,7 +385,7 @@ export const saveKrs = async (mahasiswaId, kelasKuliahIds) => {
 export const submitKrs = async (siakMahasiswaId) => {
     // Get periode aktif
     const activePeriod = await findActive();
-    if (!activePeriod) throw new Error('Tidak ada periode akademik aktif yang ditemukan');
+    if (!activePeriod) throw new NotFoundError('Tidak ada periode akademik aktif yang ditemukan');
 
     // Check eksistensi krs
     const existingKrs = await KrsMahasiswa.findOne({
@@ -424,17 +436,24 @@ export const updateKrs = async (mahasiswaId, kelasKuliahId) => {
     try {
         // Fetch the new set of classes, eager loading prerequisites
         const newSelectedClasses = await KelasKuliah.findAll({
-            attributes: ['id'],
+            attributes: ['id', 'nama', 'kapasitas', 'jumlahPeminat'],
             where: { id: kelasKuliahId },
-            include: {
-                attributes: ['id', 'totalSks', 'prasyaratMataKuliah1', 'prasyaratMataKuliah2', 'prasyaratMataKuliah3'],
-                model: MataKuliah,
-                as: 'mataKuliah',
-                // include: [{
-                //     model: MataKuliah,
-                //     as: 'prasyarat_mata_kuliah',
-                // }]
-            }
+            include: [
+                {
+                    attributes: ['id', 'nama', 'totalSks', 'prasyaratMataKuliah1', 'prasyaratMataKuliah2', 'prasyaratMataKuliah3'],
+                    model: MataKuliah,
+                    as: 'mataKuliah',
+                    // include: [{
+                    //     model: MataKuliah,
+                    //     as: 'prasyarat_mata_kuliah',
+                    // }]
+                },
+                {
+                    attributes: ['id', 'hari', 'jamMulai', 'jamSelesai'],
+                    model: JadwalKuliah,
+                    as: 'jadwalKuliah',
+                }
+            ]
         });
         if(newSelectedClasses.length !== kelasKuliahId.length) {
             throw new NotFoundError('Beberapa kelas tidak ditemukan');
@@ -444,7 +463,7 @@ export const updateKrs = async (mahasiswaId, kelasKuliahId) => {
         const takenSubjectIds = await getTakenSubjectIds(krs.siakMahasiswaId);
 
         // Run the same validation checks
-        await _validateKrsRules(mahasiswa, newSelectedClasses, takenSubjectIds);
+        await _validateKrsRules(mahasiswa, newSelectedClasses, takenSubjectIds, activePeriod);
 
         // filter kelas untuk di add dan dihapus
         const currentClassIds = krs.rincianKrsMahasiswa.map(rincian => rincian.siakKelasKuliahId);
@@ -485,7 +504,7 @@ export const updateKrs = async (mahasiswaId, kelasKuliahId) => {
         return { message: 'KRS berhasil diperbarui' };
     } catch (error) {
         console.error('Error updating KRS:', error);
-        throw new Error(`Gagal memperbarui KRS: ${error.message}`);
+        throw error;
     }
 };
 
@@ -515,7 +534,7 @@ export const deleteKrs = async (krsId, kelasKuliahId) => {
     }
     catch (error) {
         console.log(error);
-        throw new Error(`Gagal memperbarui KRS: ${error.message}`);
+        throw error;
     }
 }
 
@@ -732,7 +751,7 @@ export const historyKrs = async (mahasiswaId, periodeId) => {
     }
     catch (error) {
         console.log(error);
-        throw new Error(error.message);
+        throw error;
     }
 }
 
@@ -767,42 +786,107 @@ const getTakenSubjectIds = async (mahasiswaId) => {
     return takenSubject;
 };
 
+// Helper function to determine a student's max SKS allowance,
+// based on their IPS from the academic period preceding the given active period.
+const getBatasSksForMahasiswa = async (mahasiswaId, activePeriod) => {
+    const tahun = parseInt(activePeriod.kode.slice(0, 4));
+    const kode = parseInt(activePeriod.kode.slice(4));
+
+    const periodeBeforeCode = kode === 1 ? `${tahun - 1}2` : `${tahun}1`;
+
+    const periodeBefore = await PeriodeAkademik.findOne({
+        where: { kode: periodeBeforeCode }
+    });
+
+    if (!periodeBefore) return 21;
+
+    const hasilStudi = await HasilStudi.findOne({
+        where: {
+            siakMahasiswaId: mahasiswaId,
+            siakPeriodeAkademikId: periodeBefore.id,
+        }
+    });
+
+    if (!hasilStudi) return 21;
+
+    const batas = await BatasSks.findOne({
+        where: {
+            ipsMin: { [Op.lte]: hasilStudi.ips },
+            ipsMax: { [Op.gte]: hasilStudi.ips },
+        }
+    });
+
+    return batas ? batas.batasSks : 21;
+};
+
 // A private helper function to validate KRS rules.
 // It uses a closure to prevent external access.
-const _validateKrsRules = async (mahasiswa, selectedClasses, takenSubjects) => {
-    // A Set is used for O(1) lookups, just like in your previous Express.js code.
+const _validateKrsRules = async (mahasiswa, selectedClasses, takenSubjects, activePeriod) => {
     const takenSubjectSet = new Set(takenSubjects);
     const errors = {};
 
-    // A. Check for prerequisites
+    // Pengecekan prasyarat mata kuliah
     for (const kelas of selectedClasses) {
         const mataKuliah = kelas.mataKuliah;
-        // Collect all prerequisite IDs for the current course
         const requiredPrereqIds = [];
         if (mataKuliah.prasyaratMataKuliah1) requiredPrereqIds.push(mataKuliah.prasyaratMataKuliah1);
         if (mataKuliah.prasyaratMataKuliah2) requiredPrereqIds.push(mataKuliah.prasyaratMataKuliah2);
         if (mataKuliah.prasyaratMataKuliah3) requiredPrereqIds.push(mataKuliah.prasyaratMataKuliah3);
 
         if (requiredPrereqIds.length > 0) {
-            // Find which prerequisites have NOT been taken
             const unmetPrereqIds = requiredPrereqIds.filter(prereqId => !takenSubjectSet.has(prereqId));
 
             if (unmetPrereqIds.length > 0) {
-                // You can fetch the names of the missing prerequisites here if needed,
-                // but for now, we'll just throw a clear error message.
                 if (!errors[kelas.id]) errors[kelas.id] = [];
-                errors[kelas.id].push(`Prerequisites for '${mataKuliah.nama}' are not met.`);
+                errors[kelas.id].push(`Mata kuliah prasyarat untuk '${mataKuliah.nama}' tidak memenuhi.`);
             }
         }
 
-        // B. (Optional) Check SKS limit here if you implement it.
-        // C. (Optional) Check for class capacity.
+        // Pengecekan kapasitas kelas
+        if (kelas.kapasitas != null && kelas.jumlahPeminat >= kelas.kapasitas) {
+            if (!errors[kelas.id]) errors[kelas.id] = [];
+            errors[kelas.id].push(`Kelas '${kelas.nama || mataKuliah.nama}' sudah penuh (kapasitas: ${kelas.kapasitas}).`);
+        }
+    }
+
+    // Pengecekan jadwal bentrok antar kelas yang dipilih
+    const jadwalEntries = [];
+    for (const kelas of selectedClasses) {
+        for (const jadwal of kelas.jadwalKuliah || []) {
+            jadwalEntries.push({ kelas, jadwal });
+        }
+    }
+
+    for (let i = 0; i < jadwalEntries.length; i++) {
+        for (let j = i + 1; j < jadwalEntries.length; j++) {
+            const a = jadwalEntries[i];
+            const b = jadwalEntries[j];
+            if (a.kelas.id === b.kelas.id) continue;
+            if (a.jadwal.hari !== b.jadwal.hari) continue;
+
+            const overlap = a.jadwal.jamMulai < b.jadwal.jamSelesai && a.jadwal.jamSelesai > b.jadwal.jamMulai;
+            if (!overlap) continue;
+
+            const namaA = a.kelas.mataKuliah?.nama || a.kelas.nama;
+            const namaB = b.kelas.mataKuliah?.nama || b.kelas.nama;
+            const message = `Jadwal bentrok antara '${namaA}' dan '${namaB}' pada hari ${a.jadwal.hari} jam ${a.jadwal.jamMulai}-${a.jadwal.jamSelesai}.`;
+
+            if (!errors[a.kelas.id]) errors[a.kelas.id] = [];
+            errors[a.kelas.id].push(message);
+        }
+    }
+
+    // Pengecekan batas sks mahasiswa
+    const batasSks = await getBatasSksForMahasiswa(mahasiswa.id, activePeriod);
+    const totalSksSelected = selectedClasses.reduce((sum, kelas) => sum + (kelas.mataKuliah?.totalSks || 0), 0);
+    if (totalSksSelected > batasSks) {
+        if (!errors['sks']) errors['sks'] = [];
+        errors['sks'].push(`Total SKS yang diambil (${totalSksSelected}) melebihi batas maksimal SKS (${batasSks}).`);
     }
 
     if (Object.keys(errors).length > 0) {
-        // We'll throw a single error object with all messages, similar to Laravel's ValidationException.
         const allErrors = Object.values(errors).flat();
-        throw new Error(allErrors.join(' '));
+        throw new UnprocessableEntityError(allErrors.join(' '));
     }
 };
 

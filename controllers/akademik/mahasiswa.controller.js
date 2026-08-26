@@ -29,7 +29,7 @@ export const findAll = async (req, res, next) => {
     }
 }
 
-export const findOne = async (req, res) => {
+export const findOne = async (req, res, next) => {
     const response = new ResponseBuilder(res)
     const mahasiswaId = req.params.id
 
@@ -41,11 +41,44 @@ export const findOne = async (req, res) => {
             .message("Berhasil mengambil data")
             .json(data)
     } catch (error) {
+        console.error(error);
+        next(error)
+    }
+}
+
+export const update = async (req, res, next) => {
+    const response = new ResponseBuilder(res)
+    const mahasiswaId = req.params.id
+
+    try {
+        const data = await mahasiswaService.updateMahasiswa(mahasiswaId, req.body)
+
         response
-            .status('failure')
-            .code(500)
-            .message("Gagal mengambil data")
-            .json(error.message)
+            .code(200)
+            .message("Berhasil memperbarui data mahasiswa")
+            .json(data)
+    }
+    catch (error) {
+        console.error(error);
+        next(error)
+    }
+}
+
+export const remove = async (req, res, next) => {
+    const mahasiswaId = req.params.id
+
+    try {
+        await mahasiswaService.deleteMahasiswa(mahasiswaId)
+
+        return new ResponseBuilder(res)
+            .status('success')
+            .code(200)
+            .message("Berhasil menghapus data mahasiswa")
+            .json();
+    }
+    catch (error) {
+        console.error(error);
+        next(error)
     }
 }
 

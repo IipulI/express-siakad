@@ -11,7 +11,7 @@ export const findAll = async (page, size) => {
         attributes: {
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
         },
-        order: [['id', 'DESC']],
+        order: [['tahun', 'DESC']],
     }
 
     if (isPaginated) {

@@ -2,7 +2,10 @@ import db from '../models/index.js'
 import { getPagination } from "../utils/pagination.js";
 import { NotFoundError } from "../utils/custom-error.js";
 
-const { PeriodeAkademik } = db
+const {
+    PeriodeAkademik,
+    TahunAjaran
+} = db
 
 export const findAll = async (page, size) => {
     const isPaginated = page !== null && size !== null
@@ -11,8 +14,17 @@ export const findAll = async (page, size) => {
         attributes: {
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
         },
+        include: {
+            model: TahunAjaran,
+            as: 'tahunAjaran'
+        },
         order: [['kode', 'DESC']],
     }
+
+    const flatten = (row) => {
+        const { tahunAjaran, ...rest } = row.toJSON();
+        return { ...rest, tahun: tahunAjaran?.tahun ?? null };
+    };
 
     if (isPaginated) {
         const { limit, offset } = getPagination(page, size);
@@ -23,7 +35,7 @@ export const findAll = async (page, size) => {
 
         return {
             count,
-            rows,
+            rows: rows.map(flatten),
             isPaginated,
         }
     } else {
@@ -31,10 +43,29 @@ export const findAll = async (page, size) => {
 
         return {
             count: data.length,
-            rows: data,
+            rows: data.map(flatten),
             isPaginated: false,
         }
     }
+}
+
+export const findOneById = async (id) => {
+    const existDataPeriodeAkademik = await PeriodeAkademik.findByPk(id, {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        include: {
+            model: TahunAjaran,
+            as: 'tahunAjaran'
+        }
+    })
+
+    if (!existDataPeriodeAkademik) {
+        throw new NotFoundError(`Periode Akademik tidak dapat ditemukan`)
+    }
+
+    const { tahunAjaran, ...rest } = existDataPeriodeAkademik.toJSON();
+    return { ...rest, tahun: tahunAjaran?.tahun ?? null };
 }
 
 export const findActive = async () => {
@@ -77,13 +108,6 @@ export const updatePeriodeAkademik = async (id, updateData) => {
         throw new NotFoundError(`Periode Akademik tidak dapat ditemukan`)
     }
 
-    // FIX: sebelumnya .update(updateData) dikirim mentah-mentah -- attribute
-    // model ini ditulis snake_case langsung (siak_tahun_ajaran_id, tanggal_mulai,
-    // tanggal_selesai, bukan di-mapping ke camelCase kayak model lain), padahal
-    // body request dari FE camelCase (siakTahunAjaranId, tanggalMulai, dst).
-    // Sequelize .update() diam-diam SKIP key yang gak match attribute apapun,
-    // jadi update-nya "sukses" tapi gak beneran ngubah apa-apa. Sekarang
-    // di-map eksplisit sama kayak createPeriodeAkademik di atas.
     const { siakTahunAjaranId, nama, kode, tanggalMulai, tanggalSelesai, status } = updateData;
     const payload = {};
     if (siakTahunAjaranId !== undefined) payload.siak_tahun_ajaran_id = siakTahunAjaranId;
@@ -93,10 +117,6 @@ export const updatePeriodeAkademik = async (id, updateData) => {
     if (tanggalSelesai !== undefined) payload.tanggal_selesai = tanggalSelesai;
     if (status !== undefined) payload.status = status;
 
-    // Banyak fitur lain (dashboard jadwal, default periode di RPS/Rencana
-    // Pembelajaran/Evaluasi, dst) asumsinya cuma ADA SATU periode berstatus
-    // "Aktif". Kalau baris ini diubah jadi Aktif, matiin dulu semua periode
-    // lain biar gak dobel -- pakai transaksi biar atomik.
     if (payload.status === 'Aktif') {
         return db.sequelize.transaction(async (t) => {
             await PeriodeAkademik.update(
@@ -108,7 +128,7 @@ export const updatePeriodeAkademik = async (id, updateData) => {
         });
     }
 
-    return existDataPeriodeAkademik.update(payload)
+    return existDataPeriodeAkademik.update(payload)s
 };
 
 export const deletePeriodeAkademik = async (id) => {

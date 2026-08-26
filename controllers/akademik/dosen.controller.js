@@ -27,6 +27,21 @@ export const findAll = async (req, res, next) => {
     }
 }
 
+export const syncSimpeg = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+
+    try {
+        const stats = await dosenService.syncFromSimpeg()
+
+        responseBuilder
+            .status('success')
+            .message('Sinkronisasi data dosen dari Simpeg berhasil')
+            .json(stats)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export const findOneById = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
     const id = req.params.id

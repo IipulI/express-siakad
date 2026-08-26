@@ -5,11 +5,15 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class PeriodeAkademik extends Model {
         static associate(models) {
-            // define assoc
             this.hasMany(models.TahunKurikulum, {
-        as: 'tahunKurikulum',
-        foreignKey: 'siak_periode_akademik_id'
-    });
+                as: 'tahunKurikulum',
+                foreignKey: 'siak_periode_akademik_id'
+            });
+
+            this.belongsTo(models.TahunAjaran, {
+                as: 'tahunAjaran',
+                foreignKey: 'siak_tahun_ajaran_id'
+            })
         }
     }
 
@@ -20,8 +24,9 @@ export default (sequelize) => {
                 primaryKey: true,
                 defaultValue: uuid7,
             },
-            siak_tahun_ajaran_id: {
+            siakTahunAjaranId: {
                 type: DataTypes.UUID,
+                field: 'siak_tahun_ajaran_id'
             },
             nama: {
                 allowNull: false,
@@ -32,13 +37,15 @@ export default (sequelize) => {
                 allowNull: false,
                 type: DataTypes.STRING,
             },
-            tanggal_mulai: {
+            tanggalMulai: {
                 allowNull: false,
                 type: DataTypes.DATEONLY,
+                field: 'tanggal_mulai'
             },
-            tanggal_selesai: {
+            tanggalSelesai: {
                 allowNull: false,
                 type: DataTypes.DATEONLY,
+                field: 'tanggal_selesai'
             },
             status: {
                 allowNull: false,

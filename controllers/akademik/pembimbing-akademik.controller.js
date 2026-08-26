@@ -1,3 +1,4 @@
+// controllers/akademik/pembimbing-akademik.controller.js
 import * as pembimbingAkademikService from "../../services/pembiming-akademik.service.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";

@@ -211,7 +211,7 @@ router.get('/callback', async (req, res, next) => {
                 eportal_user_id: eportalUserId,
             },
             process.env.THIRD_PARTY_JWT_SECRET,
-            { expiresIn: '8h' }
+            { expiresIn: '15m' }
         );
 
         return res.json({
@@ -229,6 +229,7 @@ router.get('/callback', async (req, res, next) => {
                     nama: nama,
                     code: eportalUser.npm || eportalUser.nidn || eportalUser.email,
                 },
+                permissions: rolePermissions
             },
         });
 
