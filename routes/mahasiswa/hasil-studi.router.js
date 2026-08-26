@@ -4,5 +4,6 @@ import * as HasilStudiController from "../../controllers/mahasiswa/hasil-studi.c
 const router = new Router();
 
 router.get("/", HasilStudiController.getHasilStudi);
+router.get("/mengulang", HasilStudiController.getMataKuliahMengulang);
 
 export default router;

@@ -248,6 +248,86 @@ export const getIpk = async (mahasiswaId) => {
   };
 };
 
+// Mata kuliah mengulang: mata kuliah yang PERNAH diambil dan berstatus
+// "Tidak Lulus" pada seluruh percobaan (kalau salah satu percobaan sudah
+// "Lulus", mata kuliah itu tidak lagi dianggap perlu diulang).
+export const getMataKuliahMengulang = async (mahasiswaId) => {
+  const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
+    attributes: ['id', 'nama'],
+  });
+  if (!mahasiswa) {
+    throw new NotFoundError(`Mahasiswa tidak dapat ditemukan`);
+  }
+
+  const rincianKrsMahasiswa = await RincianKrsMahasiswa.findAll({
+    attributes: ['id', 'status', 'nilaiAkhir', 'hurufMutu'],
+    where: {
+      status: { [Op.in]: ['Dikunci', 'Lulus', 'Tidak Lulus'] },
+    },
+    include: [
+      {
+        attributes: ['id', 'siakPeriodeAkademikId', 'semester'],
+        where: { siakMahasiswaId: mahasiswaId },
+        model: KrsMahasiswa,
+        as: 'krsMahasiswa',
+        required: true,
+        include: [
+          {
+            model: PeriodeAkademik,
+            as: 'periodeAkademik',
+            attributes: ['id', 'nama', 'kode'],
+          },
+        ],
+      },
+      {
+        attributes: ['id', 'nama'],
+        model: KelasKuliah,
+        as: 'kelasKuliah',
+        required: true,
+        include: {
+          attributes: ['id', 'nama', 'kode', 'totalSks'],
+          model: MataKuliah,
+          as: 'mataKuliah',
+          required: true,
+        },
+      },
+    ],
+    order: [['krsMahasiswa', 'periodeAkademik', 'kode', 'ASC']],
+  });
+
+  const perMataKuliah = new Map();
+  rincianKrsMahasiswa.forEach((item) => {
+    const mataKuliahId = item.kelasKuliah?.mataKuliah?.id;
+    if (!mataKuliahId) return;
+
+    const entry = perMataKuliah.get(mataKuliahId) || {
+      mataKuliah: item.kelasKuliah.mataKuliah,
+      pernahLulus: false,
+      percobaanTerakhir: null,
+    };
+
+    if (item.status === 'Lulus') {
+      entry.pernahLulus = true;
+    }
+    entry.percobaanTerakhir = {
+      kelasKuliah: { id: item.kelasKuliah.id, nama: item.kelasKuliah.nama },
+      periodeAkademik: item.krsMahasiswa.periodeAkademik,
+      status: item.status,
+      nilaiAkhir: item.nilaiAkhir,
+      hurufMutu: item.hurufMutu,
+    };
+
+    perMataKuliah.set(mataKuliahId, entry);
+  });
+
+  return Array.from(perMataKuliah.values())
+    .filter((entry) => !entry.pernahLulus)
+    .map((entry) => ({
+      mataKuliah: entry.mataKuliah,
+      percobaanTerakhir: entry.percobaanTerakhir,
+    }));
+};
+
 export const getKkn = async (mahasiswaId) => {
   const mahasiswa = await Mahasiswa.findByPk(mahasiswaId, {
     attributes: ['id', 'nama', 'periodeMasuk'],

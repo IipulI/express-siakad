@@ -5,6 +5,7 @@ import { validateCreatePeriodeAkademik }  from '../../validators/periode-akademi
 const router = new Router();
 
 router.get('/', periodeAkademikController.findAll)
+router.get('/:id', periodeAkademikController.findOne)
 router.post('/', validateCreatePeriodeAkademik, periodeAkademikController.create)
 router.put('/:id', periodeAkademikController.updatePeriodeAkademik)
 router.delete('/:id', periodeAkademikController.deletePeriodeAkademik)

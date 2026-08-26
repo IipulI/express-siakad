@@ -36,10 +36,10 @@ export default (sequelize) => {
             field: "kode",
             allowNull: true 
         },
-        nama: { 
-            type: DataTypes.STRING, 
+        nama: {
+            type: DataTypes.STRING,
             field: "nama",
-            allowNull: false 
+            allowNull: false
         }
     }, {
         sequelize, 

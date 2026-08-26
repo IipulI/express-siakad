@@ -10,7 +10,7 @@ export const findAll = async (req, res, next) => {
     const filter = {
         siakPeriodeAkademikId : req.query.siakPeriodeAkademikId,
         siakProgramStudiId : req.query.siakProgramStudiId,
-        siakSistemKuliahId : req.query.siakSistemKuliahId,
+        sistemKuliah : req.query.sistemKuliah,
         siakTahunKurikulumId: req.query.siakTahunKurikulumId,
         search: req.query.search,
         npm: req.query.npm,
@@ -52,7 +52,7 @@ export const create = async (req, res) => {
     } catch (error) {
         return responseBuilder
             .status('failure')
-            .code(500)
+            .code(error.status || 500)
             .message(error.message || "Gagal membuat kelas kuliah")
             .json();
     }
@@ -79,6 +79,45 @@ export const findOne = async (req, res) => {
     }
 }
 
+export const update = async (req, res) => {
+    const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        const updatedClass = await KelasKuliahService.updateClass(id, req.body);
+
+        return responseBuilder
+            .code(200)
+            .message("Berhasil memperbarui kelas kuliah")
+            .json(updatedClass)
+    }
+    catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(error.status || 500)
+            .message(error.message || "Kesalahan yang tidak terduga")
+            .json();
+    }
+}
+
+export const remove = async (req, res) => {
+    const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        await KelasKuliahService.deleteClass(id);
+
+        return res.status(204).end();
+    }
+    catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(error.status || 500)
+            .message(error.message || "Kesalahan yang tidak terduga")
+            .json();
+    }
+}
+
 export const schedules = async (req, res) => {
     const id = req.params.id;
     const responseBuilder = new ResponseBuilder(res);
@@ -96,6 +135,48 @@ export const schedules = async (req, res) => {
             .status('failure')
             .code(500)
             .message(error.message || "Kesalahan yang tidak terduga")
+            .json();
+    }
+}
+
+export const addSchedule = async (req, res) => {
+    const id = req.params.id;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        const newSchedule = await KelasKuliahService.addClassSchedule(id, req.body.jadwalKuliah);
+
+        return responseBuilder
+            .code(201)
+            .message("Berhasil menambahkan jadwal kuliah")
+            .json(newSchedule)
+    }
+    catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(error.status || 500)
+            .message(error.message || "Gagal menambahkan jadwal kuliah")
+            .json();
+    }
+}
+
+export const deleteSchedule = async (req, res) => {
+    const { id, jadwalId } = req.params;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        await KelasKuliahService.deleteClassSchedule(id, jadwalId);
+
+        return responseBuilder
+            .code(200)
+            .message("Berhasil menghapus jadwal kuliah")
+            .json()
+    }
+    catch (error) {
+        return responseBuilder
+            .status('failure')
+            .code(500)
+            .message(error.message || "Gagal menghapus jadwal kuliah")
             .json();
     }
 }

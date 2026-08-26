@@ -1,8 +1,9 @@
 import * as sukuService from "../../services/suku.servise.js";
 import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
+import { BadRequestError } from "../../utils/custom-error.js";
 
-export const findAll = async (req, res) => {
+export const findAll = async (req, res, next) => {
   const page = req.query.page ? parseInt(req.query.page) : null;
   const size = req.query.size ? parseInt(req.query.size) : null;
   const responseBuilder = new ResponseBuilder(res);
@@ -19,104 +20,61 @@ export const findAll = async (req, res) => {
 
     responseBuilder.code(200).message("Berhasil Menggambil data").json(payload);
   } catch (error) {
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message(error.message || "Terjadi kesalahan")
-      .json();
+    next(error)
   }
 };
 
-export const create = async (req, res) => {
+export const create = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        await sukuService.createSuku(req.body)
+        const data = await sukuService.createSuku(req.body)
 
         responseBuilder
             .code(201)
             .message("Data suku berhasil ditambahkan")
-            .json();
-    }
-    catch (err) {
-        if (err.message.includes('already exists')) {
-            return responseBuilder
-                .status('failure')
-                .code(409)
-                .message(err.message)
-                .json();
-        }
-
-        responseBuilder
-            .status('failure')
-            .code(500)
-            .message(err.message || 'Terjadi kesalahan saat menambahkan data Suku.')
-            .json();
-    }
-}
-
-export const update = async (req, res) => {
-    const { id } = req.params;
-    const responseBuilder = new ResponseBuilder(res);
-    const { nama } = req.body;
-
-    // request validation
-    if (!nama) {
-        return responseBuilder
-            .status('failure')
-            .code(404)
-            .message("Harap isi minimal satu data (nama) untuk melakukan update")
-            .json();
-    }
-
-    try {
-        const isUpdated = await sukuService.updateSuku(id, req.body)
-
-        if (isUpdated) {
-            return responseBuilder.status('success')
-                .code(200)
-                .message("Data berhasil diperbarui")
-                .json();
-        } else {
-            return responseBuilder
-                .status('failure')
-                .code(404)
-                .message(`Suku dengan ID ${id} tidak ditemukan atau datanya tidak berubah`)
-                .json();
-        }
+            .json(data);
     }
     catch (error) {
-        responseBuilder
-            .status('failure')
-            .code(500)
-            .message("Terjadi kesalahan yang tidak terduga")
-            .json();
+        next(error)
     }
 }
 
-export const destroy = async (req, res) => {
+export const update = async (req, res, next) => {
     const { id } = req.params;
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        const isDeleted = await sukuService.deleteSuku(id);
+        if (!req.body.nama) {
+            throw new BadRequestError("Harap isi minimal satu data (nama) untuk melakukan update")
+        }
 
-        if (isDeleted) {
-            return res.status(204).end();
-        }
-        else {
-            return responseBuilder
-                .status('failure')
-                .code(404)
-                .message(`Suku dengan ID ${id} tidak ditemukan`)
-                .json();
-        }
-    } catch (error) {
-        console.error(error);
-        return responseBuilder
-            .status('failure')
-            .code(500)
-            .message('Terjadi kesalahan yang tidak terduga')
+        const isUpdated = await sukuService.updateSuku(id, req.body)
+
+        responseBuilder
+            .status("success")
+            .code(200)
+            .message("Data suku berhasil diperbarui")
+            .json(isUpdated);
+    }
+    catch (error) {
+        next(error)
+    }
+}
+
+export const destroy = async (req, res, next) => {
+    const { id } = req.params;
+    const responseBuilder = new ResponseBuilder(res);
+
+    try {
+        await sukuService.deleteSuku(id);
+
+        responseBuilder
+            .status("success")
+            .code(200)
+            .message("Data suku berhasil dihapus")
             .json();
+    } catch (error) {
+        next(error)
     }
 }

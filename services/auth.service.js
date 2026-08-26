@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import { Op } from "sequelize"
 
-const { Mahasiswa, Dosen, Pegawai, User, UserRole, Role } = models;
+const { Mahasiswa, Dosen, User, UserRole, Role } = models;
 
 export const login = async(data) => {
     // 1. Build the query safely so we don't pass 'undefined' to Sequelize
@@ -31,21 +31,15 @@ export const login = async(data) => {
                 }
             },
             {
-                attributes: ["id", "nama", 'npm'],
+                attributes: ["id", "nama", 'npm', 'semester'],
                 model: Mahasiswa,
                 as: "mahasiswa",
                 required: false,
             },
             {
-                attributes: ["id", "nama"],
+                attributes: ["id", "nama", "nidn", "nip", "isDosen", "isPegawai"],
                 model: Dosen,
                 as: "dosen",
-                required: false,
-            },
-            {
-                attributes: ["id", "nama"],
-                model: Pegawai,
-                as: "pegawai",
                 required: false,
             }
         ]
@@ -84,14 +78,7 @@ export const login = async(data) => {
         accountInfo = {
             id: user.dosen.id,
             nama: user.dosen.nama,
-            code: user.dosen.nidn
-        }
-    }
-    else if (user.pegawai !== null) {
-        accountInfo = {
-            id: user.pegawai.id,
-            nama: user.pegawai.nama,
-            code: user.pegawai.nip
+            code: user.dosen.nidn || user.dosen.nip
         }
     }
 

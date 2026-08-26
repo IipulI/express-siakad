@@ -50,7 +50,7 @@ export default (sequelize) => {
         siakUserId: {
             field: 'siak_user_id',
             type: DataTypes.UUID,
-            allowNull: false,
+            allowNull: true,
         },
         isDosen: {
             field: 'is_dosen',

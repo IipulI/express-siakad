@@ -1,109 +1,84 @@
 import models from "../models/index.js"
+import { Op } from "sequelize"
 import { getPagination } from "../utils/pagination.js";
-import { Op } from "sequelize";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 
 const { Suku } = models;
 
 export const findAll = async (page, size) => {
-  try {
-    if (page !== null && size !== null) {
-      const { limit, offset } = getPagination(page, size);
+    const isPaginated = page !== null && size !== null;
 
-      const { count, rows } = await Suku.findAndCountAll({
-        attributes: [
-          "id",
-          "nama"
-        ],
-        limit,
-        offset,
-        raw: true,
-      });
-
-      // const formattedRows = rows.map(record => ({
-      //     ...record,
-      //     createdAt: formatTimestamp(record.createdAt),
-      // }));
-
-      return {
-        count,
-        rows,
-        isPaginated: true,
-      };
-    } else {
-      const { count, rows } = await Suku.findAndCountAll({
-        attributes: [
-          "id",
-          "nama"
-        ],
-        // raw: true,
-      });
-
-      return {
-        count: count,
-        rows,
-        isPaginated: false,
-      };
+    const queryBuilder = {
+        attributes: ['id', 'nama'],
+        order: [['id', 'DESC']]
     }
-  } catch (error) {
-    console.log(error)
-    throw new Error(`Kesalahan saat mengambil data : ${error.message}`);
-  }
+
+    if (isPaginated) {
+        const { limit, offset } = getPagination(page, size);
+        queryBuilder.limit = limit;
+        queryBuilder.offset = offset;
+
+        const { count, rows } = await Suku.findAndCountAll(queryBuilder);
+
+        return {
+            count,
+            rows,
+            isPaginated: true,
+        }
+    }
+    else {
+        const data = await Suku.findAll(queryBuilder);
+
+        return {
+            count: data.length,
+            rows: data,
+            isPaginated: false,
+        }
+    }
 };
 
 export const createSuku = async (sukuData) => {
     const { nama } = sukuData;
 
-    const cekDataSuku = await Suku.findOne({ 
-      attributes: ['nama'],
-      where: {
-        nama: { [Op.iLike] : nama}
-      }
+    const cekDataSuku = await Suku.findOne({
+        attributes: ['nama'],
+        where: {
+            nama: { [Op.iLike]: nama }
+        }
     });
     if (cekDataSuku) {
-        throw new Error(`Suku : ${nama} sudah ada.`);
+        throw new ConflictError(`Suku : ${nama} sudah ada.`);
     }
 
-    try {
-        await Suku.create({ nama });
-    } catch (err) {
-        if (err.name === 'SequelizeUniqueConstraintError') {
-            throw new Error(`Data yang Anda masukkan sudah ada.: ${err.errors.map(e => e.message).join(', ')}`);
-        }
-        throw new Error(`Gagal membuat data Suku : ${err.message}`);
-    }
+    return await Suku.create({ nama });
 };
 
 export const updateSuku = async (id, sukuData) => {
     const { nama } = sukuData;
 
-    try {
-        const cekDataSuku = await Suku.findByPk(id)
-        if (!cekDataSuku) {
-            throw new Error (`Suku tidak ditemukan`)
+    const cekDataSuku = await Suku.findByPk(id)
+    if (!cekDataSuku) {
+        throw new NotFoundError(`Suku tidak ditemukan`)
+    }
+
+    const existingNameSuku = await Suku.findOne({
+        where: {
+            nama: { [Op.iLike]: nama }
         }
-
-        const [updatedRowsCount] = await Suku.update({
-            nama: nama,
-        }, {
-            where: { id: id }
-        });
-
-        return updatedRowsCount > 0;
+    })
+    if (existingNameSuku && existingNameSuku.id !== id) {
+        throw new ConflictError(`Suku : ${nama} sudah ada.`);
     }
-    catch (error) {
-        throw new Error(`Gagal memperbarui data Suku : ${error.message}`);
-    }
+
+    return cekDataSuku.update({ nama })
 }
 
 export const deleteSuku = async (id) => {
-    try {
-        const deletedRowsCount = await Suku.destroy({
-            where: { id: id }
-        });
+    const cekDataSuku = await Suku.findByPk(id)
 
-        return deletedRowsCount > 0;
+    if (!cekDataSuku) {
+        throw new NotFoundError(`Suku tidak ditemukan`)
     }
-    catch (error) {
-        throw new Error(`Gagal menghapus data Suku : ${error.message}`);
-    }
+
+    await cekDataSuku.destroy()
 }

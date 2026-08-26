@@ -1,5 +1,6 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError } from "../utils/custom-error.js";
 
 const { KebutuhanKhusus } = models;
 
@@ -52,7 +53,7 @@ export const createKebutuhanKhusus = async (kebutuhanKhususData) => {
   });
 
   if (existingKebutuhanKhusus) {
-    throw new Error(`Kebutuhan Khusus dengan nama "${nama}" sudah ada`);
+    throw new ConflictError(`Kebutuhan Khusus dengan nama "${nama}" sudah ada`);
   }
 
   try {

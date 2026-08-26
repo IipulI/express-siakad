@@ -25,7 +25,7 @@ export const attachUser = async (req, res, next) => {
                     required: false
                 },
                 {
-                    attributes: ["id", "nama", "nip", "nidn"],
+                    attributes: ["id", "nama", "nip", "nidn", "isDosen", "isPegawai"],
                     model: Dosen,
                     as: "dosen",
                     required: false

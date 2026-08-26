@@ -1,5 +1,6 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError } from "../utils/custom-error.js";
 
 const { PenghasilanPekerjaan } = models;
 
@@ -52,9 +53,7 @@ export const createPenghasilanPekerjaan = async (penghasilanPekerjaanData) => {
   });
 
   if (existingPenghasilanPekerjaan) {
-    throw new Error(
-      `Penghasilan Pekerjaan dengan rentang "${range}" sudah ada`
-    );
+    throw new ConflictError(`Penghasilan Pekerjaan dengan rentang "${range}" sudah ada`);
   }
 
   try {

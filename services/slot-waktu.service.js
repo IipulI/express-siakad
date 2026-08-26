@@ -9,8 +9,8 @@ export const findAll = async (page, size) => {
     const isPaginated = page !== null && size !== null;
 
     const queryBuilder = {
-        attributes: ['id', 'nama', 'jamMulai', 'jamSelesai'],
-        order: [['jamMulai', 'ASC']],
+        attributes: ['id', 'waktu'],
+        order: [['waktu', 'ASC']],
     };
 
     if (isPaginated) {
@@ -38,7 +38,7 @@ export const findAll = async (page, size) => {
 
 export const findOneById = async (id) => {
     const slotWaktu = await SlotWaktu.findByPk(id, {
-        attributes: ['id', 'nama', 'jamMulai', 'jamSelesai'],
+        attributes: ['id', 'waktu'],
     });
 
     if (!slotWaktu) {
@@ -49,21 +49,21 @@ export const findOneById = async (id) => {
 };
 
 export const createSlotWaktu = async (payload) => {
-    const { nama, jamMulai, jamSelesai } = payload;
+    const { waktu } = payload;
 
     const existing = await SlotWaktu.findOne({
         attributes: ['id'],
-        where: { nama: { [Op.iLike]: nama } },
+        where: { waktu },
     });
     if (existing) {
-        throw new ConflictError(`Slot Waktu : ${nama} sudah ada.`);
+        throw new ConflictError(`Slot Waktu : ${waktu} sudah ada.`);
     }
 
-    return await SlotWaktu.create({ nama, jamMulai, jamSelesai });
+    return await SlotWaktu.create({ waktu });
 };
 
 export const updateSlotWaktu = async (id, payload) => {
-    const { nama, jamMulai, jamSelesai } = payload;
+    const { waktu } = payload;
 
     const slotWaktu = await SlotWaktu.findByPk(id);
     if (!slotWaktu) {
@@ -71,13 +71,13 @@ export const updateSlotWaktu = async (id, payload) => {
     }
 
     const existing = await SlotWaktu.findOne({
-        where: { nama: { [Op.iLike]: nama } },
+        where: { waktu },
     });
     if (existing && existing.id !== id) {
-        throw new ConflictError(`Slot Waktu : ${nama} sudah ada.`);
+        throw new ConflictError(`Slot Waktu : ${waktu} sudah ada.`);
     }
 
-    return slotWaktu.update({ nama, jamMulai, jamSelesai });
+    return slotWaktu.update({ waktu });
 };
 
 export const deleteSlotWaktu = async (id) => {

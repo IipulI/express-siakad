@@ -2,7 +2,10 @@ import db from '../models/index.js'
 import { getPagination } from "../utils/pagination.js";
 import { NotFoundError } from "../utils/custom-error.js";
 
-const { PeriodeAkademik } = db
+const {
+    PeriodeAkademik,
+    TahunAjaran
+} = db
 
 export const findAll = async (page, size) => {
     const isPaginated = page !== null && size !== null
@@ -11,8 +14,17 @@ export const findAll = async (page, size) => {
         attributes: {
             exclude: ['createdAt', 'updatedAt', 'deletedAt']
         },
+        include: {
+            model: TahunAjaran,
+            as: 'tahunAjaran'
+        },
         order: [['kode', 'DESC']],
     }
+
+    const flatten = (row) => {
+        const { tahunAjaran, ...rest } = row.toJSON();
+        return { ...rest, tahun: tahunAjaran?.tahun ?? null };
+    };
 
     if (isPaginated) {
         const { limit, offset } = getPagination(page, size);
@@ -23,7 +35,7 @@ export const findAll = async (page, size) => {
 
         return {
             count,
-            rows,
+            rows: rows.map(flatten),
             isPaginated,
         }
     } else {
@@ -31,10 +43,29 @@ export const findAll = async (page, size) => {
 
         return {
             count: data.length,
-            rows: data,
+            rows: data.map(flatten),
             isPaginated: false,
         }
     }
+}
+
+export const findOneById = async (id) => {
+    const existDataPeriodeAkademik = await PeriodeAkademik.findByPk(id, {
+        attributes: {
+            exclude: ['createdAt', 'updatedAt', 'deletedAt']
+        },
+        include: {
+            model: TahunAjaran,
+            as: 'tahunAjaran'
+        }
+    })
+
+    if (!existDataPeriodeAkademik) {
+        throw new NotFoundError(`Periode Akademik tidak dapat ditemukan`)
+    }
+
+    const { tahunAjaran, ...rest } = existDataPeriodeAkademik.toJSON();
+    return { ...rest, tahun: tahunAjaran?.tahun ?? null };
 }
 
 export const findActive = async () => {

@@ -1,3 +1,4 @@
+// controller/mahasiswa/krs-mahasiswa.controller.js
 import * as KrsMahasiswaService from "../../services/krs-mahasiswa.service.js";
 import * as riwayatKrsService from "../../services/riwayat-krs.service.js";
 import ResponseBuilder from "../../utils/response.js";
@@ -65,11 +66,14 @@ export const saveKrs = async (req, res, next) => {
     const mahasiswa = user.mahasiswa;
 
     const data = await KrsMahasiswaService.saveKrs(
-      mahasiswa.id,
-      kelasKuliahIds
+        mahasiswa.id,
+        kelasKuliahIds
     );
 
-    responseBuilder.code(201).message("Successfully update data").json(data);
+    responseBuilder
+        .code(201)
+        .message("Successfully update data")
+        .json(data);
   } catch (error) {
     console.error(error)
     next(error)
@@ -84,18 +88,21 @@ export const submitKrs = async (req, res, next) => {
     const mahasiswa = user?.mahasiswa;
 
     const updateData = await KrsMahasiswaService.submitKrs(
-      mahasiswa.id
+        mahasiswa.id
     );
 
     console.log(updateData);
 
     if (updateData) {
-      responseBuilder.code(200).message("Berhasil mengajukan krs").json();
+      responseBuilder
+          .code(200)
+          .message("Berhasil mengajukan krs")
+          .json();
     } else {
       responseBuilder
-        .status("failure")
-        .code(500)
-        .message("Gagal mengajukan krs");
+          .status("failure")
+          .code(500)
+          .message("Gagal mengajukan krs");
     }
   } catch (error) {
     console.error(error);

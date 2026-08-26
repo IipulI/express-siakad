@@ -1,8 +1,7 @@
 import models from "../models/index.js";
-import { getPagination } from "../utils/pagination.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 import { BadRequestError, ConflictError, NotFoundError } from "../utils/custom-error.js";
 import { Op } from "sequelize";
-import { resolveUnitKerjaIds } from "./unit-kerja.service.js";
 
 const {
     Dosen,
@@ -96,28 +95,62 @@ export const deleteRuangan = async (id) => {
     await cekDataRuangan.destroy()
 };
 
-export const getMonitoringRuangan = async ({ hari, unitKerjaId }) => {
-    const { fakultasIds, prodiIds } = await resolveUnitKerjaIds(unitKerjaId);
+const HARI_MAP = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
-    const ruanganWhere = {
-        deletedAt: null,
-        [Op.or]: [],
-    };
+const getHariFromTanggal = (tanggal) => {
+    const [year, month, day] = tanggal.split("-").map(Number);
+    const dayIndex = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    return HARI_MAP[dayIndex];
+};
 
-    if (fakultasIds.length > 0) {
-        ruanganWhere[Op.or].push({ siakFakultasId: { [Op.in]: fakultasIds } });
+export const getMonitoringRuangan = async ({
+    tanggal,
+    fakultasId,
+    programStudiId,
+    dosenId,
+    kapasitasMin,
+    search,
+    page,
+    size,
+}) => {
+    if (!tanggal) {
+        throw new BadRequestError("Parameter tanggal wajib diisi");
     }
-    if (prodiIds.length > 0) {
-        ruanganWhere[Op.or].push({ siakProgramStudiId: { [Op.in]: prodiIds } });
+
+    const hari = getHariFromTanggal(tanggal);
+
+    const ruanganWhere = {};
+    if (fakultasId) {
+        ruanganWhere.siakFakultasId = fakultasId;
+    }
+    if (programStudiId) {
+        ruanganWhere.siakProgramStudiId = programStudiId;
+    }
+    if (kapasitasMin) {
+        ruanganWhere.kapasitas = { [Op.gte]: Number(kapasitasMin) };
+    }
+    if (search) {
+        ruanganWhere[Op.or] = [
+            { ruangan: { [Op.iLike]: `%${search}%` } },
+            { nama: { [Op.iLike]: `%${search}%` } },
+        ];
     }
 
-    if (ruanganWhere[Op.or].length === 0) {
-        return buildResponse({ hari, unitKerjaId, ruanganList: [] });
-    }
+    const totalRuangan = await Ruangan.count({ where: ruanganWhere });
 
-    const ruanganList = await Ruangan.findAll({
+    const { limit, offset } = getPagination(page, size);
+
+    // Ambil halaman ruangan lebih dulu (tanpa join ke jadwal) supaya paginasi
+    // tidak terpengaruh oleh jumlah baris jadwal per ruangan.
+    const ruanganPage = await Ruangan.findAll({
         where: ruanganWhere,
         attributes: ["id", "nama", "ruangan", "kapasitas", "lantai"],
+        limit,
+        offset,
+        order: [
+            ["lantai", "ASC"],
+            ["ruangan", "ASC"],
+        ],
         include: [
             {
                 model: Fakultas,
@@ -131,78 +164,121 @@ export const getMonitoringRuangan = async ({ hari, unitKerjaId }) => {
                 attributes: ["id", "nama"],
                 required: false,
             },
-            {
-                model: JadwalKuliah,
-                as: "jadwalKuliah",
-                required: false,
-                where: {
-                    hari,
-                    deletedAt: null,
-                },
-                attributes: [
-                    "id",
-                    "hari",
-                    "jamMulai",
-                    "jamSelesai",
-                    "jenisPetemuan",
-                    "metodePembelajaran",
-                ],
-                include: [
-                    {
-                        model: KelasKuliah,
-                        as: "kelasKuliah",
-                        attributes: ["id", "nama", "sistemKuliah", "statusKelas"],
-                        include: [
-                            {
-                                model: MataKuliah,
-                                as: "mataKuliah",
-                                attributes: ["id", "nama", "kode", "totalSks"],
-                            },
-                            {
-                                model: ProgramStudi,
-                                as: "programStudi",
-                                attributes: ["id", "nama"],
-                            },
-                        ],
-                    },
-                    {
-                        model: Dosen,
-                        as: "dosen",
-                        attributes: ["id", "nama", "nidn"],
-                        required: false,
-                    },
-                ],
-            },
-        ],
-        order: [
-            ["lantai", "ASC"],
-            ["ruangan", "ASC"],
-            [{ model: JadwalKuliah, as: "jadwalKuliah" }, "jamMulai", "ASC"],
         ],
     });
 
-    return buildResponse({ hari, unitKerjaId, ruanganList });
+    const ruanganIds = ruanganPage.map((r) => r.id);
+
+    // Ambil jadwal perkuliahan untuk ruangan-ruangan pada halaman ini secara terpisah,
+    // supaya filter dosen/tanggal tidak ikut memangkas jumlah ruangan yang tampil.
+    let jadwalByRuanganId = {};
+    if (ruanganIds.length > 0) {
+        const jadwalWhere = { hari, siakRuanganId: { [Op.in]: ruanganIds } };
+        if (dosenId) {
+            jadwalWhere.siakDosenId = dosenId;
+        }
+
+        const jadwalList = await JadwalKuliah.findAll({
+            where: jadwalWhere,
+            attributes: [
+                "id",
+                "siakRuanganId",
+                "jamMulai",
+                "jamSelesai",
+                "jenisPertemuan",
+                "metodePembelajaran",
+            ],
+            include: [
+                {
+                    model: KelasKuliah,
+                    as: "kelasKuliah",
+                    required: true,
+                    where: {
+                        [Op.and]: [
+                            {
+                                [Op.or]: [
+                                    { tanggalMulai: null },
+                                    { tanggalMulai: { [Op.lte]: tanggal } },
+                                ],
+                            },
+                            {
+                                [Op.or]: [
+                                    { tanggalSelesai: null },
+                                    { tanggalSelesai: { [Op.gte]: tanggal } },
+                                ],
+                            },
+                        ],
+                    },
+                    attributes: ["id", "nama", "sistemKuliah", "statusKelas"],
+                    include: [
+                        {
+                            model: MataKuliah,
+                            as: "mataKuliah",
+                            attributes: ["id", "nama", "kode", "totalSks"],
+                        },
+                        {
+                            model: ProgramStudi,
+                            as: "programStudi",
+                            attributes: ["id", "nama"],
+                        },
+                    ],
+                },
+                {
+                    model: Dosen,
+                    as: "dosen",
+                    attributes: ["id", "nama", "nidn"],
+                    required: false,
+                },
+            ],
+            order: [["jamMulai", "ASC"]],
+        });
+
+        jadwalByRuanganId = jadwalList.reduce((acc, jadwal) => {
+            const j = jadwal.toJSON();
+            (acc[j.siakRuanganId] ||= []).push(j);
+            return acc;
+        }, {});
+    }
+
+    return buildMonitoringResponse({
+        tanggal,
+        hari,
+        ruanganPage,
+        jadwalByRuanganId,
+        totalRuangan,
+        page,
+        size,
+    });
 };
 
-const buildResponse = ({ hari, unitKerjaId, ruanganList }) => {
-    const result = ruanganList.map((ruangan) => {
+const buildMonitoringResponse = ({
+    tanggal,
+    hari,
+    ruanganPage,
+    jadwalByRuanganId,
+    totalRuangan,
+    page,
+    size,
+}) => {
+    const result = ruanganPage.map((ruangan) => {
         const r = ruangan.toJSON();
+        const jadwalList = jadwalByRuanganId[r.id] || [];
+
         return {
             id: r.id,
             kode: r.ruangan,
             nama: r.nama,
             kapasitas: r.kapasitas,
             lantai: r.lantai,
-            pemilik: r.fakultas
-                ? { jenis: "fakultas", id: r.fakultas.id, nama: r.fakultas.nama }
-                : r.programStudi
-                    ? { jenis: "prodi", id: r.programStudi.id, nama: r.programStudi.nama }
-                    : null,
-            jadwal: r.jadwalKuliah.map((j) => ({
+            fakultas: r.fakultas ? { id: r.fakultas.id, nama: r.fakultas.nama } : null,
+            programStudi: r.programStudi ? { id: r.programStudi.id, nama: r.programStudi.nama } : null,
+            status: jadwalList.length > 0 ? "terpakai" : "kosong",
+            jadwal: jadwalList.map((j) => ({
                 id: j.id,
+                jenisKegiatan: "perkuliahan",
                 jamMulai: j.jamMulai,
                 jamSelesai: j.jamSelesai,
-                jenisPetemuan: j.jenisPetemuan,
+                jenisPertemuan: j.jenisPertemuan,
                 metodePembelajaran: j.metodePembelajaran,
                 kelas: {
                     id: j.kelasKuliah.id,
@@ -226,14 +302,19 @@ const buildResponse = ({ hari, unitKerjaId, ruanganList }) => {
         };
     });
 
+    const pagingData = getPagingData({ count: totalRuangan, rows: result }, page, size);
+
     return {
+        tanggal,
         hari,
-        unitKerjaId,
-        ruangan: result,
+        ruangan: pagingData.items,
         meta: {
-            totalRuangan: result.length,
-            ruanganTerpakai: result.filter((r) => r.jadwal.length > 0).length,
-            ruanganKosong: result.filter((r) => r.jadwal.length === 0).length,
+            total: pagingData.total,
+            perPage: pagingData.perPage,
+            currentPage: pagingData.currentPage,
+            totalPage: pagingData.totalPage,
+            ruanganTerpakai: result.filter((r) => r.status === "terpakai").length,
+            ruanganKosong: result.filter((r) => r.status === "kosong").length,
         },
     };
 };

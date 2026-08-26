@@ -1,5 +1,6 @@
 import models from '../models/index.js';
-import {getPagination} from "../utils/pagination.js";
+import { getPagination } from "../utils/pagination.js";
+import { ConflictError, NotFoundError } from "../utils/custom-error.js";
 
 const {
     sequelize,
@@ -32,81 +33,80 @@ export const findAll = async (page, size) => {
 
         return {
             count: data.length,
-            rows: data.rows,
+            rows: data,
             isPaginated: false
         }
     }
 }
 
 export const findOneById = async (id) => {
-    const cekDataBidangIlmu = await BidangIlmu.findOne(id);
+    const cekDataBidangIlmu = await BidangIlmu.findByPk(id, {
+        attributes: ['id', 'kode', 'nama'],
+    })
+
+    if (!cekDataBidangIlmu) {
+        throw new NotFoundError(`Bidang Ilmu tidak ditemukan`)
+    }
+
+    return cekDataBidangIlmu
 }
 
 export const createBidangIlmu = async (data) => {
-    try {
-        sequelize.transaction(async (trx) => {
-            const existingJenisMk = await BidangIlmu.findOne({
-                where : {
-                    nama: data.nama,
-                },
-                transaction: trx
-            })
-            if (existingJenisMk) {
-                throw new Error(`Bidang Ilmu dengan nama ${data.nama} sudah ada`);
-            }
-
-            await BidangIlmu.create({
-                kode: data.kode,
+    return await sequelize.transaction(async (trx) => {
+        const existingBidangIlmu = await BidangIlmu.findOne({
+            where: {
                 nama: data.nama,
-            }, {
-                transaction: trx
-            })
+            },
+            transaction: trx
         })
+        if (existingBidangIlmu) {
+            throw new ConflictError(`Bidang Ilmu dengan nama ${data.nama} sudah ada`);
+        }
 
-        return true
-    }
-    catch (error) {
-        throw new Error(error.message);
-    }
+        return await BidangIlmu.create({
+            kode: data.kode,
+            nama: data.nama,
+        }, {
+            transaction: trx
+        })
+    })
 }
 
 export const updateBidangIlmu = async (id, data) => {
-    try {
-        const updatedData = sequelize.transaction(async (trx) => {
-            const JenisMk = await BidangIlmu.findByPk(id, {
-                transaction: trx
-            })
-            if (!JenisMk) {
-                return null
-            }
-
-            const [updatedRowsCount] = await BidangIlmu.update(data, {
-                where: { id: id },
-                transaction: trx
-            })
-
-            return updatedRowsCount
+    return await sequelize.transaction(async (trx) => {
+        const bidangIlmu = await BidangIlmu.findByPk(id, {
+            transaction: trx
         })
+        if (!bidangIlmu) {
+            throw new NotFoundError(`Bidang Ilmu tidak ditemukan`)
+        }
 
-        return updatedData > 0
-    }
-    catch (error) {
-        throw new Error(error.message);
-    }
+        if (data.nama) {
+            const existingBidangIlmu = await BidangIlmu.findOne({
+                where: { nama: data.nama },
+                transaction: trx
+            })
+            if (existingBidangIlmu && existingBidangIlmu.id !== id) {
+                throw new ConflictError(`Bidang Ilmu dengan nama ${data.nama} sudah ada`);
+            }
+        }
+
+        await bidangIlmu.update(data, { transaction: trx })
+
+        return true
+    })
 }
 
 export const deleteBidangIlmu = async (id) => {
-    try {
-        const deletedData = sequelize.transaction(async (trx) => {
-            return await BidangIlmu.destroy({
-                where: {id: id},
-                transaction: trx
-            })
-        })
+    return await sequelize.transaction(async (trx) => {
+        const bidangIlmu = await BidangIlmu.findByPk(id, { transaction: trx })
 
-        return deletedData > 0;
-    }
-    catch (error) {
-        throw new Error(error.message);
-    }
+        if (!bidangIlmu) {
+            throw new NotFoundError(`Bidang Ilmu tidak ditemukan`)
+        }
+
+        await bidangIlmu.destroy({ transaction: trx })
+
+        return true
+    })
 }

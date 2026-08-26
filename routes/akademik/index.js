@@ -7,6 +7,7 @@ import KurikulumProdiRouter from "./kurikulum-prodi.router.js";
 import KelasKuliahRouter from "./kelas-kuliah.router.js";
 import RuanganRouter from "./ruangan.router.js";
 import JenjangRouter from "./jenjang.router.js";
+import KonsentrasiRouter from "./konsentrasi.router.js";
 import FakultasRouter from "./fakultas.router.js";
 import PembimbingAkademikRouter from "./pembimbing-akademik.router.js";
 import DosenRouter from "./dosen.router.js";
@@ -93,9 +94,9 @@ router.use("/pembimbing-akademik", PembimbingAkademikRouter);
 // --- MASTER DATA ---
 // perguruan tinggi
 // Todo : Data Perguruan Tinggi
-// Todo : router.use("/fakultas", ) -- lihat GET /public/fakultas untuk dropdown read-only
+router.use("/fakultas", FakultasRouter);
 // Todo : router.use("/program-studi", )
-// Todo : konsentrasi
+router.use("/konsentrasi", KonsentrasiRouter);
 router.use("/jenjang", JenjangRouter);
 router.use("/sistem-kuliah", SistemKuliahRouter)
 router.use("/ruangan", RuanganRouter);

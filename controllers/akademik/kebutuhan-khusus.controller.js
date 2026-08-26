@@ -3,7 +3,7 @@ import ResponseBuilder from "../../utils/response.js";
 import { getPagingData } from "../../utils/pagination.js";
 import { validationResult } from "express-validator";
 
-export const findAll = async (req, res) => {
+export const findAll = async (req, res, next) => {
   const page = req.query.page ? parseInt(req.query.page) : null;
   const size = req.query.size ? parseInt(req.query.size) : null;
   const responseBuilder = new ResponseBuilder(res);
@@ -20,15 +20,11 @@ export const findAll = async (req, res) => {
 
     responseBuilder.code(200).message("Berhasil Menggambil data").json(payload);
   } catch (error) {
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message(error.message || "Terjadi kesalahan yang tidak terduga")
-      .json();
-  }
+      next(error);
+    }
 };
 
-export const create = async (req, res) => {
+export const create = async (req, res, next) => {
   const responseBuilder = new ResponseBuilder(res);
 
   const errors = validationResult(req);
@@ -52,26 +48,11 @@ export const create = async (req, res) => {
       .message("Data Kebutuhan Khusus berhasil ditambahkan.")
       .json();
   } catch (err) {
-    if (err.message.includes("already exists")) {
-      return responseBuilder
-        .status("failure")
-        .code(409)
-        .message(err.message)
-        .json();
+      next(err);
     }
-
-    responseBuilder
-      .status("failure")
-      .code(500)
-      .message(
-        err.message ||
-          "Terjadi kesalahan saat menambahkan data Kebutuhan Khusus."
-      )
-      .json();
-  }
 };
 
-export const updateKebutuhanKhusus = async (req, res) => {
+export const updateKebutuhanKhusus = async (req, res, next) => {
   const { id } = req.params;
   const { nama } = req.body;
   const responseBuilder = new ResponseBuilder(res);
@@ -105,18 +86,11 @@ export const updateKebutuhanKhusus = async (req, res) => {
         .json();
     }
   } catch (error) {
-    console.error(error);
-    return responseBuilder
-      .status("failure")
-      .code(500)
-      .message(
-        "Terjadi kesalahan internal server saat memperbarui Kebutuhan Khusus Models."
-      )
-      .json();
-  }
+      next(error);
+    }
 };
 
-export const deleteKebutuhanKhusus = async (req, res) => {
+export const deleteKebutuhanKhusus = async (req, res, next) => {
   const { id } = req.params;
   const responseBuilder = new ResponseBuilder(res);
 
@@ -136,13 +110,6 @@ export const deleteKebutuhanKhusus = async (req, res) => {
         .json();
     }
   } catch (error) {
-    console.error(error);
-    return responseBuilder
-      .status("failure")
-      .code(500)
-      .message(
-        "Terjadi kesalahan internal server saat menghapus Kebutuhan Khusus."
-      )
-      .json();
-  }
+      next(error);
+    }
 };

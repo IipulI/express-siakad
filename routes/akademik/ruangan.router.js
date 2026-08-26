@@ -5,6 +5,7 @@ import { validateCreateRuangan } from "../../validators/ruangan.validator.js";
 const router = new Router();
 
 router.get("/", RuanganController.findAll);
+router.get("/monitoring", RuanganController.monitoringRuangan);
 router.post("/", validateCreateRuangan, RuanganController.create);
 router.put("/:id", RuanganController.updateRuangan);
 router.delete("/:id", RuanganController.deleteRuangan);

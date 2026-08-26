@@ -1,5 +1,6 @@
 import models from "../models/index.js";
 import { getPagination } from "../utils/pagination.js";
+import { ConflictError } from "../utils/custom-error.js";
 
 const { Pekerjaan } = models;
 
@@ -51,7 +52,7 @@ export const createPekerjaan = async (pekerjaanData) => {
   const existingPekerjaan = await Pekerjaan.findOne({ where: { nama } });
 
   if (existingPekerjaan) {
-    throw new Error(`Ruangan dengan nama "${nama}" sudah ada`);
+    throw new ConflictError(`Pekerjaan dengan nama "${nama}" sudah ada`);
   }
 
   try {

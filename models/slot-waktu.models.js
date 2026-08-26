@@ -16,19 +16,9 @@ export default (sequelize) => {
                 primaryKey: true,
                 defaultValue: uuid7,
             },
-            nama: {
-                type: DataTypes.STRING(75),
-                allowNull: false,
-            },
-            jamMulai: {
+            waktu: {
                 type: DataTypes.TIME,
                 allowNull: false,
-                field: "jam_mulai",
-            },
-            jamSelesai: {
-                type: DataTypes.TIME,
-                allowNull: false,
-                field: "jam_selesai",
             },
         },
         {

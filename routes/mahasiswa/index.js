@@ -11,6 +11,8 @@ const router = Router();
 
 router.get("/dashboard/akademik", getDashboardMahasiswa)
 
+// router.get('/biodata', )
+
 router.use("/krs", KrsMahasiswaRouter);
 router.use('/jadwal-akademik', JadwalAkademikRouter)
 router.use("/pengumuman", PengumumanRouter);
