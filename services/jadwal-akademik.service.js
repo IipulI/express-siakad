@@ -243,18 +243,10 @@ export const getWeeklyScheduleLecturer = async (dosenId) => {
     const schedule = {};
     days.forEach(day => { schedule[day] = []; });
 
-    let totalSksTeaching = 0;
-    const countedClasses = new Set();
-
     // 4. Transform and Group by Day
     jadwalKuliah.forEach(jadwal => {
         const kelas = jadwal.kelasKuliah;
         const mk = kelas?.mataKuliah;
-
-        if (mk && !countedClasses.has(kelas.id)) {
-            totalSksTeaching += mk.totalSks;
-            countedClasses.add(kelas.id);
-        }
 
         schedule[jadwal.hari].push({
             id: jadwal.id,
@@ -275,10 +267,4 @@ export const getWeeklyScheduleLecturer = async (dosenId) => {
     });
 
     return schedule
-
-    return {
-        totalSks: totalSksTeaching,
-        periode: activePeriod.nama,
-        schedule
-    };
 }

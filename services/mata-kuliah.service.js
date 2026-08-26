@@ -19,7 +19,7 @@ const {
 // =========================================================
 // 1. GET LIST MATA KULIAH OBE (Dipanggil oleh Controller OBE)
 // =========================================================
-export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKurikulumId, searchBy) => {
+export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKurikulumId, searchBy, dosenId = null) => {
     // 👇 1. PASTIKAN SEMUA MODEL DI-DESTRUCTURE DULU DI SINI
     const {
         MataKuliah,
@@ -36,6 +36,29 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
     const whereClause = {};
     if (prodiId) whereClause.siakProgramStudiId = prodiId;
     if (tahunKurikulumId) whereClause.siakTahunKurikulumId = tahunKurikulumId;
+
+    // Dipakai buat endpoint /akademik/dosen/mata-kuliah -- dosen (non-admin)
+    // cuma boleh liat MK yang dia AJAR (punya jadwal di salah satu kelas MK
+    // itu) ATAU yang dia KOORDINATORKAN, bukan semua MK di sistem. Admin
+    // tetap lihat semua (dosenId gak dikirim dari controller kalau
+    // requester-nya admin).
+    if (dosenId) {
+        const kelasList = await KelasKuliah.findAll({
+            attributes: ['siakMataKuliahId'],
+            include: [{
+                model: JadwalKuliah, as: 'jadwalKuliah',
+                attributes: [], where: { siakDosenId: dosenId }, required: true,
+            }],
+            group: ['KelasKuliah.siak_mata_kuliah_id'],
+            raw: true,
+        });
+        const mkDiajarIds = kelasList.map((k) => k.siakMataKuliahId);
+
+        whereClause[Op.or] = [
+            { id: { [Op.in]: mkDiajarIds.length > 0 ? mkDiajarIds : [null] } },
+            { koordinatorMkId: dosenId },
+        ];
+    }
 
     if (search) {
         if (searchBy === 'kode') {
@@ -101,7 +124,7 @@ export const getListMataKuliahObe = async (page, size, search, prodiId, tahunKur
 // =========================================================
 // 2. GET DETAIL MATA KULIAH OBE (Tampilan Detail Frontend)
 // =========================================================
-export const getDetailMataKuliahObe = async (id) => {
+export const getDetailMataKuliahObe = async (id, currentDosenId = null) => {
     // 👇 KUNCI: Tarik semua model dari 'models' supaya gak "is not defined"
     const {
         MataKuliah,
@@ -162,7 +185,11 @@ export const getDetailMataKuliahObe = async (id) => {
         pengembangRps: mk.pengembangRps ? mk.pengembangRps.map(dosen => ({
             id: dosen.id,
             label: `${dosen.nidn} - ${dosen.nama}`
-        })) : []
+        })) : [],
+        // FIX 2026-08-19: dipakai FE buat nentuin nampilin tombol edit atau
+        // enggak -- dosen pengampu biasa cuma bisa lihat, cuma koordinator MK
+        // ini yang boleh edit CPL/CPMK/RPS/Rencana Pembelajaran/Rencana Evaluasi.
+        isKoordinator: !!(currentDosenId && mk.koordinatorMkId === currentDosenId)
     };
 };
 // =========================================================

@@ -63,6 +63,12 @@ const router = Router();
 // "hasil-studi" itu :id, error invalid UUID) sebelum sempat sampai ke HasilStudiRouter.
 router.use("/mahasiswa/hasil-studi", HasilStudiRouter)
 router.use("/mahasiswa", MahasiswaRouter)
+// FIX 2026-08-19: sama kasusnya kayak /mahasiswa/hasil-studi di atas -- dosenPengampuRouter
+// (route spesifik /dosen/mata-kuliah, /dosen/kelas dst, lihat mount-nya di bawah) harus
+// ke-daftar SEBELUM DosenRouter, karena DosenRouter punya /:id generik yang bakal nangkep
+// "mata-kuliah"/"kelas" sebagai kalau itu id dosen, bikin halaman dosen (Mata Kuliah dkk) gak
+// bisa dibuka sama sekali.
+router.use('/dosen', dosenPengampuRouter);
 router.use("/dosen", DosenRouter)
 router.use('/pengumuman', PengumumanRouter)
 
@@ -141,7 +147,6 @@ router.use("/cbt", CbtRouter) // Jalur D: integrasi CBT (soal & koreksi di CBT, 
 router.use("/monitoring", MonitoringRouter)
 
 router.use('/koordinator-mk', koordinatorMkRouter);
-router.use('/dosen', dosenPengampuRouter);
 router.use('/kaprodi', kaprodiRouter);
 
 export default router;

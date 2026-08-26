@@ -267,6 +267,7 @@ export const infoKrs = async (mahasiswaId) => {
 
     // Batas SKS
     let batasSks = null;
+    console.log("mahasiswa : ",mahasiswa.hasilStudi)
     if (mahasiswa.hasilStudi.length > 0) {
         const batas = await BatasSks.findOne({
             where: {

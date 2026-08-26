@@ -1,10 +1,11 @@
+import { Op } from 'sequelize';
 import models from '../models/index.js';
 import * as CustomError from '../utils/custom-error.js';
-import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap, refreshNilaiAkhirJalurD } from './penilaian.service.js';
+import { DEFAULT_SKALA, getGrade, hitungDanOverrideNilaiCpmkDariKomponen, updateHasilStudiJikaPeriodeLengkap, refreshNilaiAkhirJalurD, cekKelengkapanKelas } from './penilaian.service.js';
 
 const {
     sequelize, RencanaEvaluasi, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, CapaianMataKuliah,
-    NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, PemetaanEvaluasiCpmk
+    NilaiCpmkMahasiswa, NilaiSubcpmkEvaluasiMahasiswa, PemetaanEvaluasiCpmk, NilaiUnitCbtManual
 } = models;
 
 // BUG FIX 2026-08-19: nama variabel ini sejak awal bilang "final ATAU kunci",
@@ -187,9 +188,27 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
 
         // 2. Wipe & replace hasil agregat komponen ini -- resend dari CBT (mis. dosen
         //    minta koreksi ulang) otomatis MENGGANTIKAN data lama, bukan menumpuk.
+        //    Raw breakdown per unit/soal DIIKUTKAN wipe & replace yang SAMA (1
+        //    transaksi) supaya siak_nilai_unit_cbt_manual (arahan 2026-08-19: dosen
+        //    harus bisa lihat skor MENTAH yang dia input, bukan cuma hasil per
+        //    Sub-CPMK) selalu akurat & atomik bareng ledger -- resend TIDAK PERNAH
+        //    menyisakan baris lama atau numpuk duplikat.
+        //
+        // FIX 2026-08-24: wipe SEBELUMNYA cuma di-scope (krsId, rencanaEvaluasiId)
+        // TANPA cpmkId -- artinya breakdown PARSIAL (mis. remedial 1 Sub-CPMK doang
+        // dalam komponen yang sama) ikut menghapus Sub-CPMK LAIN yang gak ada di
+        // breakdown ini, padahal mahasiswa udah benar di situ. Sekarang breakdown
+        // yang gak kosong cuma boleh nimpa cpmkId yang beneran dikirim; breakdown
+        // KOSONG (sengaja mengosongkan seluruh komponen ini) tetap wipe semua,
+        // sesuai perilaku lama.
+        const cpmkIdsDikirim = Object.keys(agregatKomponenIni);
+        const scopeDestroy = { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId };
+        if (cpmkIdsDikirim.length > 0) {
+            scopeDestroy.siakCpmkId = { [Op.in]: cpmkIdsDikirim };
+        }
         await sequelize.transaction(async (trx) => {
             await NilaiSubcpmkEvaluasiMahasiswa.destroy({
-                where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
+                where: scopeDestroy,
                 force: true, transaction: trx
             });
             const payloadAgregat = Object.entries(agregatKomponenIni).map(([cpmkId, agg]) => ({
@@ -201,6 +220,25 @@ export const simpanNilaiKomponenDariCbt = async (rencanaEvaluasiId, daftarMahasi
             }));
             if (payloadAgregat.length > 0) {
                 await NilaiSubcpmkEvaluasiMahasiswa.bulkCreate(payloadAgregat, { transaction: trx });
+            }
+
+            await NilaiUnitCbtManual.destroy({
+                where: { siakRincianKrsMahasiswaId: krsId, siakRencanaEvaluasiId: rencanaEvaluasiId },
+                force: true, transaction: trx
+            });
+            const payloadUnitMentah = (breakdown || []).map((unit, idx) => ({
+                siakRincianKrsMahasiswaId: krsId,
+                siakRencanaEvaluasiId: rencanaEvaluasiId,
+                nomorUnit: String(unit.nomor ?? idx + 1),
+                skorDiperoleh: parseFloat(unit.skorDiperoleh || 0),
+                skorMaksimal: parseFloat(unit.skorMaksimal || 0),
+                pemetaanCpmk: (unit.pemetaanCpmk || []).map(p => ({
+                    cpmkId: p.cpmkId,
+                    bobotPoin: parseFloat(p.bobotPoin || 0)
+                }))
+            }));
+            if (payloadUnitMentah.length > 0) {
+                await NilaiUnitCbtManual.bulkCreate(payloadUnitMentah, { transaction: trx });
             }
         });
 
@@ -362,14 +400,10 @@ export const simpanNilaiAkhirDariCbt = async (daftarMahasiswa) => {
         // ada yang kunci manual.
         const kelasId = rincian.siakKelasKuliahId;
         if (kelasId) {
-            const [cekRows] = await sequelize.query(
-                `SELECT COUNT(*) AS total,
-                        SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
-                 FROM siak_rincian_krs_mahasiswa
-                 WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
-                { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
-            );
-            if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+            // Auto-kunci cuma kalau SEMUA komponen (bukan cuma nilai_akhir) sudah
+            // terisi -- lihat komentar lengkap di cekKelengkapanKelas (penilaian.service.js).
+            const { lengkapSemua } = await cekKelengkapanKelas(kelasId);
+            if (lengkapSemua) {
                 await sequelize.query(
                     `UPDATE siak_rincian_krs_mahasiswa
                      SET status = 'Dikunci', updated_at = NOW()

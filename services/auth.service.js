@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import { Op } from "sequelize"
 
-const { Mahasiswa, Dosen, User, UserRole, Role } = models;
+const { Mahasiswa, Dosen, User, UserRole, Role, ProgramStudi } = models;
 
 export const login = async(data) => {
     // 1. Build the query safely so we don't pass 'undefined' to Sequelize
@@ -56,11 +56,22 @@ export const login = async(data) => {
         throw new Error("Passwords don't match");
     }
 
+    let roles = user.userRole.map(ur => ur.role.nama);
+    if (roles.length === 0) {
+        if (user.dosen !== null) {
+            const kaprodiDi = await ProgramStudi.findOne({ where: { kaprodiId: user.dosen.id }, attributes: ['id'] });
+            roles = kaprodiDi ? ['AKADEMIK_UNIV'] : ['DOSEN'];
+        } else if (user.mahasiswa !== null) {
+            roles = ['MAHASISWA'];
+        }
+    }
+
     // 4. Generate Token (Remember to move "secret text" to a .env file later!)
     const token = jwt.sign(
         {
             id: user.id,
             username: user.username,
+            roles,
         },
         "mGrp2pcdUoy2GJcGQgmKOuutNccZJgOrwRXDzbeYwOhA8vyggf2QOiZBTNl65Lf3",
         { expiresIn: "30d" }
@@ -89,7 +100,7 @@ export const login = async(data) => {
         user: {
             id: user.id,
             username: user.username,
-            roles: user.userRole.map(ur => ur.role.nama)
+            roles
         },
         account_info: accountInfo
     }

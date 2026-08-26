@@ -108,7 +108,27 @@ export const updatePeriodeAkademik = async (id, updateData) => {
         throw new NotFoundError(`Periode Akademik tidak dapat ditemukan`)
     }
 
-    return existDataPeriodeAkademik.update(updateData)
+    const { siakTahunAjaranId, nama, kode, tanggalMulai, tanggalSelesai, status } = updateData;
+    const payload = {};
+    if (siakTahunAjaranId !== undefined) payload.siak_tahun_ajaran_id = siakTahunAjaranId;
+    if (nama !== undefined) payload.nama = nama;
+    if (kode !== undefined) payload.kode = kode;
+    if (tanggalMulai !== undefined) payload.tanggal_mulai = tanggalMulai;
+    if (tanggalSelesai !== undefined) payload.tanggal_selesai = tanggalSelesai;
+    if (status !== undefined) payload.status = status;
+
+    if (payload.status === 'Aktif') {
+        return db.sequelize.transaction(async (t) => {
+            await PeriodeAkademik.update(
+                { status: 'Inaktif' },
+                { where: { id: { [db.Sequelize.Op.ne]: id } }, transaction: t }
+            );
+            await existDataPeriodeAkademik.update(payload, { transaction: t });
+            return existDataPeriodeAkademik;
+        });
+    }
+
+    return existDataPeriodeAkademik.update(payload)s
 };
 
 export const deletePeriodeAkademik = async (id) => {

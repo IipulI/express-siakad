@@ -1,6 +1,10 @@
 import * as KelasKuliahService from '../../services/kelas-kuliah.service.js';
 import ResponseBuilder from "../../utils/response.js";
 import {getPagingData} from "../../utils/pagination.js";
+import { Op } from "sequelize";
+import models from "../../models/index.js";
+
+const { ProgramStudi } = models;
 
 export const findAll = async (req, res, next) => {
     const page = req.query.page ?? 1;
@@ -20,6 +24,71 @@ export const findAll = async (req, res, next) => {
     }
 
     try {
+        const classes = await KelasKuliahService.findAll(page, size, filter);
+
+        let payload
+        if (classes.isPaginated === true) {
+            payload = getPagingData(classes, page, size);
+        } else {
+            payload = classes
+        }
+
+        return responseBuilder
+            .code(200)
+            .message("Data berhasil diambil")
+            .json(payload)
+    }
+    catch (error) {
+        console.error(error);
+        next(error);
+    }
+}
+
+// FIX 2026-08-23: dipakai KHUSUS di /dosen/kelas (dosen-pengampu_router.js).
+// findAll() di atas cuma nyaring by nip/nidn kalau CALLER kirim query param
+// itu sendiri -- gak pernah otomatis kepasang dari identitas dosen yang
+// login. Akibatnya /dosen/kelas tanpa filter nampilin kelas SEMUA dosen
+// (bukan cuma punya sendiri), dan dosen bisa lihat jadwal dosen lain cuma
+// dengan ganti param ?nidn=. Di sini scope-nya DIPAKSA dari identitas dosen
+// yang login (req.user.dosen.id dari attachUser), gak bisa dioverride caller:
+// - Kaprodi (ProgramStudi.kaprodiId == dosen ini) lihat SEMUA kelas di
+//   prodi yang dia pimpin (bisa lebih dari 1 prodi), bukan cuma yang dia
+//   ajar sendiri -- caller cuma boleh mempersempit ke SALAH SATU prodi yang
+//   memang dia kaprodi-i, gak bisa minta prodi lain.
+// - Dosen biasa (bukan kaprodi di prodi manapun) dibatasi ke kelas yang dia
+//   ajar sendiri (siakDosenId).
+export const findAllForDosen = async (req, res, next) => {
+    const page = req.query.page ?? 1;
+    const size = req.query.size ?? 10;
+    const responseBuilder = new ResponseBuilder(res);
+
+    const dosenId = req.user?.dosen?.id;
+    if (!dosenId) {
+        return res.status(403).json({ status: 403, message: 'Hanya dosen yang bisa mengakses menu ini.' });
+    }
+
+    const filter = {
+        siakPeriodeAkademikId : req.query.siakPeriodeAkademikId,
+        siakProgramStudiId : req.query.siakProgramStudiId,
+        siakSistemKuliahId : req.query.siakSistemKuliahId,
+        siakTahunKurikulumId: req.query.siakTahunKurikulumId,
+        search: req.query.search,
+        isActive: req.query.isActive,
+    }
+
+    try {
+        const prodiDiampu = await ProgramStudi.findAll({ attributes: ['id'], where: { kaprodiId: dosenId } });
+
+        if (prodiDiampu.length > 0) {
+            const prodiIds = prodiDiampu.map(p => p.id);
+            if (filter.siakProgramStudiId && !prodiIds.includes(filter.siakProgramStudiId)) {
+                return res.status(403).json({ status: 403, message: 'Anda bukan Kaprodi program studi tersebut.' });
+            }
+            filter.siakProgramStudiId = filter.siakProgramStudiId || { [Op.in]: prodiIds };
+        } else {
+            filter.siakDosenId = dosenId;
+        }
+
         const classes = await KelasKuliahService.findAll(page, size, filter);
 
         let payload

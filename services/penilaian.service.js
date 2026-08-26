@@ -7,7 +7,8 @@ const {
     NilaiEvaluasiMahasiswa, RincianKrsMahasiswa, KrsMahasiswa, Mahasiswa, KelasKuliah, MataKuliah, SkalaPenilaian,
     MasterMetodeEvaluasi, MasterKomponenEvaluasi,
     ProgramStudi, PeriodeAkademik, Dosen, DosenKelas, JadwalKuliah, Jenjang,
-    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi, NilaiSubcpmkEvaluasiMahasiswa, HasilStudi
+    NilaiCpmkMahasiswa, CapaianMataKuliah, RencanaEvaluasi, NilaiSubcpmkEvaluasiMahasiswa, HasilStudi,
+    NilaiUnitCbtManual
 } = models;
 
 export const DEFAULT_SKALA = [
@@ -85,6 +86,63 @@ export const inputNilaiMahasiswa = async (krsId, arrNilai) => {
         throw new Error("Gagal menyimpan nilai evaluasi: " + detailError);
     }
 }
+
+// Cek kelengkapan nilai SATU KELAS -- dipakai buat gating auto-kunci di
+// hitungNilaiAkhir (Jalur A), refreshNilaiAkhirJalurD (Jalur D/CBT), dan
+// simpanNilaiAkhirDariCbt (cbt.service.js). Sebelum ada fungsi ini, auto-kunci
+// cuma cek "nilai_akhir IS NOT NULL" per mahasiswa -- padahal nilai_akhir bisa
+// kepenuhi cuma dari 1 komponen (mis. UTS doang) karena hitungNilaiAkhirDariLedgerJalurD
+// & hitungNilaiAkhir menulis nilai_akhir begitu ADA data, bukan begitu LENGKAP.
+// Akibatnya: begitu mahasiswa TERAKHIR di kelas kebetulan dapat nilai apa pun
+// (walau baru 1 komponen), COUNT(total) == COUNT(nilai_akhir IS NOT NULL) jadi
+// TRUE untuk pertama kalinya → seluruh kelas ikut ter-kunci, padahal komponen
+// lain (UAS/Tugas/Kehadiran) mahasiswa itu -- dan siapa tahu mahasiswa lain --
+// belum tentu semuanya sudah terisi. Fungsi ini cek langsung ke ledger
+// (siak_nilai_subcpmk_evaluasi_mahasiswa, tempat Jalur A & Jalur D/CBT SAMA-SAMA
+// menulis kontribusi per komponen) apakah SETIAP mahasiswa di kelas sudah punya
+// data utk SETIAP komponen RencanaEvaluasi yang terdaftar di MK+periode itu.
+export const cekKelengkapanKelas = async (kelasId, trx = null) => {
+    const [row] = await sequelize.query(
+        `WITH komponen_wajib AS (
+            SELECT re.id
+            FROM siak_kelas_kuliah kk
+            JOIN siak_rencana_evaluasi re
+              ON re.siak_mata_kuliah_id = kk.siak_mata_kuliah_id
+             AND re.siak_periode_akademik_id = kk.siak_periode_akademik_id
+             AND re.deleted_at IS NULL
+            WHERE kk.id = :kelasId
+        ),
+        mahasiswa_kelas AS (
+            SELECT id FROM siak_rincian_krs_mahasiswa
+            WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL
+        ),
+        kelengkapan AS (
+            SELECT ns.siak_rincian_krs_mahasiswa_id AS krs_id,
+                   COUNT(DISTINCT ns.siak_rencana_evaluasi_id) AS jumlah_terisi
+            FROM siak_nilai_subcpmk_evaluasi_mahasiswa ns
+            WHERE ns.siak_rincian_krs_mahasiswa_id IN (SELECT id FROM mahasiswa_kelas)
+              AND ns.siak_rencana_evaluasi_id IN (SELECT id FROM komponen_wajib)
+              AND ns.deleted_at IS NULL
+              AND ns.total_bobot > 0
+            GROUP BY ns.siak_rincian_krs_mahasiswa_id
+        )
+        SELECT
+            (SELECT COUNT(*) FROM mahasiswa_kelas) AS total,
+            (SELECT COUNT(*) FROM komponen_wajib) AS jumlah_komponen_wajib,
+            (SELECT COUNT(*) FROM kelengkapan
+             WHERE jumlah_terisi = (SELECT COUNT(*) FROM komponen_wajib)) AS sudah_lengkap`,
+        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT, transaction: trx }
+    );
+    const total = parseInt(row.total);
+    const jumlahKomponenWajib = parseInt(row.jumlah_komponen_wajib);
+    const sudahLengkap = parseInt(row.sudah_lengkap);
+    // Kalau MK ini belum punya RencanaEvaluasi sama sekali, jangan pernah
+    // auto-kunci -- "0 komponen wajib" gak boleh dianggap "semua sudah lengkap".
+    return {
+        total,
+        lengkapSemua: total > 0 && jumlahKomponenWajib > 0 && total === sudahLengkap,
+    };
+};
 
 // 3. KALKULATOR HASIL AKHIR OBE (VERSI DINAMIS SKALA NILAI)
 export const hitungNilaiAkhir = async (krsId) => {
@@ -271,15 +329,12 @@ export const hitungNilaiAkhir = async (krsId) => {
                 if (kelasId && mhsId) {
                     await tulisManualRowsKeLedger(krsId, listNilai, trx);
 
-                    // Auto-kunci: jika semua mahasiswa di kelas sudah punya nilai_akhir → kunci semua
-                    const [cekRows] = await sequelize.query(
-                        `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
-                         FROM siak_rincian_krs_mahasiswa
-                         WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
-                        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT, transaction: trx }
-                    );
-                    if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+                    // Auto-kunci: cek SEMUA komponen (bukan cuma "nilai_akhir sudah
+                    // terisi") -- lihat komentar lengkap di cekKelengkapanKelas.
+                    // trx diteruskan supaya ledger yang baru saja ditulis di atas
+                    // (masih dalam transaksi ini, belum commit) ikut kebaca.
+                    const { lengkapSemua } = await cekKelengkapanKelas(kelasId, trx);
+                    if (lengkapSemua) {
                         await sequelize.query(
                             `UPDATE siak_rincian_krs_mahasiswa
                              SET status = 'Dikunci', updated_at = NOW()
@@ -592,16 +647,11 @@ export const refreshNilaiAkhirJalurD = async (krsId, kelasId) => {
     );
 
     // Auto-kunci per-kelas -- pola identik simpanNilaiAkhirDariCbt (cbt.service.js):
-    // begitu SEMUA mahasiswa di kelas ini sudah punya nilai_akhir, kelas otomatis
-    // dikunci, supaya nilai kebuka di KHS/Transkrip.
-    const [cekRows] = await sequelize.query(
-        `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN nilai_akhir IS NOT NULL THEN 1 ELSE 0 END) AS sudah_dinilai
-         FROM siak_rincian_krs_mahasiswa
-         WHERE siak_kelas_kuliah_id = :kelasId AND deleted_at IS NULL`,
-        { replacements: { kelasId }, type: sequelize.QueryTypes.SELECT }
-    );
-    if (parseInt(cekRows.total) > 0 && parseInt(cekRows.total) === parseInt(cekRows.sudah_dinilai)) {
+    // begitu SEMUA mahasiswa di kelas ini SEMUA KOMPONENnya sudah terisi, kelas
+    // otomatis dikunci, supaya nilai kebuka di KHS/Transkrip. Lihat komentar
+    // lengkap di cekKelengkapanKelas.
+    const { lengkapSemua } = await cekKelengkapanKelas(kelasId);
+    if (lengkapSemua) {
         await sequelize.query(
             `UPDATE siak_rincian_krs_mahasiswa
              SET status = 'Dikunci', updated_at = NOW()
@@ -705,6 +755,101 @@ export const getRaporOBEMahasiswa = async (rincianKrsId) => {
     }
 }
 
+// ============================================================================
+// Rincian nilai mentah per komponen x Sub-CPMK/CPMK untuk 1 mahasiswa -- dipakai
+// FE buat nunjukin ke dosen/kaprodi "nilai yang diinput itu ada di mana", karena
+// selama ini yang keliatan cuma hasil akhirnya. Dibaca LANGSUNG dari ledger
+// siak_nilai_subcpmk_evaluasi_mahasiswa (sumber CBT & MANUAL digabung per
+// (rencanaEvaluasiId, cpmkId) sebelum dihitung %), bukan dari NilaiCpmkMahasiswa
+// yang sudah di-rollup ke CPMK induk -- di sini levelnya tetap per baris ledger.
+// ============================================================================
+export const getRincianNilaiSubcpmk = async (rincianKrsId) => {
+    const [rows, unitRows] = await Promise.all([
+        NilaiSubcpmkEvaluasiMahasiswa.findAll({
+            where: { siakRincianKrsMahasiswaId: rincianKrsId },
+            include: [
+                { model: RencanaEvaluasi, as: 'rencanaEvaluasi', attributes: ['id', 'metodeEvaluasi'] },
+                { model: CapaianMataKuliah, as: 'capaianMataKuliah', attributes: ['id', 'kode'] }
+            ]
+        }),
+        // Skor MENTAH persis yang diketik dosen di CBT Manual (bukan hasil hitungan
+        // per Sub-CPMK) -- lihat siak_nilai_unit_cbt_manual, arahan 2026-08-19.
+        NilaiUnitCbtManual.findAll({
+            where: { siakRincianKrsMahasiswaId: rincianKrsId },
+            order: [['createdAt', 'ASC']]
+        })
+    ]);
+
+    // Semua cpmkId yang muncul di breakdown unit mentah, buat resolve kode-nya
+    // sekali jalan (bukan per-unit) -- sumbernya JSONB jadi gak ada include langsung.
+    const cpmkIdSet = new Set();
+    unitRows.forEach((u) => (u.pemetaanCpmk || []).forEach((p) => cpmkIdSet.add(p.cpmkId)));
+    const daftarCpmkUnit = cpmkIdSet.size > 0
+        ? await CapaianMataKuliah.findAll({ where: { id: Array.from(cpmkIdSet) }, attributes: ['id', 'kode'] })
+        : [];
+    const kodeCpmkMap = {};
+    daftarCpmkUnit.forEach((c) => { kodeCpmkMap[c.id] = c.kode; });
+
+    const grouped = {};
+    rows.forEach((r) => {
+        const revId = r.siakRencanaEvaluasiId;
+        if (!grouped[revId]) {
+            grouped[revId] = {
+                rencanaEvaluasiId: revId,
+                namaKomponen: (r.rencanaEvaluasi?.metodeEvaluasi || '-').toUpperCase(),
+                subCpmk: {},
+                unitMentah: []
+            };
+        }
+        const cpmkId = r.siakCpmkId;
+        if (!grouped[revId].subCpmk[cpmkId]) {
+            grouped[revId].subCpmk[cpmkId] = {
+                cpmkId,
+                kode: r.capaianMataKuliah?.kode || cpmkId,
+                skorTerbobot: 0,
+                totalBobot: 0
+            };
+        }
+        grouped[revId].subCpmk[cpmkId].skorTerbobot += parseFloat(r.skorTerbobot || 0);
+        grouped[revId].subCpmk[cpmkId].totalBobot += parseFloat(r.totalBobot || 0);
+    });
+
+    unitRows.forEach((u) => {
+        const revId = u.siakRencanaEvaluasiId;
+        // Komponen ini mungkin belum ada di `grouped` kalau breakdown-nya semua
+        // ke-skip pas agregasi (bobotPoin 0 dst) -- tetap tampilkan raw-nya.
+        if (!grouped[revId]) {
+            grouped[revId] = { rencanaEvaluasiId: revId, namaKomponen: '-', subCpmk: {}, unitMentah: [] };
+        }
+        grouped[revId].unitMentah.push({
+            nomorUnit: u.nomorUnit,
+            skorDiperoleh: parseFloat(u.skorDiperoleh || 0),
+            skorMaksimal: parseFloat(u.skorMaksimal || 0),
+            // Waktu input TERKINI -- karena tiap resend wipe & replace baris lama
+            // (lihat simpanNilaiKomponenDariCbt), createdAt selalu reflect submit
+            // yang terakhir, bukan histori semua percobaan input.
+            waktuInput: u.createdAt,
+            pemetaanCpmk: (u.pemetaanCpmk || []).map((p) => ({
+                cpmkId: p.cpmkId,
+                kode: kodeCpmkMap[p.cpmkId] || p.cpmkId,
+                bobotPoin: parseFloat(p.bobotPoin || 0)
+            }))
+        });
+    });
+
+    return Object.values(grouped).map((k) => ({
+        rencanaEvaluasiId: k.rencanaEvaluasiId,
+        namaKomponen: k.namaKomponen,
+        subCpmk: Object.values(k.subCpmk)
+            .sort((a, b) => a.kode.localeCompare(b.kode))
+            .map((s) => ({
+                cpmkId: s.cpmkId,
+                kode: s.kode,
+                nilaiPersen: s.totalBobot > 0 ? Math.round((s.skorTerbobot / s.totalBobot) * 10000) / 100 : 0
+            })),
+        unitMentah: k.unitMentah.sort((a, b) => a.nomorUnit.localeCompare(b.nomorUnit, undefined, { numeric: true }))
+    }));
+};
 
 export const getDropdownMasterEvaluasi = async () => {
     try {
@@ -1539,6 +1684,14 @@ export const resetNilaiMahasiswa = async (rincianKrsId) => {
             WHERE siak_rincian_krs_mahasiswa_id = :rincianKrsId
         `, { replacements: { rincianKrsId }, transaction: trx });
 
+        // Skor mentah per soal CBT Manual (arahan 2026-08-19: kalau nilai direset,
+        // raw input-nya juga harus ikut hilang, jangan jadi data basi yang gak
+        // nyambung ke ledger/nilai akhir manapun).
+        await sequelize.query(`
+            DELETE FROM siak_nilai_unit_cbt_manual
+            WHERE siak_rincian_krs_mahasiswa_id = :rincianKrsId
+        `, { replacements: { rincianKrsId }, transaction: trx });
+
         if (mhsId) {
             await sequelize.query(`
                 DELETE FROM siak_nilai_cpmk_mahasiswa
@@ -1598,6 +1751,11 @@ export const resetNilaiBeberapa = async (rincianKrsIds) => {
             WHERE siak_rincian_krs_mahasiswa_id IN (:ids)
         `, { replacements: { ids: idsValid }, transaction: trx });
 
+        await sequelize.query(`
+            DELETE FROM siak_nilai_unit_cbt_manual
+            WHERE siak_rincian_krs_mahasiswa_id IN (:ids)
+        `, { replacements: { ids: idsValid }, transaction: trx });
+
         for (const { kelasId, mhsId } of pasanganKelasMhs) {
             await sequelize.query(`
                 DELETE FROM siak_nilai_cpmk_mahasiswa
@@ -1639,6 +1797,13 @@ export const resetNilaiKelas = async (kelasId) => {
             DELETE FROM siak_nilai_subcpmk_evaluasi_mahasiswa nsc
             USING siak_rincian_krs_mahasiswa rkm
             WHERE nsc.siak_rincian_krs_mahasiswa_id = rkm.id
+              AND rkm.siak_kelas_kuliah_id = :kelasId
+        `, { replacements: { kelasId }, transaction: trx });
+
+        await sequelize.query(`
+            DELETE FROM siak_nilai_unit_cbt_manual nuc
+            USING siak_rincian_krs_mahasiswa rkm
+            WHERE nuc.siak_rincian_krs_mahasiswa_id = rkm.id
               AND rkm.siak_kelas_kuliah_id = :kelasId
         `, { replacements: { kelasId }, transaction: trx });
 

@@ -6,29 +6,14 @@ import * as PenilaianController from '../../controllers/akademik/penilaian.contr
 import * as KelasKuliahController from '../../controllers/akademik/kelas-kuliah.controller.js';
 import * as CapaianController from '../../controllers/akademik/capaian-pembelajaran.controller.js';
 import * as exportExcelCapaianKelas from '../../controllers/akademik/export-nilai-kelas.controller.js';
+import { requireDosenLogin as requireDosenPengampu, cekKepemilikanKelas } from '../../middleware/require-koordinator-mk.middleware.js';
 
-/**
- * MIDDLEWARE PLACEHOLDER - DOSEN PENGAMPU
- * TODO: diisi tim SSO/RBAC dengan JWT verify
- * decoded.role === 'dosen_pengampu'
- * req.dosenId = decoded.dosenId
- */
-const requireDosenPengampu = (req, res, next) => {
-    // TODO: JWT verify oleh tim SSO
-    next();
-};
-
-/**
- * MIDDLEWARE CEK KEPEMILIKAN KELAS
- * TODO: diisi tim SSO/RBAC
- * Cek apakah dosenId adalah pengampu kelas ini
- * if (!isAmpu) return 403
- * -> Ini yang membuat "dosen tidak bisa lihat nilai kelas dosen lain"
- */
-const cekKepemilikanKelas = (req, res, next) => {
-    // TODO: JWT verify oleh tim SSO
-    next();
-};
+// FIX 2026-08-19: dua middleware ini sebelumnya CUMA placeholder (`next()` doang,
+// gak ada pengecekan apapun) -- artinya siapa aja yang login bisa lihat DAN UBAH
+// nilai/kunci nilai/capaian kelas kuliah MANAPUN, bukan cuma kelas yang dia ampu
+// sendiri. Sekarang dipindah ke middleware/require-koordinator-mk.middleware.js
+// (cekKepemilikanKelas beneran ngecek lewat siak_jadwal_kuliah) biar bisa dipakai
+// bareng sama routes/dosen/kelas-kuliah.routes.js yang punya celah sama persis.
 
 const router = express.Router();
 router.use(requireDosenPengampu);
@@ -63,7 +48,7 @@ router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', RpsController.getRenca
 // ============================================================
 
 // [Detail Kelas]
-router.get('/kelas', KelasKuliahController.findAll);
+router.get('/kelas', KelasKuliahController.findAllForDosen);
 router.get('/kelas/:id', cekKepemilikanKelas, KelasKuliahController.findOne);
 
 // [Peserta Kelas]
@@ -85,6 +70,10 @@ router.post('/kelas/:kelasId/nilai-cpmk/:krsId', cekKepemilikanKelas, PenilaianC
 router.patch('/kelas/:kelasId/nilai/kunci', cekKepemilikanKelas, PenilaianController.kunciNilaiKelas);
 router.patch('/kelas/:kelasId/nilai/:rincianKrsId/kunci', cekKepemilikanKelas, PenilaianController.kunciNilaiMahasiswa);
 
+// GET: rincian nilai mentah per komponen (UTS/UAS/Tugas dst) x Sub-CPMK untuk 1 mahasiswa
+// -- bukti nilai yang diinput dosen per Sub-CPMK, bukan cuma hasil akhirnya
+router.get('/kelas/:kelasId/nilai/:rincianKrsId/rincian', cekKepemilikanKelas, PenilaianController.getRincianNilaiMahasiswa);
+
 // [Capaian Pembelajaran] - tab CPMK dan tab CPL
 // ?tab=cpmk -> tabel nilai CPMK per mahasiswa
 // ?tab=cpl  -> tabel nilai CPL per mahasiswa (setelah nilai dikunci)
@@ -101,7 +90,7 @@ router.get('/kelas/:krsId/rapor-obe/export', cekKepemilikanKelas, async (req, re
     if (req.query.format === 'pdf') return exportExcelCapaianKelas.exportPdfRaporObe(req, res, next);
     return exportExcelCapaianKelas.exportExcelRaporObe(req, res, next);
 });
-router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
+router.get('/kelas/:kelasId/nilai/export', cekKepemilikanKelas, async (req, res, next) => {
     if (req.query.format === 'pdf') {
         if (req.query.jenis === 'daftar-nilai') {
             return exportExcelCapaianKelas.exportPdfDaftarNilai(req, res, next);
@@ -110,7 +99,7 @@ router.get('/kelas/:kelasId/nilai/export', async (req, res, next) => {
     }
     return exportExcelCapaianKelas.exportExcelNilaiKelas(req, res, next);
 });
-router.get('/kelas/:kelasId/capaian/export', async (req, res, next) => {
+router.get('/kelas/:kelasId/capaian/export', cekKepemilikanKelas, async (req, res, next) => {
     if (req.query.format === 'pdf') {
         if (req.query.jenis === 'cpl') return exportExcelCapaianKelas.exportPdfCapaianCplKelas(req, res, next);
         return exportExcelCapaianKelas.exportPdfCapaianKelas(req, res, next);

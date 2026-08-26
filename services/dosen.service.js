@@ -9,6 +9,13 @@ const {
     UnitKerja
 } = db
 
+// FIX 2026-08-19: sebelumnya dipakai di findOneById tapi gak pernah
+// didefinisikan (ReferenceError), bikin endpoint detail dosen selalu crash.
+const ADMIN_LIST_ATTRIBUTES = [
+    'id', 'nama', 'nidn', 'nip', 'gelarDepan', 'gelarBelakang',
+    'jenisKelamin', 'emailPegawai', 'jabatanFungsional', 'statusAktif'
+];
+
 const SIMPEG_DOSEN_ROLE_NAMES = ['dosen', 'dosen lb'];
 
 export const findOneById = async (id) => {
