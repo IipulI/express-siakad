@@ -257,6 +257,17 @@ export const infoKrs = async (mahasiswaId) => {
                 model: PembimbingAkademik,
                 as: 'pembimbingDosen',
                 required: false,
+                where: {
+                    id: {
+                        [Op.eq]: Sequelize.literal(`(
+                            SELECT pa2.id
+                            FROM siak_pembimbing_akademik AS pa2
+                            WHERE pa2.siak_mahasiswa_id = "pembimbingDosen"."siak_mahasiswa_id"
+                            ORDER BY pa2.created_at DESC
+                            LIMIT 1
+                        )`)
+                    }
+                },
                 include: {
                     model: Dosen,
                     as: 'dosen',
@@ -824,6 +835,25 @@ const getBatasSksForMahasiswa = async (mahasiswaId, activePeriod) => {
 const _validateKrsRules = async (mahasiswa, selectedClasses, takenSubjects, activePeriod) => {
     const takenSubjectSet = new Set(takenSubjects);
     const errors = {};
+
+    const mataKuliahIdToKelas = new Map();
+    for (const kelas of selectedClasses) {
+        const mkId = kelas.mataKuliah.id;
+        if (!mataKuliahIdToKelas.has(mkId)) {
+            mataKuliahIdToKelas.set(mkId, []);
+        }
+        mataKuliahIdToKelas.get(mkId).push(kelas);
+    }
+
+    for (const [mkId, kelasList] of mataKuliahIdToKelas.entries()) {
+        if (kelasList.length > 1) {
+            const namaMk = kelasList[0].mataKuliah.nama;
+            for (const kelas of kelasList) {
+                if (!errors[kelas.id]) errors[kelas.id] = [];
+                errors[kelas.id].push(`Mata kuliah '${namaMk}' dipilih lebih dari satu kali (kelas berbeda).`);
+            }
+        }
+    }
 
     // Pengecekan prasyarat mata kuliah
     for (const kelas of selectedClasses) {

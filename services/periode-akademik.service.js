@@ -86,7 +86,7 @@ export const findActive = async () => {
 export const createPeriodeAkademik = async (periodeAkademikData) => {
     const { siakTahunAjaranId, nama, kode, tanggalMulai, tanggalSelesai } = periodeAkademikData;
 
-    const tahunAjaranExist = await TahunAjaranModels.findByPk(periodeAkademikData.siakTahunAjaranId);
+    const tahunAjaranExist = await TahunAjaran.findByPk(periodeAkademikData.siakTahunAjaranId);
     if (!tahunAjaranExist) {
         throw new Error (`Tahun Ajaran tidak ditemukan`)
     }
@@ -95,8 +95,8 @@ export const createPeriodeAkademik = async (periodeAkademikData) => {
         siak_tahun_ajaran_id: siakTahunAjaranId,
         nama,
         kode,
-        tanggal_mulai: tanggalMulai,
-        tanggal_selesai: tanggalSelesai,
+        tanggalMulai: tanggalMulai,
+        tanggalSelesai: tanggalSelesai,
         status: "Inaktif"
     })
 }
@@ -128,7 +128,7 @@ export const updatePeriodeAkademik = async (id, updateData) => {
         });
     }
 
-    return existDataPeriodeAkademik.update(payload)s
+    return existDataPeriodeAkademik.update(payload)
 };
 
 export const deletePeriodeAkademik = async (id) => {

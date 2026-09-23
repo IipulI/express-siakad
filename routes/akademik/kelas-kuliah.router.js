@@ -12,7 +12,7 @@ router.get('/:id/schedule', KelasKuliahController.schedules)
 router.post('/:id/schedule', KelasKuliahController.addSchedule)
 router.delete('/:id/schedule/:jadwalId', KelasKuliahController.deleteSchedule)
 router.get('/:id/participant', KelasKuliahController.classParticipant)
-router.post('/:id/participant', KelasKuliahController.addClassParticipant)
+router.post('/:id/peserta-kelas', KelasKuliahController.addClassParticipant)
 router.get('/:id/grading', KelasKuliahController.getGradingClass)
 router.post('/:id/grading', KelasKuliahController.submitGradingClass)
 

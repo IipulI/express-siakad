@@ -3,6 +3,7 @@ import db from '../models/index.js'
 import { Op, Sequelize } from 'sequelize'
 import { getPagination } from "../utils/pagination.js";
 import { BadRequestError, ConflictError, NotFoundError } from "../utils/custom-error.js";
+import * as periodeAkademikService from "./periode-akademik.service.js";
 
 const {
     Dosen,
@@ -91,7 +92,7 @@ export const getAllMahasiswaFiltered = async (filters, userDosen, page, size) =>
             col: 'id',      // Menghitung berdasarkan ID Mahasiswa
             limit: isPaginated ? limit : undefined,
             offset: isPaginated ? offset : undefined,
-            order: [['nama', 'ASC']], // Dipindah ke sini agar paginasi konsisten antar halaman
+            order: [['nama', 'ASC']],
             raw: true,
             transaction: t
         });
@@ -172,9 +173,14 @@ export const getAllMahasiswaFiltered = async (filters, userDosen, page, size) =>
     return finalData;
 };
 
-export const getKrsMahasiswaDetail = async (krsId) => {
-    const krsMahasiswa = await KrsMahasiswa.findByPk(krs, {
-        attributes: ['id']
+export const getKrsMahasiswaDetail = async (mahasiswaId) => {
+    const activePeriode = await periodeAkademikService.findActive()
+    const krsMahasiswa = await KrsMahasiswa.findOne({
+        where: {
+            siakMahasiswaId: mahasiswaId,
+            siakPeriodeAkademikId: activePeriode.id
+        },
+        attributes: ['id'],
     })
     if (!krsMahasiswa) {
         throw new NotFoundError("KRS Mahasiswa tidak dapat ditemukan")
@@ -328,47 +334,41 @@ export const assignDosen = async (dosenId, mahasiswaIds, periodeAkademikId) => {
 }
 
 export const updateKrsMahasiswa = async (krsIds, mahasiswaIds, periodeAkademikId, status) => {
-    try {
-        await sequelize.transaction(async (trx) => {
-
-
-            let foundKrs
-            if (krsIds !== null) {
-                foundKrs = await KrsMahasiswa.findAll({
-                    where: {
-                        id: { [Op.in]: krsIds },
-                        status: {
-                            [Op.eq] : "Diajukan"
-                        }
-                    },
-                    attributes: ['id'],
-                    transaction: trx,
-                });
-            }
-            else if (mahasiswaIds !== null) {
-                foundKrs = await KrsMahasiswa.findAll({
-                    where : {
-                        siakMahasiswaId: { [Op.in] : mahasiswaIds },
-                        siakPeriodeAkademikId: periodeAkademikId,
-                        status: { [Op.eq] : "Diajukan" }
+    await sequelize.transaction(async (trx) => {
+        let foundKrs
+        if (krsIds !== null) {
+            foundKrs = await KrsMahasiswa.findAll({
+                where: {
+                    id: { [Op.in]: krsIds },
+                    status: {
+                        [Op.eq] : "Diajukan"
                     }
-                })
-            }
-
-            const foundIds = foundKrs.map(krs => krs.id);
-            const notFoundIds = krsIds.filter(id => !foundIds.includes(id));
-            if (notFoundIds.length > 0) {
-                throw new Error(`KRS dengan ID berikut tidak ditemukan: ${notFoundIds.join(', ')}`);
-            }
-
-            await KrsMahasiswa.update({
-                status: status,
-            }, {
-                where: { id: krsIds },
+                },
+                attributes: ['id'],
                 transaction: trx,
             });
+        }
+        else if (mahasiswaIds !== null) {
+            foundKrs = await KrsMahasiswa.findAll({
+                where : {
+                    siakMahasiswaId: { [Op.in] : mahasiswaIds },
+                    siakPeriodeAkademikId: periodeAkademikId,
+                    status: { [Op.eq] : "Diajukan" }
+                }
+            })
+        }
+
+        const foundIds = foundKrs.map(krs => krs.id);
+        const notFoundIds = krsIds.filter(id => !foundIds.includes(id));
+        if (notFoundIds.length > 0) {
+            throw new Error(`KRS dengan ID berikut tidak ditemukan: ${notFoundIds.join(', ')}`);
+        }
+
+        await KrsMahasiswa.update({
+            status: status,
+        }, {
+            where: { id: krsIds },
+            transaction: trx,
         });
-    } catch (error) {
-        throw new Error(`Gagal memperbarui status KRS: ${error.message}`);
-    }
+    });
 };
