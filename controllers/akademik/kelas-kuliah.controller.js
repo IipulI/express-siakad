@@ -4,7 +4,7 @@ import {getPagingData} from "../../utils/pagination.js";
 import { Op } from "sequelize";
 import models from "../../models/index.js";
 
-const { ProgramStudi } = models;
+const { Mahasiswa, ProgramStudi } = models;
 
 export const findAll = async (req, res, next) => {
     const page = req.query.page ?? 1;
@@ -271,14 +271,14 @@ export const classParticipant = async (req, res) => {
     }
 }
 
-export const addClassParticipant = async (req, res) => {
+export const addClassParticipant = async (req, res, next) => {
     const kelasKuliahId = req.params.id;
-    const { siakMahasiswaIds, siakPeriodeAkademikId } = req.body;
+    const { mahasiswaIds, siakPeriodeAkademikId } = req.body;
     const responseBuilder = new ResponseBuilder(res);
 
 
     // --- Input Validation ---
-    if (!siakMahasiswaIds || !Array.isArray(siakMahasiswaIds) || siakMahasiswaIds.length === 0) {
+    if (!mahasiswaIds || !Array.isArray(mahasiswaIds) || mahasiswaIds.length === 0) {
         return responseBuilder.code(400).message("siakMahasiswaIds must be a non-empty array.").json();
     }
     if (!siakPeriodeAkademikId) {
@@ -294,49 +294,54 @@ export const addClassParticipant = async (req, res) => {
     const students = await Mahasiswa.findAll(
         {
             attributes: ['id', 'nama', 'npm'],
-            where: { id: siakMahasiswaIds },
+            where: { id: mahasiswaIds },
             raw: true
         }
     );
     const studentMap = new Map(students.map(s => [s.id, s]));
 
     // --- The Loop ---
-    for (const mahasiswaId of siakMahasiswaIds) {
-        const studentInfo = studentMap.get(mahasiswaId) || { id: mahasiswaId, nama: 'Unknown' };
-        try {
-            // Call the service for ONE student inside the loop
-            await KelasKuliahService.enrollMahasiswaToClass(
-                mahasiswaId,
-                kelasKuliahId,
-                siakPeriodeAkademikId,
-            );
-            results.success.push({
-                mahasiswaId,
-                nama: studentInfo.nama,
-                message: 'Mahasiswa berhasil dimasukan.',
-            });
-        } catch (error) {
-            results.failed.push({
-                mahasiswaId,
-                nama: studentInfo.nama,
-                error: error.message || 'Terjadi kesalahan tidak terduga.',
-            });
+    try {
+        for (const mahasiswaId of mahasiswaIds) {
+            const studentInfo = studentMap.get(mahasiswaId) || { id: mahasiswaId, nama: 'Unknown' };
+            try {
+                // Call the service for ONE student inside the loop
+                await KelasKuliahService.enrollMahasiswaToClass(
+                    mahasiswaId,
+                    kelasKuliahId,
+                    siakPeriodeAkademikId,
+                );
+                results.success.push({
+                    mahasiswaId,
+                    nama: studentInfo.nama,
+                    message: 'Mahasiswa berhasil dimasukan.',
+                });
+            } catch (error) {
+                results.failed.push({
+                    mahasiswaId,
+                    nama: studentInfo.nama,
+                    error: error.message || 'Terjadi kesalahan tidak terduga.',
+                });
+            }
         }
+
+        const summary = {
+            total: mahasiswaIds.length,
+            successCount: results.success.length,
+            failedCount: results.failed.length,
+        };
+
+        // Determine status code based on results
+        const statusCode = (summary.failedCount > 0 && summary.successCount > 0) ? 207 : (summary.failedCount > 0 ? 400 : 201);
+
+        return responseBuilder
+            .code(statusCode)
+            .message("Bulk enrollment process completed.")
+            .json({ summary, results });
     }
-
-    const summary = {
-        total: siakMahasiswaIds.length,
-        successCount: results.success.length,
-        failedCount: results.failed.length,
-    };
-
-    // Determine status code based on results
-    const statusCode = (summary.failedCount > 0 && summary.successCount > 0) ? 207 : (summary.failedCount > 0 ? 400 : 201);
-
-    return responseBuilder
-        .code(statusCode)
-        .message("Bulk enrollment process completed.")
-        .json({ summary, results });
+    catch (error) {
+        next(error)
+    }
 };
 
 export const getGradingClass = async (req, res) => {

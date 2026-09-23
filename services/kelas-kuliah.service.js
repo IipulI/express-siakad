@@ -126,7 +126,7 @@ export const findAll = async (page, size, filter) => {
     let kelasKuliahQueryBuilder = {
         attributes: [
             'id', 'siakMataKuliahId', 'siakPeriodeAkademikId',
-            'nama', 'kapasitas', 'jumlah_peminat', 'sistem_kuliah', 'status_kelas'
+            'nama', 'kapasitas', ['jumlah_peminat', 'peserta'], 'sistem_kuliah', 'status_kelas'
         ],
         where: kelasKuliahWhere,
         include: [
@@ -182,6 +182,10 @@ export const findAll = async (page, size, filter) => {
                 ]
             },
             ...(mahasiswaInclude ? [mahasiswaInclude] : [])
+        ],
+        order: [
+            [{ model: PeriodeAkademik, as: 'periodeAkademik' }, 'kode', 'DESC'],
+            ['nama', 'ASC']
         ]
     }
 

@@ -3,6 +3,9 @@ import akademikRoutes from './akademik/index.js';
 import mahasiswaRoutes from './mahasiswa/index.js';
 import dosenRoutes from './dosen/index.js';
 import orangTuaRoutes from './orang-tua/index.js';
+import dosenPengampuRouter from './akademik/dosen-pengampu_router.js';
+import kaprodiRouter from './akademik/kaprodi_router.js';
+import koordinatorMkRouter from './akademik/koordinator-mk_router.js';
 import { checkBlacklist, verifySsoToken } from "../middleware/auth.middleware.js";
 import * as programStudiController from "../controllers/akademik/program-studi.controller.js"
 import { attachUser } from "../middleware/attachUser.middleware.js";
@@ -25,6 +28,16 @@ router.get('/program-studi', programStudiController.findAll)
 
 router.use('/public', publicRouter)
 
+// [Nilai Perkuliahan dkk] -- /akademik/dosen, /akademik/kaprodi, /akademik/koordinator-mk
+// harus di-mount DULUAN, TANPA requireAdmin: masing-masing sub-router-nya
+// (dosen-pengampu_router.js, kaprodi_router.js, koordinator-mk_router.js) sudah
+// ngecek sendiri (dosen yang beneran ngampu/kaprodi/koordinator MK, ATAU admin
+// akademik). Kalau requireAdmin blanket di bawah kena duluan, dosen/kaprodi/
+// koordinator MK ke-403 sebelum sempat nyampe ke pengecekan yang lebih spesifik
+// itu -- endpoint kelihatan "punya admin" padahal harusnya bisa diakses dosen.
+router.use('/akademik/dosen', verifySsoToken, checkBlacklist, attachUser, dosenPengampuRouter);
+router.use('/akademik/kaprodi', verifySsoToken, checkBlacklist, attachUser, kaprodiRouter);
+router.use('/akademik/koordinator-mk', verifySsoToken, checkBlacklist, attachUser, koordinatorMkRouter);
 router.use('/akademik', verifySsoToken, checkBlacklist, attachUser, requireAdmin, akademikRoutes);
 router.use('/mahasiswa', verifySsoToken, checkBlacklist, attachUser, requireMahasiswa, mahasiswaRoutes)
 router.use('/dosen', verifySsoToken, checkBlacklist, attachUser, requireDosen, dosenRoutes)

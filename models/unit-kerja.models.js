@@ -15,7 +15,7 @@ export default (sequelize) => {
             });
 
             this.hasOne(models.Fakultas, {
-                foreignKey : "siak_fakultas_id",
+                foreignKey : "siak_unit_kerja_id",
                 as : "fakultas",
             });
 

@@ -34,10 +34,10 @@ export const getAllAssignedMahasiswa = async (req, res, next) => {
 export const getKrsMahasiswa = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
 
-    const krsId = req.params.krsId
+    const mahasiswaId = req.params.mahasiswaId
 
     try {
-        const data = await pembimbingAkademikService.getKrsMahasiswaDetail(krsId)
+        const data = await pembimbingAkademikService.getKrsMahasiswaDetail(mahasiswaId)
 
         responseBuilder
             .status('success')

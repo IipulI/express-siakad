@@ -53,11 +53,13 @@ export const assignDosen = async (req, res) => {
     }
 }
 
-export const acceptKrsMahasiswa = async (req, res) => {
+export const acceptKrsMahasiswa = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
-    const krsIds = req.body.krsIds ? req.body.krsIds : null;
-    const mahasiswaIds = req.body.mahasiswaIds ? req.body.mahasiswaIds : null;
-    const periodeAkademikId = req.body.periodeAkademikId ? req.body.periodeAkademikId : null;
+    const {
+        krsIds,
+        mahasiswaIds,
+        periodeAkademikId
+    } = req.body;
 
     try {
         await pembimbingAkademikService.updateKrsMahasiswa(krsIds, mahasiswaIds, periodeAkademikId, "Disetujui")
@@ -69,17 +71,17 @@ export const acceptKrsMahasiswa = async (req, res) => {
     }
     catch (error) {
         console.log(error)
-        responseBuilder
-            .status('failure')
-            .code(500)
-            .message("Error")
-            .json(error)
+        next(error)
     }
 }
 
-export const rejectKrsMahasiswa = async (req, res) => {
+export const rejectKrsMahasiswa = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
-    const { krsIds, mahasiswaIds, periodeAkademikId } = req.body;
+    const {
+        krsIds,
+        mahasiswaIds,
+        periodeAkademikId
+    } = req.body;
 
     try {
         await pembimbingAkademikService.updateKrsMahasiswa(krsIds, mahasiswaIds, periodeAkademikId,"Ditolak")
@@ -91,9 +93,6 @@ export const rejectKrsMahasiswa = async (req, res) => {
     }
     catch (error) {
         console.log(error)
-        responseBuilder
-            .code(500)
-            .message("Error")
-            .json()
+        next(error)
     }
 }
