@@ -6,7 +6,7 @@ dotenv.config();
 const config = {
     development: {
         username: process.env.DB_USER_DEV || 'postgres',
-        password: process.env.DB_PASSWORD_DEV || '123456',
+        password: process.env.DB_PASSWORD_DEV || '123',
         database: process.env.DB_NAME_DEV || 'asd',
         host: process.env.DB_HOST_DEV || '127.0.0.1',
         port: process.env.DB_PORT_DEV || 5432,

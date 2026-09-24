@@ -208,8 +208,8 @@ export const getDetailMataKuliahObe = async (req, res, next) => {
 
 export const createMataKuliahObe = async (req, res, next) => {
     try {
-        // Panggil Service Create
-        const data = await MataKuliahService.createMataKuliahObe(req.body);
+        // Panggil Service Create (req.files untuk upload SAP/Silabus/Bahan Ajar/Diktat)
+        const data = await MataKuliahService.createMataKuliahObe(req.body, req.files);
 
         // Kirim response 201 (Created) pakai ResponseBuilder
         return new ResponseBuilder(res)
@@ -225,7 +225,7 @@ export const createMataKuliahObe = async (req, res, next) => {
 export const updateMataKuliahObe = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const data = await MataKuliahService.updateMataKuliah(id, req.body);
+        const data = await MataKuliahService.updateMataKuliah(id, req.body, req.files);
 
         return new ResponseBuilder(res)
             .code(200)

@@ -236,6 +236,28 @@ export default (sequelize) => {
                 allowNull: true,
                 defaultValue: false
             },
+            // Path file dokumen (SAP/Silabus/Bahan Ajar/Diktat) — status "Ada" dihitung
+            // dari keberadaan file ini (lihat service getDetailMataKuliahObe).
+            sapFile: {
+                type: DataTypes.STRING,
+                field: 'sap_file',
+                allowNull: true
+            },
+            silabusFile: {
+                type: DataTypes.STRING,
+                field: 'silabus_file',
+                allowNull: true
+            },
+            bahanAjarFile: {
+                type: DataTypes.STRING,
+                field: 'bahan_ajar_file',
+                allowNull: true
+            },
+            diktatFile: {
+                type: DataTypes.STRING,
+                field: 'diktat_file',
+                allowNull: true
+            },
 
 
             koordinatorMkId: {
