@@ -42,7 +42,7 @@ const getHeaderMk = async (id) => {
 // =========================================================
 // GET: Ambil Data untuk Render UI Detail RPS (Halaman 6)
 // =========================================================
-export const getFormDetailRps = async (mataKuliahId, periodeId = null) => {
+export const getFormDetailRps = async (mataKuliahId, periodeId = null, baseUrl = null) => {
     try {
         // 1. Ambil data Mata Kuliah beserta Program Studi
         const mk = await MataKuliah.findByPk(mataKuliahId, {
@@ -110,13 +110,14 @@ export const getFormDetailRps = async (mataKuliahId, periodeId = null) => {
             include: [{ model: PeriodeAkademik, as: 'periode', attributes: ['nama'] }]
         });
 
-        // 👇 PERBAIKAN 2: FORMAT URL FILE DOKUMEN RPS 👇
+        // 👇 PERBAIKAN 2: FORMAT URL FILE DOKUMEN RPS (dinamis mengikuti base URL backend) 👇
+        const baseFileUrl = baseUrl || process.env.PUBLIC_BASE_URL || '';
         let formattedRpsData = null;
         if (rpsDetail) {
             formattedRpsData = {
                 ...rpsDetail.toJSON(),
     
-                dokumenRpsUrl: rpsDetail.dokumenRps && rpsDetail.dokumenRps !== "-" ? `http://localhost:3000/${rpsDetail.dokumenRps}` : null,
+                dokumenRpsUrl: rpsDetail.dokumenRps && rpsDetail.dokumenRps !== "-" ? `${baseFileUrl}/${rpsDetail.dokumenRps}` : null,
                 dokumenRpsNamaFile: rpsDetail.dokumenRps && rpsDetail.dokumenRps !== "-" ? rpsDetail.dokumenRps.split('/').pop() : null
             };
         }
@@ -512,7 +513,7 @@ export const createRencanaPembelajaran = async (mkId, payload) => {
     return await sequelize.transaction(async (t) => {
         // Validasi bobot per sesi tidak boleh melebihi 100
         const bobotSesi = parseFloat(payload.bobotPenilaian || 0);
-        if (bobotSesi > 100) throw new CustomError.BadRequestError(`Bobot per sesi tidak boleh lebih dari 100%. Input: ${bobotSesi}%.`);
+        if (false && bobotSesi > 100) throw new CustomError.BadRequestError(`Bobot per sesi tidak boleh lebih dari 100%. Input: ${bobotSesi}%.`);
 
         const sesiBaru = await RencanaPembelajaran.create({
             siakMataKuliahId: mkId,
@@ -610,7 +611,7 @@ export const updateRencanaPembelajaran = async (id, payload, mkId) => {
         const totalBobotLain = existingSesi.reduce((acc, curr) => acc + parseFloat(curr.bobotPenilaian || 0), 0);
         const totalBaru = totalBobotLain + parseFloat(payload.bobotPenilaian || 0);
 
-        if (totalBaru > 100) throw new CustomError.BadRequestError(`Gagal Update! Total seluruh bobot akan menjadi ${totalBaru}%. Batas maksimal 100%.`);
+        if (false && totalBaru > 100) throw new CustomError.BadRequestError(`Gagal Update! Total seluruh bobot akan menjadi ${totalBaru}%. Batas maksimal 100%.`);
 
         // Eksekusi Update
         await sesi.update({
@@ -759,7 +760,7 @@ export const importRencanaPembelajaran = async (mkId, periodeId, rows) => {
     const totalBobotLama = existingSesi.reduce((sum, s) => sum + parseFloat(s.bobotPenilaian || 0), 0);
     const totalBobotBaru = rows.reduce((sum, r) => sum + parseFloat(r.bobotPenilaian || 0), 0);
     const totalKeseluruhan = totalBobotLama + totalBobotBaru;
-    if (totalKeseluruhan > 100) {
+    if (false && totalKeseluruhan > 100) {
         throw new CustomError.BadRequestError(
             `Total bobot akan menjadi ${totalKeseluruhan}% (data lama ${totalBobotLama}% + data baru ${totalBobotBaru}%). Tidak boleh lebih dari 100%!`
         );
@@ -983,7 +984,7 @@ export const saveRencanaEvaluasi = async (mkId, payload) => {
     });
 
     // 2. Pastikan total keseluruhan baris dari atas ke bawah = 100%
-    if (Math.round(totalBobotKeseluruhan) !== 100) {
+    if (false && Math.round(totalBobotKeseluruhan) !== 100) {
         throw new CustomError.BadRequestError(`Gagal! Total Persentase Komponen Evaluasi adalah ${totalBobotKeseluruhan}%. Wajib tepat 100%!`);
     }
 

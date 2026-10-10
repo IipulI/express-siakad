@@ -18,7 +18,13 @@ app.use(express.json());
 // Parse URL-encoded bodies
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/public", express.static(path.join(process.cwd(), "public")));
+app.use("/public", express.static(path.join(process.cwd(), "public"), {
+    // File dokumen (SAP/Silabus/Bahan Ajar/Diktat) tampil inline (preview) dulu,
+    // bukan langsung di-download oleh browser.
+    setHeaders: (res, filePath) => {
+        res.setHeader("Content-Disposition", "inline");
+    }
+}));
 app.use("/rps", express.static(path.join(process.cwd(), "public/rps")))
 // --- API Routes ---
 app.get("/", (req, res) => {

@@ -213,7 +213,8 @@ export const getFormDetailRps = async (req, res) => {
     const { periodeId } = req.query; 
 
     try {
-        const data = await rpsService.getFormDetailRps(mataKuliahId, periodeId);
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const data = await rpsService.getFormDetailRps(mataKuliahId, periodeId, baseUrl);
         
         return responseBuilder
             .status("success")

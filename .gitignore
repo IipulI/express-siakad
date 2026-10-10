@@ -2,6 +2,7 @@
 .env
 .idea
 ./public/rps
+public/obe/
 .DS_Store
 bahan/
 scripts/

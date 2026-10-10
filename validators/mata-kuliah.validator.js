@@ -10,7 +10,10 @@ export const validateCreateMkObe = [
     body('jenis').notEmpty().withMessage('Jenis Mata Kuliah wajib diisi'),
     body('adaPraktikum').isBoolean().withMessage('Ada Praktikum wajib diisi (boolean)'),
     body('koordinatorMkId').optional({ checkFalsy: true }).isUUID().withMessage('ID Koordinator wajib format UUID'),
-    body('pengembangRpsIds').optional({ checkFalsy: true }).isArray().withMessage('Pengembang RPS harus berupa Array'),
+    // Form multipart mengirim 1 element sebagai string, bukan array — samakan jadi array dulu.
+    body('pengembangRpsIds').optional({ checkFalsy: true })
+        .customSanitizer((v) => (Array.isArray(v) ? v : v == null ? [] : [v]))
+        .isArray().withMessage('Pengembang RPS harus berupa Array'),
     
     (req, res, next) => {
         const errors = validationResult(req);

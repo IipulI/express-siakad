@@ -1,6 +1,8 @@
 import { getPagination } from "../utils/pagination.js";
 import models from "../models/index.js";
 import { Op } from 'sequelize';
+import fs from "fs";
+import path from "path";
 
 import * as CustomError from "../utils/custom-error.js";
 import { NotFoundError } from "../utils/custom-error.js";
@@ -15,6 +17,22 @@ const {
     MataKuliah,
     TahunKurikulum,
 } = models;
+
+// --- Helper untuk field "Ada SAP/Silabus/Bahan Ajar/Diktat" yang sekarang berbasis file ---
+// (input multipart mengirim semuanya sebagai string, jadi boolean/angka perlu di-coerce)
+const toBool = (v) => v === true || v === "true" || v === 1 || v === "1";
+const normalizePath = (p) => (p ? String(p).replace(/\\/g, "/") : null);
+const getUploadedFile = (files, key) =>
+    files && Array.isArray(files[key]) && files[key].length ? files[key][0] : null;
+const removeFileFromDisk = (filePath) => {
+    if (!filePath) return;
+    try {
+        const abs = path.join(process.cwd(), filePath);
+        if (fs.existsSync(abs)) fs.unlinkSync(abs);
+    } catch (e) {
+        // file lama gagal dihapus tidak boleh menggagalkan request
+    }
+};
 
 // =========================================================
 // 1. GET LIST MATA KULIAH OBE (Dipanggil oleh Controller OBE)
@@ -173,10 +191,15 @@ export const getDetailMataKuliahObe = async (id, currentDosenId = null) => {
         prasyaratMataKuliah3Id: mk.prasyaratMataKuliah3,
         atribut: {
             merupakanMku: mk.merupakanMku,
-            adaSap: mk.adaSap,
-            adaSilabus: mk.adaSilabus,
-            adaBahanAjar: mk.adaBahanAjar,
-            adaDiktat: mk.adaDiktat,
+            adaSap: Boolean(mk.sapFile),
+            adaSilabus: Boolean(mk.silabusFile),
+            adaBahanAjar: Boolean(mk.bahanAjarFile),
+            adaDiktat: Boolean(mk.diktatFile),
+            // Path file untuk dibuka/diunduh di frontend
+            sap: mk.sapFile || null,
+            silabus: mk.silabusFile || null,
+            bahanAjar: mk.bahanAjarFile || null,
+            diktat: mk.diktatFile || null,
         },
         koordinatorMataKuliah: mk.koordinatorMk ? {
             id: mk.koordinatorMk.id,
@@ -419,7 +442,7 @@ export const createMataKuliah = async (mataKuliahData) => {
 }
 
 //OBE
-export const createMataKuliahObe = async (payload) => {
+export const createMataKuliahObe = async (payload, files = {}) => {
     // Gunakan transaksi agar data konsisten
     const result = await sequelize.transaction(async (t) => {
 
@@ -434,6 +457,12 @@ export const createMataKuliahObe = async (payload) => {
         });
         if (existing) throw new CustomError.ConflictError(`Kode MK ${payload.kode} sudah ada di prodi & kurikulum ini!`);
 
+        // File dokumen "Ada SAP/Silabus/Bahan Ajar/Diktat" (field: sapFile, silabusFile, ...)
+        const sapFile = normalizePath(getUploadedFile(files, "sapFile")?.path) || payload.sapFile || null;
+        const silabusFile = normalizePath(getUploadedFile(files, "silabusFile")?.path) || payload.silabusFile || null;
+        const bahanAjarFile = normalizePath(getUploadedFile(files, "bahanAjarFile")?.path) || payload.bahanAjarFile || null;
+        const diktatFile = normalizePath(getUploadedFile(files, "diktatFile")?.path) || payload.diktatFile || null;
+
         // 2. Create Data Utama
         const newMk = await MataKuliah.create({
             siakProgramStudiId: payload.siakProgramStudiId,
@@ -444,24 +473,33 @@ export const createMataKuliahObe = async (payload) => {
             nama: payload.nama,
             namaEn: payload.namaEn,
             jenis: payload.jenis,
-            adaPraktikum: payload.adaPraktikum,
-            sksTatapMuka: payload.sksTatapMuka || 0,
-            sksPraktikum: payload.sksPraktikum || 0,
-            sksPraktikLapangan: payload.sksPraktikLapangan || 0,
-            sksSimulasi: payload.sksSimulasi || 0,
+            adaPraktikum: toBool(payload.adaPraktikum),
+            sksTatapMuka: Number(payload.sksTatapMuka) || 0,
+            sksPraktikum: Number(payload.sksPraktikum) || 0,
+            sksPraktikLapangan: Number(payload.sksPraktikLapangan) || 0,
+            sksSimulasi: Number(payload.sksSimulasi) || 0,
             // Hitung total SKS otomatis
-            totalSks: (payload.sksTatapMuka || 0) + (payload.sksPraktikum || 0) + (payload.sksPraktikLapangan || 0) + (payload.sksSimulasi || 0),
-            merupakanMku: payload.merupakanMku,
-            adaSap: payload.adaSap,
-            adaSilabus: payload.adaSilabus,
-            adaBahanAjar: payload.adaBahanAjar,
-            adaDiktat: payload.adaDiktat,
+            totalSks: (Number(payload.sksTatapMuka) || 0) + (Number(payload.sksPraktikum) || 0) + (Number(payload.sksPraktikLapangan) || 0) + (Number(payload.sksSimulasi) || 0),
+            merupakanMku: toBool(payload.merupakanMku),
+            adaSap: Boolean(sapFile),
+            sapFile,
+            adaSilabus: Boolean(silabusFile),
+            silabusFile,
+            adaBahanAjar: Boolean(bahanAjarFile),
+            bahanAjarFile,
+            adaDiktat: Boolean(diktatFile),
+            diktatFile,
             koordinatorMkId: payload.koordinatorMkId,
         }, { transaction: t });
 
         // 3. Simpan Relasi Many-to-Many (Pengembang RPS)
-        if (payload.pengembangRpsIds && payload.pengembangRpsIds.length > 0) {
-            await newMk.setPengembangRps(payload.pengembangRpsIds, { transaction: t });
+        const pengembangRpsIds = Array.isArray(payload.pengembangRpsIds)
+            ? payload.pengembangRpsIds
+            : payload.pengembangRpsIds
+                ? [payload.pengembangRpsIds]
+                : [];
+        if (pengembangRpsIds.length > 0) {
+            await newMk.setPengembangRps(pengembangRpsIds, { transaction: t });
         }
 
         return newMk;
@@ -475,11 +513,34 @@ export const createMataKuliahObe = async (payload) => {
 // =========================================================
 // 6. UPDATE MATA KULIAH
 // =========================================================
-export const updateMataKuliah = async (id, mataKuliahData) => {
+export const updateMataKuliah = async (id, mataKuliahData, files = {}) => {
     const existMataKuliah = await MataKuliah.findByPk(id);
     if (!existMataKuliah) {
         throw new Error(`Mata Kuliah tidak ditemukan`);
     }
+
+    // File dokumen: kalau ada file baru, pakai file baru & hapus file lama.
+    // Kalau tidak ada file baru, pertahankan file yang sudah ada.
+    const picks = [
+        { key: "sapFile", field: "sapFile" },
+        { key: "silabusFile", field: "silabusFile" },
+        { key: "bahanAjarFile", field: "bahanAjarFile" },
+        { key: "diktatFile", field: "diktatFile" },
+    ];
+    const fileResult = {};
+    picks.forEach(({ key, field }) => {
+        const uploaded = getUploadedFile(files, key);
+        if (uploaded) {
+            const newPath = normalizePath(uploaded.path);
+            if (existMataKuliah[field] && existMataKuliah[field] !== newPath) {
+                removeFileFromDisk(existMataKuliah[field]);
+            }
+            fileResult[field] = newPath;
+        } else {
+            // Pertahankan file lama (kalau form multipart tidak mengirim field-nya)
+            fileResult[field] = existMataKuliah[field] || null;
+        }
+    });
 
     await MataKuliah.update({
         siakProgramStudiId: mataKuliahData.siakProgramStudiId,
@@ -490,22 +551,26 @@ export const updateMataKuliah = async (id, mataKuliahData) => {
         namaEn: mataKuliahData.namaEn,
         kode: mataKuliahData.kode,
         jenis: mataKuliahData.jenis,
-        adaPraktikum: mataKuliahData.adaPraktikum,
+        adaPraktikum: toBool(mataKuliahData.adaPraktikum),
 
-        sksTatapMuka: mataKuliahData.sksTatapMuka,
-        sksPraktikum: mataKuliahData.sksPraktikum,
-        sksPraktikLapangan: mataKuliahData.sksPraktikLapangan,
-        sksSimulasi: mataKuliahData.sksSimulasi,
-        totalSks: (mataKuliahData.sksTatapMuka || 0) +
-            (mataKuliahData.sksPraktikum || 0) +
-            (mataKuliahData.sksPraktikLapangan || 0) +
-            (mataKuliahData.sksSimulasi || 0),
+        sksTatapMuka: Number(mataKuliahData.sksTatapMuka) || 0,
+        sksPraktikum: Number(mataKuliahData.sksPraktikum) || 0,
+        sksPraktikLapangan: Number(mataKuliahData.sksPraktikLapangan) || 0,
+        sksSimulasi: Number(mataKuliahData.sksSimulasi) || 0,
+        totalSks: (Number(mataKuliahData.sksTatapMuka) || 0) +
+            (Number(mataKuliahData.sksPraktikum) || 0) +
+            (Number(mataKuliahData.sksPraktikLapangan) || 0) +
+            (Number(mataKuliahData.sksSimulasi) || 0),
 
-        merupakanMku: mataKuliahData.merupakanMku,
-        adaSap: mataKuliahData.adaSap,
-        adaSilabus: mataKuliahData.adaSilabus,
-        adaBahanAjar: mataKuliahData.adaBahanAjar,
-        adaDiktat: mataKuliahData.adaDiktat,
+        merupakanMku: toBool(mataKuliahData.merupakanMku),
+        adaSap: Boolean(fileResult.sapFile),
+        sapFile: fileResult.sapFile,
+        adaSilabus: Boolean(fileResult.silabusFile),
+        silabusFile: fileResult.silabusFile,
+        adaBahanAjar: Boolean(fileResult.bahanAjarFile),
+        bahanAjarFile: fileResult.bahanAjarFile,
+        adaDiktat: Boolean(fileResult.diktatFile),
+        diktatFile: fileResult.diktatFile,
 
         koordinatorMkId: mataKuliahData.koordinatorMkId, // PERBAIKAN: disamakan dengan model ORM
 
@@ -516,7 +581,10 @@ export const updateMataKuliah = async (id, mataKuliahData) => {
 
     // UPDATE DATA PENGEMBANG RPS DI TABEL PIVOT
     if (mataKuliahData.pengembangRpsIds) {
-        await existMataKuliah.setPengembangRps(mataKuliahData.pengembangRpsIds);
+        const pengembangRpsIds = Array.isArray(mataKuliahData.pengembangRpsIds)
+            ? mataKuliahData.pengembangRpsIds
+            : [mataKuliahData.pengembangRpsIds];
+        await existMataKuliah.setPengembangRps(pengembangRpsIds);
     }
 
     // Mengembalikan format detail lengkap setelah berhasil update

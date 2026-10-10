@@ -21,8 +21,18 @@ import {
 
 import { validateSaveCpmk } from "../../validators/cpmk.validator.js";
 import { requireKoordinatorMK } from "../../middleware/require-koordinator-mk.middleware.js";
+import { upload } from '../../utils/upload-file.js';
 
 const router = new Router();
+
+// Fields upload dokumen "Ada SAP/Silabus/Bahan Ajar/Diktat" — wajib masuk sebelum
+// validator supaya req.body terisi oleh multer untuk request multipart/form-data.
+const MATA_KULIAH_FILE_FIELDS = [
+    { name: 'sapFile', maxCount: 1 },
+    { name: 'silabusFile', maxCount: 1 },
+    { name: 'bahanAjarFile', maxCount: 1 },
+    { name: 'diktatFile', maxCount: 1 },
+];
 
 // =====================================================================
 // 1. MASTER DATA (Referensi PDF Hal 15 - Dropdown)
@@ -96,8 +106,8 @@ router.get('/mata-kuliah/:id', MataKuliahController.getDetailMataKuliahObe);
 // [TAMBAHAN UNTUK HALAMAN 3 - CREATE, UPDATE, DELETE]
 // router.post('/mata-kuliah', MataKuliahController.create);          // Untuk Tombol Simpan (Tambah Baru)
 // Rute untuk Create Mata Kuliah OBE
-router.post('/mata-kuliah', validateCreateMkObe, MataKuliahController.createMataKuliahObe);
-router.put('/mata-kuliah/:id', validateUpdateMkObe, MataKuliahController.updateMataKuliahObe); // 👈 Update
+router.post('/mata-kuliah', upload.fields(MATA_KULIAH_FILE_FIELDS), validateCreateMkObe, MataKuliahController.createMataKuliahObe);
+router.put('/mata-kuliah/:id', upload.fields(MATA_KULIAH_FILE_FIELDS), validateUpdateMkObe, MataKuliahController.updateMataKuliahObe); // 👈 Update
 router.delete('/mata-kuliah/:id', validateDeleteMkObe, MataKuliahController.deleteMataKuliahObe); // 👈 Delete
 // router.put('/mata-kuliah/:id', MataKuliahController.update);       // Untuk Tombol Simpan (Edit Data)
 // router.delete('/mata-kuliah/:id', MataKuliahController.destroy);   // Untuk Tombol Hapus MK
