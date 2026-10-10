@@ -109,7 +109,7 @@ export const findAllForDosen = async (req, res, next) => {
     }
 }
 
-export const create = async (req, res) => {
+export const create = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res);
     try {
         const payload = req.body;
@@ -119,11 +119,7 @@ export const create = async (req, res) => {
             .message("Berhasil membuat kelas kuliah baru")
             .json(newClass);
     } catch (error) {
-        return responseBuilder
-            .status('failure')
-            .code(error.status || 500)
-            .message(error.message || "Gagal membuat kelas kuliah")
-            .json();
+        next(error)
     }
 }
 
@@ -148,7 +144,7 @@ export const findOne = async (req, res) => {
     }
 }
 
-export const update = async (req, res) => {
+export const update = async (req, res, next) => {
     const id = req.params.id;
     const responseBuilder = new ResponseBuilder(res);
 
@@ -161,11 +157,7 @@ export const update = async (req, res) => {
             .json(updatedClass)
     }
     catch (error) {
-        return responseBuilder
-            .status('failure')
-            .code(error.status || 500)
-            .message(error.message || "Kesalahan yang tidak terduga")
-            .json();
+        next(error)
     }
 }
 

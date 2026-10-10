@@ -1,12 +1,12 @@
-import {getPagination} from "../utils/pagination.js";
+import { getPagination } from "../utils/pagination.js";
 import models from "../models/index.js"
-import { QueryTypes, Op } from "sequelize";
-import ResponseBuilder from "../utils/response.js";
-import { BadRequestError, NotFoundError, ConflictError } from "../utils/custom-error.js";
+import { Op, QueryTypes } from "sequelize";
+import { BadRequestError, ConflictError, NotFoundError } from "../utils/custom-error.js";
 
 const {
     BidangIlmu,
     Dosen,
+    DosenKelasKuliah,
     JadwalKuliah,
     Jenjang,
     KelasKuliah,
@@ -332,7 +332,8 @@ export const createClass = async (payload) => {
             jumlahPertemuan,
             tanggalMulai,
             tanggalSelesai,
-            jadwalKuliah
+            jadwalKuliah,
+            dosenPengajar
         } = payload;
 
         // Cari MK untuk dapetin prodi
@@ -359,6 +360,16 @@ export const createClass = async (payload) => {
                 tanggalMulai: tanggalMulai,
                 tanggalSelesai: tanggalSelesai
             }, { transaction: t });
+
+            if (Array.isArray(dosenPengajar) && dosenPengajar.length > 0) {
+                await DosenKelasKuliah.bulkCreate(
+                    dosenPengajar.map((dosen) => ({
+                        siakKelasKuliahId: newClass.id,
+                        siakDosenId: dosen.siakDosenId
+                    })),
+                    { transaction: t }
+                )
+            }
 
             if (Array.isArray(jadwalKuliah) && jadwalKuliah.length > 0) {
                 await checkScheduleConflict(jadwalKuliah, siakPeriodeAkademikId, t);
@@ -456,7 +467,8 @@ export const updateClass = async (id, payload) => {
         statusKelas,
         jumlahPertemuan,
         tanggalMulai,
-        tanggalSelesai
+        tanggalSelesai,
+        dosenPengajar
     } = payload;
 
     if (kapasitas !== undefined && kapasitas !== null) {
@@ -469,14 +481,26 @@ export const updateClass = async (id, payload) => {
         }
     }
 
-    return existClass.update({
-        nama,
-        kapasitas,
-        sistemKuliah,
-        statusKelas,
-        jumlahPertemuan,
-        tanggalMulai,
-        tanggalSelesai
+    return await sequelize.transaction(async (t) => {
+        if (Array.isArray(dosenPengajar) && dosenPengajar.length > 0) {
+            await DosenKelasKuliah.bulkCreate(
+                dosenPengajar.map((dosen) => ({
+                    siakKelasKuliahId: newClass.id,
+                    siakDosenId: dosen.siakDosenId
+                })),
+                { transaction: t }
+            )
+
+            await existClass.update({
+                nama,
+                kapasitas,
+                sistemKuliah,
+                statusKelas,
+                jumlahPertemuan,
+                tanggalMulai,
+                tanggalSelesai
+            }, { transaction: t})
+        }
     })
 }
 
