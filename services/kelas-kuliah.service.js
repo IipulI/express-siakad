@@ -161,6 +161,12 @@ export const findAll = async (page, size, filter) => {
                 as: 'periodeAkademik'
             },
             {
+                attributes: ['id', 'nama', 'nip'],
+                model: Dosen,
+                as: 'dosen',
+                through: { attributes: [] },
+            },
+            {
                 attributes: ['id', 'hari', 'jamMulai', 'jamSelesai', 'jenisPertemuan', 'metodePembelajaran'],
                 model: JadwalKuliah,
                 as: 'jadwalKuliah',
@@ -431,6 +437,12 @@ export const detailClass = async (id) => {
                 ]
             },
             {
+                attributes: ['id', 'nama', 'nip'],
+                model: Dosen,
+                as: 'dosen',
+                through: { attributes: [] },
+            },
+            {
                 attributes: [
                     'id', 'nama',
                 ],
@@ -455,52 +467,50 @@ export const detailClass = async (id) => {
 }
 
 export const updateClass = async (id, payload) => {
-    const existClass = await KelasKuliah.findByPk(id)
-    if (!existClass) {
-        throw new NotFoundError(`Kelas Kuliah tidak dapat ditemukan`)
-    }
-
     const {
-        nama,
-        kapasitas,
-        sistemKuliah,
-        statusKelas,
-        jumlahPertemuan,
-        tanggalMulai,
-        tanggalSelesai,
-        dosenPengajar
-    } = payload;
-
-    if (kapasitas !== undefined && kapasitas !== null) {
-        const jadwalList = await JadwalKuliah.findAll({
-            where: { siakKelasKuliahId: id },
-            attributes: ['siakRuanganId']
-        });
-        if (jadwalList.length > 0) {
-            await validateRuanganCapacity(jadwalList.map(j => ({ siakRuanganId: j.siakRuanganId })), kapasitas);
-        }
-    }
+        nama, kapasitas, sistemKuliah, statusKelas,
+        jumlahPertemuan, tanggalMulai, tanggalSelesai,
+        dosenPengajar,
+    } = payload
 
     return await sequelize.transaction(async (t) => {
-        if (Array.isArray(dosenPengajar) && dosenPengajar.length > 0) {
-            await DosenKelasKuliah.bulkCreate(
-                dosenPengajar.map((dosen) => ({
-                    siakKelasKuliahId: newClass.id,
-                    siakDosenId: dosen.siakDosenId
-                })),
-                { transaction: t }
-            )
-
-            await existClass.update({
-                nama,
-                kapasitas,
-                sistemKuliah,
-                statusKelas,
-                jumlahPertemuan,
-                tanggalMulai,
-                tanggalSelesai
-            }, { transaction: t})
+        const existClass = await KelasKuliah.findByPk(id, { transaction: t })
+        if (!existClass) {
+            throw new NotFoundError(`Kelas Kuliah tidak dapat ditemukan`)
         }
+
+        // update parsial: field yang undefined tidak ikut diubah
+        const fields = Object.fromEntries(
+            Object.entries({
+                nama, kapasitas, sistemKuliah, statusKelas,
+                jumlahPertemuan, tanggalMulai, tanggalSelesai,
+            }).filter(([, v]) => v !== undefined)
+        )
+        await existClass.update(fields, { transaction: t })
+
+        // undefined = dosen tidak disentuh, [] = hapus semua dosen
+        if (Array.isArray(dosenPengajar)) {
+            const dosenIds = [
+                ...new Set(dosenPengajar.map((d) => d.siakDosenId).filter(Boolean)),
+            ]
+
+            await DosenKelasKuliah.destroy({
+                where: { siakKelasKuliahId: existClass.id },
+                transaction: t,
+            })
+
+            if (dosenIds.length > 0) {
+                await DosenKelasKuliah.bulkCreate(
+                    dosenIds.map((siakDosenId) => ({
+                        siakKelasKuliahId: existClass.id,
+                        siakDosenId,
+                    })),
+                    { transaction: t }
+                )
+            }
+        }
+
+        return existClass
     })
 }
 
