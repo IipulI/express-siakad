@@ -28,6 +28,11 @@ router.get('/program-studi', programStudiController.findAll)
 
 router.use('/public', publicRouter)
 
+import * as CpmkController from '../controllers/akademik/cpmk.controller.js';
+import * as MataKuliahController from '../controllers/akademik/mata-kuliah.controller.js';
+import { requireKoordinatorMK, requireDosenLogin } from '../middleware/require-koordinator-mk.middleware.js';
+import { validateSaveCpmk } from '../validators/cpmk.validator.js';
+
 // [Nilai Perkuliahan dkk] -- /akademik/dosen, /akademik/kaprodi, /akademik/koordinator-mk
 // harus di-mount DULUAN, TANPA requireAdmin: masing-masing sub-router-nya
 // (dosen-pengampu_router.js, kaprodi_router.js, koordinator-mk_router.js) sudah
@@ -38,6 +43,26 @@ router.use('/public', publicRouter)
 router.use('/akademik/dosen', verifySsoToken, checkBlacklist, attachUser, dosenPengampuRouter);
 router.use('/akademik/kaprodi', verifySsoToken, checkBlacklist, attachUser, kaprodiRouter);
 router.use('/akademik/koordinator-mk', verifySsoToken, checkBlacklist, attachUser, koordinatorMkRouter);
+
+import { validateUpdateMkObe } from '../validators/mata-kuliah.validator.js';
+import { upload } from '../utils/upload-file.js';
+
+const MATA_KULIAH_FILE_FIELDS = [
+    { name: 'sapFile', maxCount: 1 },
+    { name: 'silabusFile', maxCount: 1 },
+    { name: 'bahanAjarFile', maxCount: 1 },
+    { name: 'diktatFile', maxCount: 1 },
+];
+
+// Bypass requireAdmin blanket untuk endpoint OBE mata kuliah (Data MK, Pemetaan CPMK & CPL)
+// agar dosen pengampu/koordinator MK bisa akses langsung dari FE yang memanggil /akademik/obe/...
+router.get('/akademik/obe/mata-kuliah/:id', verifySsoToken, checkBlacklist, attachUser, requireDosenLogin, MataKuliahController.getDetailMataKuliahObe);
+router.put('/akademik/obe/mata-kuliah/:id', verifySsoToken, checkBlacklist, attachUser, requireKoordinatorMK(), upload.fields(MATA_KULIAH_FILE_FIELDS), validateUpdateMkObe, MataKuliahController.updateMataKuliahObe);
+router.get('/akademik/obe/mata-kuliah/:id/pemetaan-cpmk', verifySsoToken, checkBlacklist, attachUser, requireDosenLogin, CpmkController.getFormPemetaanCpmk);
+router.post('/akademik/obe/mata-kuliah/:id/pemetaan-cpmk', verifySsoToken, checkBlacklist, attachUser, requireKoordinatorMK(), validateSaveCpmk, CpmkController.savePemetaanCpmk);
+router.get('/akademik/obe/mata-kuliah/:id/pemetaan-cpl', verifySsoToken, checkBlacklist, attachUser, requireDosenLogin, MataKuliahController.getCplMapping);
+router.post('/akademik/obe/mata-kuliah/:id/pemetaan-cpl', verifySsoToken, checkBlacklist, attachUser, requireKoordinatorMK(), MataKuliahController.saveCplMapping);
+
 router.use('/akademik', verifySsoToken, checkBlacklist, attachUser, requireAdmin, akademikRoutes);
 router.use('/mahasiswa', verifySsoToken, checkBlacklist, attachUser, requireMahasiswa, mahasiswaRoutes)
 router.use('/dosen', verifySsoToken, checkBlacklist, attachUser, requireDosen, dosenRoutes)

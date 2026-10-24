@@ -1,6 +1,6 @@
 import models from '../models/index.js';
 
-const { MataKuliah, JadwalKuliah, KelasKuliah, ProgramStudi } = models;
+const { MataKuliah, JadwalKuliah, KelasKuliah, ProgramStudi, Dosen } = models;
 
 // FIX 2026-08-19: role admin sebelumnya CUMA dicek dari tabel siak_user_role
 // (req.user.userRole, di-populate attachUser.middleware.js) -- ini beres buat
@@ -22,19 +22,40 @@ export const isAdminAkademik = (req) =>
 
 export const resolveDariParamsMk = async (req) => req.params.id || req.params.mataKuliahId || null;
 
-// requireKoordinatorMK: cuma boleh lewat kalau requester itu koordinator_mk_id
-// dari mata kuliah yang dituju, atau admin akademik (AKADEMIK_UNIV). Dipakai di
-// semua endpoint yang bisa UBAH data OBE per-MK (pemetaan CPL/CPMK, RPS, Rencana
-// Pembelajaran/Evaluasi), baik yang lewat /akademik/koordinator-mk/... maupun
-// endpoint lama di /akademik/obe/... yang sebelumnya kebuka buat siapa aja yang
-// login (lihat obe.router.js).
+// canDosenManageMk: mengecek apakah dosen berhak MENGELOLA (CRUD) data OBE mata kuliah
+// (CPL, CPMK, RPS, Rencana Pembelajaran, Rencana Evaluasi).
+// Berhak jika:
+// 1. Koordinator MK resmi (mk.koordinatorMkId === dosenId)
+// 2. Tim Pengembang RPS (ada di relasi pengembangRps)
+// Catatan: Dosen Pengampu biasa HANYA bisa READ (via /akademik/dosen/...), tidak bisa CRUD.
+export const canDosenManageMk = async (dosenId, mataKuliahId) => {
+    if (!dosenId || !mataKuliahId) return false;
+
+    const mk = await MataKuliah.findByPk(mataKuliahId, {
+        attributes: ['id', 'koordinatorMkId'],
+        include: [{ model: Dosen, as: 'pengembangRps', attributes: ['id'], through: { attributes: [] } }]
+    });
+    if (!mk) return false;
+
+    // 1. Koordinator MK
+    if (mk.koordinatorMkId === dosenId) return true;
+
+    // 2. Tim Pengembang RPS
+    if (mk.pengembangRps && mk.pengembangRps.some((d) => d.id === dosenId)) return true;
+
+    return false;
+};
+
+// requireKoordinatorMK: boleh lewat kalau requester adalah koordinator MK, tim pengembang RPS,
+// atau admin akademik (AKADEMIK_UNIV).
+// Dosen pengampu biasa hanya READ via /akademik/dosen/...
 export const requireKoordinatorMK = (resolveMataKuliahId = resolveDariParamsMk) => async (req, res, next) => {
     try {
         if (isAdminAkademik(req)) return next();
 
         const dosenId = req.user?.dosen?.id;
         if (!dosenId) {
-            return res.status(403).json({ status: 403, message: 'Hanya dosen (koordinator mata kuliah) atau admin akademik yang bisa mengakses menu ini.' });
+            return res.status(403).json({ status: 403, message: 'Hanya dosen (koordinator / pengampu mata kuliah) atau admin akademik yang bisa mengakses menu ini.' });
         }
 
         const mataKuliahId = await resolveMataKuliahId(req);
@@ -42,9 +63,9 @@ export const requireKoordinatorMK = (resolveMataKuliahId = resolveDariParamsMk) 
             return res.status(404).json({ status: 404, message: 'Mata kuliah/data terkait tidak ditemukan.' });
         }
 
-        const mk = await MataKuliah.findByPk(mataKuliahId, { attributes: ['id', 'koordinatorMkId'] });
-        if (!mk || mk.koordinatorMkId !== dosenId) {
-            return res.status(403).json({ status: 403, message: 'Anda bukan koordinator mata kuliah ini, tidak dapat mengakses/mengubah datanya.' });
+        const allowed = await canDosenManageMk(dosenId, mataKuliahId);
+        if (!allowed) {
+            return res.status(403).json({ status: 403, message: 'Anda bukan Koordinator MK maupun Tim Pengembang RPS mata kuliah ini, tidak dapat mengubah datanya.' });
         }
 
         next();

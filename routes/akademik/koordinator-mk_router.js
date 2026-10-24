@@ -10,7 +10,16 @@ import * as ExportNilaiKelasController from '../../controllers/akademik/export-n
 import * as ExportController from '../../controllers/akademik/export.controller.js';
 import { normalizeFilePath, upload, uploadExcel } from '../../utils/upload-file.js';
 import { validateSaveDetailRps, validateGetPratinjauSalinDetailRps, validateSalinDetailRps } from '../../validators/rps.validator.js';
+import { validateSaveCpmk } from '../../validators/cpmk.validator.js';
+import { validateUpdateMkObe } from '../../validators/mata-kuliah.validator.js';
 import { requireKoordinatorMK, requireDosenLogin } from '../../middleware/require-koordinator-mk.middleware.js';
+
+const MATA_KULIAH_FILE_FIELDS = [
+    { name: 'sapFile', maxCount: 1 },
+    { name: 'silabusFile', maxCount: 1 },
+    { name: 'bahanAjarFile', maxCount: 1 },
+    { name: 'diktatFile', maxCount: 1 },
+];
 
 const { Rps, RencanaPembelajaran, RencanaEvaluasi } = models;
 
@@ -53,18 +62,19 @@ const router = express.Router();
 // [1] Data Mata Kuliah -- list gak spesifik ke 1 MK, sebatas wajib dosen asli;
 //     detail 1 MK harus koordinator MK itu sendiri.
 router.get('/mata-kuliah', requireDosenLogin, MataKuliahController.getDaftarMataKuliahObe);
-router.get('/mata-kuliah/:id', requireKoordinatorMK(), MataKuliahController.getDetailMataKuliahObe);
+router.get('/mata-kuliah/:id', requireDosenLogin, MataKuliahController.getDetailMataKuliahObe);
+router.put('/mata-kuliah/:id', requireKoordinatorMK(), upload.fields(MATA_KULIAH_FILE_FIELDS), validateUpdateMkObe, MataKuliahController.updateMataKuliahObe);
 
 // [2] Pemetaan CPL
-router.get('/mata-kuliah/:id/pemetaan-cpl', requireKoordinatorMK(), MataKuliahController.getCplMapping);
+router.get('/mata-kuliah/:id/pemetaan-cpl', requireDosenLogin, MataKuliahController.getCplMapping);
 router.post('/mata-kuliah/:id/pemetaan-cpl', requireKoordinatorMK(), MataKuliahController.saveCplMapping);
 
 // [3] Pemetaan CPMK
-router.get('/mata-kuliah/:id/pemetaan-cpmk', requireKoordinatorMK(), CpmkController.getFormPemetaanCpmk);
-router.post('/mata-kuliah/:id/pemetaan-cpmk', requireKoordinatorMK(), CpmkController.savePemetaanCpmk);
+router.get('/mata-kuliah/:id/pemetaan-cpmk', requireDosenLogin, CpmkController.getFormPemetaanCpmk);
+router.post('/mata-kuliah/:id/pemetaan-cpmk', requireKoordinatorMK(), validateSaveCpmk, CpmkController.savePemetaanCpmk);
 
 // [4] Detail RPS
-router.get('/mata-kuliah/:mataKuliahId/detail-rps', requireKoordinatorMK(), RpsController.getFormDetailRps);
+router.get('/mata-kuliah/:mataKuliahId/detail-rps', requireDosenLogin, RpsController.getFormDetailRps);
 router.get('/mata-kuliah/:mataKuliahId/detail-rps/pratinjau-salin', requireKoordinatorMK(), validateGetPratinjauSalinDetailRps, RpsController.pratinjauSalinDetailRps);
 router.post('/mata-kuliah/:mataKuliahId/detail-rps/salin', requireKoordinatorMK(), validateSalinDetailRps, RpsController.salinDetailRps);
 router.post('/mata-kuliah/:mataKuliahId/detail-rps', requireKoordinatorMK(),
@@ -72,18 +82,18 @@ router.post('/mata-kuliah/:mataKuliahId/detail-rps', requireKoordinatorMK(),
 router.delete('/detail-rps/:id', requireKoordinatorMK(resolveDariDetailRpsId), RpsController.deleteDetailRps);
 
 // [5] Rencana Pembelajaran
-router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', requireKoordinatorMK(), RpsController.getRencanaPembelajaran);
+router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', requireDosenLogin, RpsController.getRencanaPembelajaran);
 router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/template', requireKoordinatorMK(), RpsController.downloadTemplateRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/import', requireKoordinatorMK(), uploadExcel.single('file'), RpsController.importRencanaPembelajaran);
 router.get('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/pratinjau-salin', requireKoordinatorMK(), RpsController.pratinjauSalinRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran/salin', requireKoordinatorMK(), RpsController.salinRencanaPembelajaran);
 router.post('/mata-kuliah/:mataKuliahId/rencana-pembelajaran', requireKoordinatorMK(), RpsController.createRencanaPembelajaran);
-router.get('/rencana-pembelajaran/:id', requireKoordinatorMK(resolveDariRencanaPembelajaranId), RpsController.getDetailRencanaPembelajaran);
+router.get('/rencana-pembelajaran/:id', requireDosenLogin, RpsController.getDetailRencanaPembelajaran);
 router.put('/rencana-pembelajaran/:id', requireKoordinatorMK(resolveDariRencanaPembelajaranId), RpsController.updateRencanaPembelajaran);
 router.delete('/rencana-pembelajaran/:id', requireKoordinatorMK(resolveDariRencanaPembelajaranId), RpsController.deleteRencanaPembelajaran);
 
 // [6] Rencana Evaluasi
-router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', requireKoordinatorMK(), RpsController.getRencanaEvaluasi);
+router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi', requireDosenLogin, RpsController.getRencanaEvaluasi);
 router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi', requireKoordinatorMK(), RpsController.saveRencanaEvaluasiList);
 router.get('/mata-kuliah/:mataKuliahId/rencana-evaluasi/pratinjau-salin', requireKoordinatorMK(), RpsController.pratinjauSalinRencanaEvaluasi);
 router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi/salin', requireKoordinatorMK(), RpsController.salinRencanaEvaluasi);
@@ -91,8 +101,8 @@ router.post('/mata-kuliah/:mataKuliahId/rencana-evaluasi/reset', requireKoordina
 router.delete('/rencana-evaluasi/:id', requireKoordinatorMK(resolveDariRencanaEvaluasiId), RpsController.deleteRencanaEvaluasi);
 
 // Laporan Cetak RPS Lengkap (Kop + CP + Deskripsi + Rencana Pembelajaran + Rencana Evaluasi)
-router.get('/mata-kuliah/:mataKuliahId/rps/cetak', requireKoordinatorMK(), RpsController.getLaporanRpsCetak);
-router.get('/mata-kuliah/:mataKuliahId/rps/cetak/pdf', requireKoordinatorMK(), ExportController.exportPdfLaporanRps);
+router.get('/mata-kuliah/:mataKuliahId/rps/cetak', requireDosenLogin, RpsController.getLaporanRpsCetak);
+router.get('/mata-kuliah/:mataKuliahId/rps/cetak/pdf', requireDosenLogin, ExportController.exportPdfLaporanRps);
 
 // ============================================================
 // SIDEBAR KELAS KULIAH (yang OBE)

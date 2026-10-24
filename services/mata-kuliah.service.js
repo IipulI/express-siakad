@@ -6,6 +6,7 @@ import path from "path";
 
 import * as CustomError from "../utils/custom-error.js";
 import { NotFoundError } from "../utils/custom-error.js";
+import { canDosenManageMk } from "../middleware/require-koordinator-mk.middleware.js";
 
 const {
     sequelize,
@@ -209,10 +210,10 @@ export const getDetailMataKuliahObe = async (id, currentDosenId = null) => {
             id: dosen.id,
             label: `${dosen.nidn} - ${dosen.nama}`
         })) : [],
-        // FIX 2026-08-19: dipakai FE buat nentuin nampilin tombol edit atau
-        // enggak -- dosen pengampu biasa cuma bisa lihat, cuma koordinator MK
-        // ini yang boleh edit CPL/CPMK/RPS/Rencana Pembelajaran/Rencana Evaluasi.
-        isKoordinator: !!(currentDosenId && mk.koordinatorMkId === currentDosenId)
+        // FIX: dipakai FE buat nentuin nampilin tombol edit atau enggak --
+        // koordinator MK, tim pengembang RPS, maupun dosen pengampu yang mengajar
+        // mata kuliah ini dapat mengedit CPL/CPMK/RPS/Rencana Pembelajaran/Rencana Evaluasi.
+        isKoordinator: !!(currentDosenId && (await canDosenManageMk(currentDosenId, mk.id)))
     };
 };
 // =========================================================

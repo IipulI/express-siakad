@@ -36,7 +36,7 @@ export const requireMahasiswa = (req, res, next) => {
 // Patokan utama: req.user.dosen.isPegawai.
 // Safety net: role.nama === 'admin' (lowercase) di tabel siak_role.
 export const requireAdmin = (req, res, next) => {
-    const isAdmin = Boolean(req.user?.dosen?.isPegawai) || hasRole(req, 'admin') || hasRole('akademik_univ');
+    const isAdmin = Boolean(req.user?.dosen?.isPegawai) || hasRole(req, 'admin') || hasRole(req, 'akademik_univ');
 
     if (!isAdmin) return deny(res);
     next();
